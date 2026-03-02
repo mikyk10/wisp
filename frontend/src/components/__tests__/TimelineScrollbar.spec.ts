@@ -62,7 +62,7 @@ describe('TimelineScrollbar', () => {
     const wrapper = mountScrollbar(pinia)
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).toContain('2024/3')
+    expect(wrapper.text()).toContain('2024/03')
     expect(wrapper.text()).toContain('7 photos')
     wrapper.unmount()
   })
@@ -99,7 +99,7 @@ describe('TimelineScrollbar', () => {
 
     const active = wrapper.find('.timeline-entry--active')
     expect(active.exists()).toBe(true)
-    expect(active.text()).toContain('2024/6')
+    expect(active.text()).toContain('2024/06')
     wrapper.unmount()
   })
 })

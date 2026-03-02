@@ -118,7 +118,7 @@ describe('usePhotosStore', () => {
     it('formats the label correctly', () => {
       const store = usePhotosStore()
       store.timeline['2024-03'] = { year: 2024, month: 3, startIndex: 0, count: 1 }
-      expect(store.timelineEntries[0].label).toBe('2024/3')
+      expect(store.timelineEntries[0].label).toBe('2024/03')
     })
   })
 })

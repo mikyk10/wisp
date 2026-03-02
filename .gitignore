@@ -1,0 +1,21 @@
+# Local environment (copy from .env.example; never commit real paths)
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.sln
+*.suo
+
+# Claude Code
+CLAUDE.md
+AGENT.md
+.claude/
+
+# Claude Code (local settings, not for sharing)
+.claude/settings.local.json

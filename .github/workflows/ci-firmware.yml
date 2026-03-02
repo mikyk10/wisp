@@ -1,0 +1,35 @@
+name: CI - firmware
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/ci-firmware.yml'
+  pull_request:
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/ci-firmware.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-${{ hashFiles('firmware/platformio.ini') }}
+      - name: Install PlatformIO
+        run: pip install platformio
+      - name: Build (epd7in3e)
+        run: cd firmware && pio run -e seeed_xiao_esp32s3_epd7in3e
+      - name: Build (epd4ine6)
+        run: cd firmware && pio run -e seeed_xiao_esp32c3_epd4ine6

@@ -118,7 +118,7 @@ Removing the red power LED from the Waveshare driver board reduces standby curre
 
 The `web/` subdirectory contains an earlier single-file Go image server (module `pf`, Go 1.15). It scans `./imgs/`, applies gamma correction, aspect-ratio crop, and Floyd-Steinberg dithering to 7 e-paper colors, then encodes images to the same vendor binary format.
 
-This server has been superseded by [`esp32_wsepaper_photoframe-ws`](../esp32_wsepaper_photoframe-ws). Use that instead for new deployments.
+This server has been superseded by [`api/`](../api/README.md). Use that instead for new deployments.
 
 To run the legacy server (requires Go 1.15+):
 
@@ -134,9 +134,10 @@ go run main.go
 
 ## Contributing
 
-1. Fork the repository and create a branch from `main`.
-2. Build both environments before submitting a pull request: `pio run -e seeed_xiao_esp32s3_epd7in3e && pio run -e seeed_xiao_esp32c3_epd4ine6`.
-3. Keep pull requests focused — one concern per PR.
+1. Fork the [WiSP monorepo](https://github.com/mikyk10/wisp) and create a branch from `main`.
+2. Build both environments (from `firmware/`) before submitting a pull request: `pio run -e seeed_xiao_esp32s3_epd7in3e && pio run -e seeed_xiao_esp32c3_epd4ine6`.
+3. CI automatically builds both environments on every pull request.
+4. Keep pull requests focused — one concern per PR.
 
 ## License
 

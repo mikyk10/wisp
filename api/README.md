@@ -24,6 +24,8 @@ HTTP backend that serves processed images to ESP32-based e-paper photo frames.
 
 ## Getting Started
 
+> **Monorepo users:** to run the full stack (API + frontend together), start from the [repo root](../README.md) instead. The commands below work from within `api/` for API-only development.
+
 ### 1. First-time setup
 
 ```bash
@@ -197,10 +199,10 @@ Each image served to an ESP32 passes through these steps in order:
 
 ## Contributing
 
-1. Fork the repository and create a feature branch from `main`.
-2. Run `make lint-local` and `go test -race ./...` before submitting a pull request.
+1. Fork the [WiSP monorepo](https://github.com/mikyk10/wisp) and create a feature branch from `main`.
+2. Run `make lint-local` and `go test -race ./...` (from `api/`) before submitting a pull request.
 3. Keep pull requests focused — one concern per PR.
 
 ## License
 
-This project is licensed under the [GNU General Public License v3.0](LICENSE).
+This project is licensed under the [GNU General Public License v3.0](../LICENSE).

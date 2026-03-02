@@ -19,6 +19,8 @@ A modern web browser. WiSP Server is required for API mode; mock mode works stan
 
 ## Getting Started
 
+> **Monorepo users:** to run the full stack (API + frontend together), start from the [repo root](../README.md) instead. The commands below work from within `frontend/` for frontend-only development.
+
 Node 22 is required.
 
 ```bash
@@ -81,8 +83,10 @@ Click any photo to select it. A toolbar appears at the bottom showing the select
 
 ### Docker
 
+For the full stack, use `docker compose up` from the repo root. To build and run the frontend image standalone:
+
 ```bash
-# Build
+# Build (run from frontend/)
 docker build -t wisp-frontend .
 
 # Run in mock mode
@@ -113,10 +117,10 @@ npm run test:e2e
 
 ## Contributing
 
-1. Fork the repository and create a branch from `main`.
-2. Run `npm run lint` and `npm run test:unit -- --run` before submitting a pull request.
+1. Fork the [WiSP monorepo](https://github.com/mikyk10/wisp) and create a branch from `main`.
+2. Run `npm run lint` and `npm run test:unit -- --run` (from `frontend/`) before submitting a pull request.
 3. Keep pull requests focused — one concern per PR.
 
 ## License
 
-See repository root.
+This project is licensed under the [GNU General Public License v3.0](../LICENSE).

@@ -6,9 +6,9 @@ DIY battery-powered digital photo frame using Waveshare e-Paper displays and ESP
 
 | Directory | Role |
 |---|---|
-| `api/` | Go backend — indexes photos, serves e-Paper binary to ESP32 and JSON API to the frontend |
-| `frontend/` | Vue 3 SPA — browse and manage photo catalogs |
-| `firmware/` | ESP32 firmware (PlatformIO / Arduino C++) |
+| [`api/`](api/README.md) | Go backend — indexes photos, serves e-Paper binary to ESP32 and JSON API to the frontend |
+| [`frontend/`](frontend/README.md) | Vue 3 SPA — browse and manage photo catalogs |
+| [`firmware/`](firmware/README.md) | ESP32 firmware (PlatformIO / Arduino C++) |
 
 ## Quick start
 

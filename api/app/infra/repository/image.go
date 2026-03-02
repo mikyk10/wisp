@@ -62,7 +62,11 @@ func (p *imageRepositoryImpl) CountByCatalog(catalogKey string, ori model.Canoni
 
 func (p *imageRepositoryImpl) FindByHash(catalogKey, srcHash string) (*model.Image, error) {
 	existing := &model.Image{}
-	err := p.conn.Select("file_modified_at").
+	// Unscoped: include soft-deleted rows (deleted_at IS NOT NULL).
+	// Without this, GORM silently adds WHERE deleted_at IS NULL, causing user-hidden images
+	// to appear as "not found" — forcing a full re-decode and re-thumbnail on every scan,
+	// and worse, the subsequent upsert would reset deleted_at to NULL (un-hiding them).
+	err := p.conn.Unscoped().Select("file_modified_at").
 		Where("catalog_key = ? AND src_hash = ?", catalogKey, srcHash).
 		Take(existing).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -76,9 +80,12 @@ func (p *imageRepositoryImpl) FindByHash(catalogKey, srcHash string) (*model.Ima
 
 func (p *imageRepositoryImpl) UpsertActiveImage(rec *model.Image) error {
 	return p.conn.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "catalog_key"}, {Name: "src_hash"}},
-		// Reset excluded to false: handles the case where a previously excluded file becomes included again.
-		DoUpdates: clause.AssignmentColumns([]string{"image_orientation", "rnd", "taken_at", "thumb_jpg", "file_modified_at", "deleted_at", "excluded"}),
+		Columns: []clause.Column{{Name: "catalog_key"}, {Name: "src_hash"}},
+		// deleted_at is intentionally excluded: it is owned by the user (visibility toggle)
+		// and must not be overwritten by a scan. Resetting it here would un-hide images the
+		// user explicitly hid via the UI.
+		// excluded is updated to handle files that move between included/excluded criteria.
+		DoUpdates: clause.AssignmentColumns([]string{"image_orientation", "rnd", "taken_at", "thumb_jpg", "file_modified_at", "excluded"}),
 	}).Save(rec).Error
 }
 

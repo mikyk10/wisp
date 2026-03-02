@@ -1,0 +1,318 @@
+{
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "$id": "https://github.com/dmm-com/octd/blob/main/pkg/core/config/schema.json",
+  "description": "WiSP Service Configuration",
+  "additionalProperties": false,
+  "type": "object",
+  "properties": {
+    "catalog": {
+      "type": "array",
+      "title": "catalog",
+      "description": "Set of Image providers",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "title": "catalog_entry",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "http",
+              "playwright",
+              "lua",
+              "colorbar"
+            ],
+            "default": "file"
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "src_path": {
+                "type": "string"
+              },
+              "criteria": {
+                "type": "object",
+                "properties": {
+                  "include": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "time_range": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "to": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "last": {
+                              "type": "string",
+                              "pattern": "^[0-9]+"
+                            }
+                          },
+                          "required": [
+                            "from",
+                            "last",
+                            "to"
+                          ]
+                        }
+                      }
+                    },
+                    "description": "file_criteria",
+                    "required": [
+                      "path",
+                      "time_range"
+                    ]
+                  },
+                  "exclude": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "time_range": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "to": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "last": {
+                              "type": "string",
+                              "pattern": "^[0-9]+"
+                            }
+                          },
+                          "required": [
+                            "from",
+                            "last",
+                            "to"
+                          ]
+                        }
+                      }
+                    },
+                    "description": "file_criteria",
+                    "required": [
+                      "path",
+                      "time_range"
+                    ]
+                  }
+                },
+                "required": []
+              }
+            },
+            "required": [
+              "src_path",
+              "criteria"
+            ],
+            "title": "file_config"
+          },
+          "http": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "title": "http_config"
+          },
+          "playwright": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "server": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "url",
+              "server"
+            ],
+            "title": "playwright_config"
+          },
+          "lua": {
+            "type": "object",
+            "properties": {
+              "script": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "script"
+            ],
+            "title": "lua_config"
+          }
+        },
+        "required": [
+          "key",
+          "type"
+        ],
+        "description": "Catalog Entry (Image Provider)"
+      }
+    },
+    "displays": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human Readable Identifier"
+          },
+          "mac_address": {
+            "type": "string",
+            "description": "Machine Readable Identifier",
+            "title": "key"
+          },
+          "api_version": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string",
+            "title": "display_model",
+            "description": "E-Paper Module Key",
+            "enum": [
+              "ws7in3f",
+              "ws7in3e",
+              "ws13in3e"
+            ]
+          },
+          "orientation": {
+            "type": "string",
+            "title": "display_orientation",
+            "description": "landscape or portrait",
+            "enum": [
+              "landscape",
+              "portrait"
+            ]
+          },
+          "show_timestamp": {
+            "type": "boolean",
+            "default": false
+          },
+          "flip": {
+            "type": "boolean",
+            "default": false
+          },
+          "color_reduction": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "bayer",
+                  "floysteinberg",
+                  "sierra3"
+                ]
+              },
+              "size": {
+                "type": "integer"
+              },
+              "strength": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "type",
+              "size",
+              "strength"
+            ]
+          },
+          "catalog": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "time_range": {
+                  "type": "object",
+                  "properties": {
+                    "cron": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "cron"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "time_range"
+              ]
+            },
+            "description": "Associated Catalog Entry",
+            "title": "associated_catalog_entry"
+          },
+          "filters": {
+            "type": "array",
+            "title": "image_processors",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "properties": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {}
+                }
+              },
+              "required": [
+                "type",
+                "value"
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "mac_address",
+          "model",
+          "orientation",
+          "catalog",
+          "api_version"
+        ]
+      },
+      "description": "Displays to configure"
+    }
+  },
+  "required": [
+    "catalog",
+    "displays"
+  ]
+}

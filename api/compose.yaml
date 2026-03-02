@@ -1,0 +1,26 @@
+services:
+  api:
+    build:
+      context: .
+      target: development
+      args:
+        LOCAL_DEV: true
+    ports:
+      - 9002:9002
+    environment:
+      - TZ=Asia/Tokyo
+      # Restrict CORS origins (comma-separated). Defaults to "*" if unset.
+      # - ALLOWED_ORIGINS=http://192.168.1.10:3000
+    volumes:
+      - ./:/app
+      - data:/data
+      - ${PHOTO_DIR}:/mnt/wspf:ro
+    healthcheck:
+      test: curl -f http://localhost:9002/health
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 3s
+
+volumes:
+  data:

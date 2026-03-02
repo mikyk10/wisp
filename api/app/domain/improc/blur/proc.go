@@ -1,0 +1,26 @@
+package blur
+
+import (
+	"context"
+	"image"
+	"strconv"
+	"wspf/app/domain/improc"
+	"wspf/app/domain/model"
+
+	"github.com/anthonynsimon/bild/blur"
+)
+
+type processor struct {
+	value float64
+}
+
+func NewImageBlur(data map[string]string) improc.ImageProcessor {
+	value, _ := strconv.ParseFloat(data["value"], 64)
+	return &processor{
+		value: value,
+	}
+}
+
+func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgMeta) (image.Image, *model.ImgMeta) {
+	return blur.Gaussian(src, float64(p.value)), meta
+}

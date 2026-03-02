@@ -1,0 +1,12 @@
+log_level: DEBUG
+port: 9002
+database:
+  # SQLite (default for local development)
+  driver: sqlite
+  dsn: /data/wspf.db
+
+  # MySQL / MariaDB
+  # driver: mysql
+  # dsn: "user:pass@tcp(localhost:3306)/wspf?charset=utf8mb4&parseTime=True&loc=Local"
+
+  log: true

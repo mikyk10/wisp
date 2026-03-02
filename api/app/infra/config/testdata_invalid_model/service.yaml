@@ -1,0 +1,12 @@
+catalog:
+  - key: album-01
+    type: file
+    file:
+      src_path: /tmp
+
+displays:
+  - key: display-01
+    model: ws99in9x
+    orientation: landscape
+    catalog:
+      - key: album-01

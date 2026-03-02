@@ -1,0 +1,14 @@
+catalog:
+  - key: album-01
+    type: file
+    file:
+      src_path: /tmp
+
+displays:
+  - key: display-01
+    model: ws7in3e
+    orientation: landscape
+    catalog:
+      - key: album-01
+        time_range:
+          cron: "not-a-cron-expression"

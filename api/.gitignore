@@ -1,0 +1,11 @@
+wspf
+app/tmp/*
+.envrc
+tmp/*
+app/tmp/*
+*.swp
+*.db
+data/
+*.png
+config/*.yaml
+.env

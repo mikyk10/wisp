@@ -1,0 +1,153 @@
+# service.yaml — Catalog and display configuration
+#
+# CATALOG
+#   A catalog is a named image source. Images are indexed into the database by
+#   `catalog scan` and randomly served to displays. You can define multiple
+#   catalogs and assign them to displays in any combination.
+#
+#   Catalog types:
+#     file          — Scan a local directory for JPEG/PNG images.
+#     http          — Fetch a single image from an HTTP URL on each request.
+#     playwright-go — Capture a screenshot of a web page (requires a
+#                     playwright-go server sidecar; useful for dashboards).
+#     lua           — Generate an image via a Lua script.
+#     colorbar      — Render a test color bar (useful for display calibration).
+#
+# DISPLAY
+#   A display represents one physical e-Paper device. Each display is identified
+#   by its mac_address, which maps to the API endpoint:
+#     GET /pf/{mac_address}/image/random.*
+#   The ESP32 firmware calls this endpoint to receive a device-specific binary.
+#
+#   A display references one or more catalogs. When multiple catalogs are listed,
+#   images are drawn from all of them (weighted by image count). You can optionally
+#   restrict a catalog to certain hours using a cron expression — useful for
+#   showing different photo sets by time of day or season.
+#
+# IMAGE PIPELINE (applied in this order)
+#   1. Pre-processing : EXIF rotation → crop to display aspect ratio
+#   2. Filters        : blur / brightness / contrast / gamma / hue / saturation
+#                       (applied in the order listed under `filters`)
+#   3. Post-processing: color reduction → timestamp (optional) → flip (optional)
+
+# ---------------------------------------------------------------------------
+
+catalog:
+  - key: photos              # Unique identifier; referenced by displays below.
+    type: file
+    file:
+      src_path: /mnt/wspf    # Mounted from PHOTO_DIR via compose.yaml.
+
+  # Example: capture a web page as an image
+  # - key: dashboard
+  #   type: playwright-go
+  #   playwright:
+  #     url: http://grafana.local/d/abc123
+  #     server: http://playwright:3000
+
+  # Example: fetch a remote image on each request
+  # - key: apod
+  #   type: http
+  #   http:
+  #     url: https://example.com/daily-image.jpg
+
+  # Example: render a test color bar (no parameters; useful for display calibration)
+  # - key: colorbar
+  #   type: colorbar
+
+displays:
+  - name: my-display
+    # mac_address is the :displayKey path parameter in the API.
+    # Set this to your ESP32's MAC address (e.g. a1b2c3d4e5f6).
+    # Use "dev" for local testing without a real device.
+    mac_address: dev
+    api_version: 2025-03-01
+
+    # Available models:
+    #   ws4in0e  — 4.0"  6-color (E Ink Spectra 6)
+    #   ws7in3e  — 7.3"  7-color E6 full color  ← recommended
+    #   ws7in3f  — 7.3"  7-color (longer refresh, narrow temp range)
+    #   ws13in3e — 13.3" E6 full color
+    #   ws13in3k — 13.3" 4 grayscale
+    model: ws7in3e
+
+    # How the display is physically installed.
+    # This determines the crop aspect ratio: landscape = wider than tall,
+    # portrait = taller than wide. Must match the actual device orientation.
+    orientation: landscape  # landscape | portrait
+
+    # Burn the EXIF shooting date (YYYY/MM/DD) into the bottom-right corner.
+    # Skipped automatically when the image has no EXIF datetime metadata.
+    show_timestamp: false
+
+    # Rotate the final image 180°. Enable when the display is mounted upside down.
+    flip: false
+
+    # Color reduction maps full-color input to the display's limited palette.
+    #
+    #   bayer          — Ordered dithering. Produces a regular dot pattern;
+    #                    clean and predictable on e-Paper. Tunable via size
+    #                    and strength.
+    #                    size: matrix dimension (2/4/8/16); larger = coarser.
+    #                    strength: 0.0–1.0; lower = subtler dithering.
+    #
+    #   floysteinberg  — Floyd–Steinberg error diffusion. Spreads quantization
+    #                    error to neighbors; more organic but can show
+    #                    "worm" artifacts on flat areas.
+    #
+    #   sierra3        — Sierra-3 error diffusion. Softer variant of
+    #                    Floyd–Steinberg; smoother gradients.
+    #
+    color_reduction:
+      type: bayer
+      size: 4
+      strength: 0.8
+
+    # Catalogs assigned to this display.
+    # Images are picked randomly, weighted by the number of images in each catalog.
+    # Add a cron field to restrict a catalog to specific times (standard 5-field cron):
+    #   - key: holiday-photos
+    #     cron: "0 0 * 12 *"   # only in December
+    catalog:
+      - key: photos
+
+    # Optional image filters applied after cropping and before color reduction.
+    # List them in the order you want them applied.
+    #
+    #   gamma       — Gamma correction. value > 0; 1.0 = no change.
+    #                 Increase (e.g. 1.4–1.8) to lift shadows — recommended for
+    #                 e-Paper, which tends to render darker than a normal screen.
+    #
+    #   brightness  — Linear brightness shift. value: -1.0 (black) to 1.0 (white);
+    #                 0.0 = no change.
+    #
+    #   contrast    — Contrast adjustment. value: -1.0 to 1.0; 0.0 = no change.
+    #
+    #   saturation  — Color saturation. value: -1.0 (grayscale) to 1.0 (double);
+    #                 0.0 = no change. Boosting (e.g. 0.2–0.5) can compensate for
+    #                 e-Paper's muted color gamut.
+    #
+    #   hue         — Hue rotation in degrees. value: integer -180 to 180;
+    #                 0 = no change.
+    #
+    #   blur        — Gaussian blur. value = sigma radius in pixels; 0 = no blur.
+    #
+    # filters:
+    #   - type: gamma
+    #     properties:
+    #       value: 1.5
+    #   - type: saturation
+    #     properties:
+    #       value: 0.3
+    #   - type: brightness
+    #     properties:
+    #       value: 0.0
+    #   - type: contrast
+    #     properties:
+    #       value: 0.0
+    #   - type: hue
+    #     properties:
+    #       value: 0
+    #   - type: blur
+    #     properties:
+    #       value: 0.0

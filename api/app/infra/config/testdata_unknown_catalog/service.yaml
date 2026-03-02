@@ -1,0 +1,12 @@
+catalog:
+  - key: album-01
+    type: file
+    file:
+      src_path: /tmp
+
+displays:
+  - key: display-01
+    model: ws7in3e
+    orientation: landscape
+    catalog:
+      - key: does-not-exist

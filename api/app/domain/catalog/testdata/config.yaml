@@ -1,0 +1,8 @@
+log_level: DEBUG
+port: 9002
+database:
+  driver: sqlite
+  dsn: tmp/wspf.db
+  log: true
+  driver_options:
+    sqlite:

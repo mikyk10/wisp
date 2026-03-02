@@ -1,0 +1,61 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - cyclop # 複雑なコード
+    - errcheck # エラーハンドリングしていない箇所
+    - govet # go本体に入っているやつ,いろいろできる
+    - ineffassign # 効果のない代入
+    - staticcheck # いろいろ入っている
+    - unused # 未使用の関数、変数
+    - unparam # 未使用の引数
+    - forcetypeassert # アサーションの成否を確認していないもの
+    - gosec # セキュリティ
+    - nilerr # errがnilでないのにreturn nil
+    - predeclared # buildinと同じ名前の関数、変数
+    - bodyclose # closeしてないbody
+    - durationcheck # time.Duration*time.Duration
+    - makezero # lenが0ではないsliceへのappend
+
+  settings:
+    cyclop:
+      max-complexity: 15
+      #package-average: 0.5
+    gosec:
+      excludes:
+        - G404
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - errcheck
+        text: Error return value of `ui.OutputErrln` is not checked
+      - linters:
+          - errcheck
+        text: Error return value of `c.JSON` is not checked
+      - linters:
+          - dupl
+          - errcheck
+          - gocyclo
+          - gosec
+          - cyclop
+          - bodyclose
+          - unused
+          - unparam
+        path: (.+)_test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -1,0 +1,69 @@
+catalog:
+  - key: album-01
+    type: file
+    src_path: /home/pi/Pictures
+
+  - key: album-02
+    type: file
+    src_path: /home/pi/Pictures
+    criteria:
+      include: 
+        path:
+          - ".*"
+        time_range:
+          - from: "2020-01-01T00:00:00Z"
+            to: "2020-12-31T23:59:59Z"
+            last: 24h 
+      exclude:
+        path:
+          - ".*"
+
+  - key: album-http
+    type: http
+    url: https://foo.bar.test/image.jpg
+
+  - key: album-playwright
+    type: playwright-go
+    server: localhost:3000
+    url: https://foo.bar.test/test.html
+
+  - key: album-lua
+    type: lua
+    script: |
+      function get_image()
+        return "https://foo.bar.test/image.jpg"
+      end
+      get_image()
+
+displays:
+  - key: entrance-01
+    api_version: 2025-03-01 
+    model: ws7in3e
+    orientation: landscape
+    vflip: false
+    catalog: 
+      - key: album-01
+        time_range:
+          cron: "* * 1-2 * * *" 
+      - key: album-02
+        time_range:
+          cron: "* * 14-15 * * *" 
+      - key: album-http
+        time_range:
+          cron: "* * 6-9 * * *" 
+#      - key: http-404
+#        time_range:
+#          cron: "* 1-5 * * *" 
+    filters: 
+      - type: contrast
+        value: 0.5
+      - type: brightness
+        value: 0.5
+      - type: saturation
+        value: 0.5
+      - type: hue
+        value: 0.5
+      - type: gamma
+        value: 0.5
+      - type: timestamp
+        threshold: 0.5

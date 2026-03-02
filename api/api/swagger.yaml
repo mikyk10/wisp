@@ -1,0 +1,338 @@
+openapi: 3.0.4
+info:
+  title: wspf API
+  description: |
+    <h2>WSPF (Waveshare Photoframe)</h2>
+
+  version: "2025-03-01"
+
+servers:
+  - url: 'http://localhost:9002/'
+    description: Docker environment
+
+paths:
+
+  '/catalogs':
+    get:
+      tags:
+        - catalogs
+      summary: List all configured catalogs
+      responses:
+        '200':
+          $ref: "#/components/responses/CatalogListResponse"
+        '500':
+          $ref: "#/components/responses/InternalError"
+          
+  '/TBD':
+    get:
+      tags: 
+        - movie
+      summary: Getting a list of movies filterable by a query
+      description: |
+        Gets a list of movies filtered by a query. Returns an empty array if there are no result for a query, instead of returning 404.
+      parameters:
+        - in: query
+          name: search
+          description: | 
+            Keywords to match.
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: "#/components/responses/MovieSearchResultResponse"
+        '400':
+          $ref: "#/components/responses/BadRequestError"
+        '500':
+          $ref: "#/components/responses/InternalError"
+        '503':
+          $ref: "#/components/responses/ServiceUnavailableError"
+
+  '/TBD/{id}':
+    get:
+      tags: 
+        - movie
+      summary: Returns detail of a movie by given ID.
+      description: |
+        Return a detail of a movie by a given ID.
+      parameters:
+        - in: path
+          name: id
+          description: movie id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          $ref: "#/components/responses/MovieDetailResponse"
+        '400':
+          $ref: "#/components/responses/BadRequestError"
+        '404':
+          $ref: "#/components/responses/ResourceNotFoundError"
+        '500':
+          $ref: "#/components/responses/InternalError"
+        '503':
+          $ref: "#/components/responses/ServiceUnavailableError"
+
+components:
+  schemas:
+
+    TBDModel:
+      type: object
+      properties:
+        TBD:
+          description: TBD
+          type: string
+          example: TBD
+
+    ErrorModel:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              description: |
+                API specific error_code string
+              type: string
+            description:
+              description: |
+                Error description.
+                Each API implementaion MUST not disclose sensitive information here like design detail, program structure, envrionment variable and secrets...
+              type: string
+
+      
+    AuthResultModel:
+      type: object
+      properties:
+        access_token:
+          description: access token
+          type: string
+          example: fc07c404-17e6-4c35-817e-c8f921df4495
+        AuthenticatedUser:
+          type: object
+          properties:
+            id:
+              description: user id
+              type: integer
+              example: 1234
+            name:
+              description: user name
+              type: string
+              example: foobar
+            login_id:
+              description: login_id for the user
+              type: string
+              example: 'user0001'
+            created_at:
+              description: created time
+              type: string
+              example: '2023-04-11T18:13:23.447+09:00'
+            updated_at:
+              description: last modified at
+              type: string
+              example: '2023-04-11T18:13:23.447+09:00'
+            
+    MovieSearchResultModel:
+      type: array
+      items:
+        properties:
+          id:
+            description: movie id
+            type: integer
+            example: 1234
+          name:
+            description: name
+            type: string
+            example: Foreigner With A Spaceship
+          thumbnail_url:
+            description: image
+            type: integer
+            example: 'https://foobar.test/image.jpg'
+          created_at:
+            description: created time
+            type: string
+            example: '2023-04-11T18:13:23.447+09:00'
+          updated_at:
+            description: last modified at
+            type: string
+            example: '2023-04-11T18:13:23.447+09:00'
+
+    UserFavoriteMoviesModel:
+      type: array
+      items:
+        properties:
+          id:
+            description: the primary key
+            type: integer
+            example: 1234
+          user_id:
+            description: user_id
+            type: integer
+            example: 1
+          movie_id:
+            description: movie_id
+            type: integer
+            example: 2222
+          created_at:
+            description: created time
+            type: string
+            example: '2023-04-11T18:13:23.447+09:00'
+          updated_at:
+            description: last modified at
+            type: string
+            example: '2023-04-11T18:13:23.447+09:00'
+
+    MovieDetailModel:
+      type: object
+      properties:
+        id:
+          description: movie id
+          type: integer
+          example: 1234
+        name:
+          description: name
+          type: string
+          example: Foreigner With A Spaceship
+        thumbnail_url:
+          description: image
+          type: integer
+          example: 'https://foobar.test/image.jpg'
+        created_at:
+          description: created time
+          type: string
+          example: '2023-04-11T18:13:23.447+09:00'
+        updated_at:
+          description: last modified at
+          type: string
+          example: '2023-04-11T18:13:23.447+09:00'
+
+  parameters:
+    TBDParam:
+      in: path
+      name: tbd
+      description: TBD
+      required: true
+      schema:
+        type: integer
+
+  responses:
+    # To indicate TBD for an API
+    TBDResponse:
+      description: undefined
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TBDModel'
+
+    # empty object
+    EmptyResponse:
+      description: return empty 
+      content:
+        application/json:
+          schema:
+            type: object
+
+    BadRequestError:
+      description: Error someone send a malformed/invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorModel'
+          example:
+            error:
+              type: "example_nosuch_parameter"
+              description: "example message (can be not-machine-readable)"
+
+    UnauthorizedError:
+      description: Error when someone requested secured resouce without a valid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorModel'
+          example:
+            error:
+              type: "example_unauthorized"
+              description: "example message (can be not-machine-readable)"
+
+    ResourceNotFoundError:
+      description: Error when something is not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorModel'
+          example:
+            error:
+              type: "example_movie_not_found"
+              description: "example message (can be not-machine-readable)"
+
+    # サーバーエラー
+    InternalError:
+      description: unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorModel'
+          example:
+            error:
+              type: "internal_error"
+              description: "some useful error messages."
+              stack: "...."
+
+    ServiceUnavailableError:
+      description: planned outage
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorModel'
+          example:
+            error:
+              type: "example_planned_outage"
+              description: "some useful error messages."
+
+    CatalogListResponse:
+      description: planned outage
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorModel'
+          example:
+            error:
+              type: "example_planned_outage"
+              description: "some useful error messages."
+
+    MovieSearchResultResponse:
+      description: Movie Search result
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MovieSearchResultModel'
+              
+    AuthLoginResponse:
+      description: Authentication result
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AuthResultModel'
+
+    UserFavoriteMoviesResponse:
+      description: asdfasdfasdfasdfasdf
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserFavoriteMoviesModel'
+      
+    MovieDetailResponse:
+      description: Movie Search result
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MovieDetailModel'
+              
+  securitySchemes:
+    AccessTokenAuth:
+        type: apiKey
+        in: header
+        name: X-Access-Token
+        description: |
+          AccessToken string. Since the API might support BASIC authentication for a development environment, header name is named this manner; The Authorization header cannot be duplicated in an HTTP header.

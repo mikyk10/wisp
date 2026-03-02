@@ -5,9 +5,9 @@ import (
 	"math/rand/v2"
 	"slices"
 	"time"
-	"wspf/app/domain/display/epaper"
-	"wspf/app/domain/model/config"
-	"wspf/app/domain/repository"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/domain/repository"
 
 	"github.com/adhocore/gronx"
 )

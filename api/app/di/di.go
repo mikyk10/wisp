@@ -3,12 +3,12 @@ package di
 import (
 	"fmt"
 	"log"
-	"wspf/app/domain/model"
-	"wspf/app/domain/model/config"
-	"wspf/app/infra"
-	"wspf/app/infra/repository"
-	"wspf/app/interface/handler"
-	"wspf/app/usecase"
+	"github.com/mikyk10/wisp/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/infra"
+	"github.com/mikyk10/wisp/app/infra/repository"
+	"github.com/mikyk10/wisp/app/interface/handler"
+	"github.com/mikyk10/wisp/app/usecase"
 
 	"github.com/goark/gocli/rwi"
 	"go.uber.org/dig"

@@ -1,4 +1,4 @@
-module wspf
+module github.com/mikyk10/wisp
 
 go 1.26.0
 

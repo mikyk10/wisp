@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"os"
 	"time"
-	"wspf/app/domain/finder"
-	"wspf/app/domain/finder/fs"
-	"wspf/app/domain/model/config"
-	"wspf/app/domain/model/config/raw"
+	"github.com/mikyk10/wisp/app/domain/finder"
+	"github.com/mikyk10/wisp/app/domain/finder/fs"
+	"github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/domain/model/config/raw"
 
 	"github.com/Code-Hex/synchro/iso8601"
 	"github.com/adhocore/gronx"
 	"github.com/caarlos0/env/v10"
-	"wspf/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
 
 	"gopkg.in/yaml.v2"
 )
@@ -22,7 +22,7 @@ type defaultConfigLoader struct {
 }
 
 func NewDefaultConfigLoader() config.ConfigLoader {
-	execName := "wspf" //filepath.Base(os.Args[0])
+	execName := "wisp" //filepath.Base(os.Args[0])
 	return &defaultConfigLoader{
 		finder: fs.NewConfigFilePathFinder(fmt.Sprintf("/etc/%s/", execName), fmt.Sprintf("$HOME/.%s", execName), "./config", "."),
 	}

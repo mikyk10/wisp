@@ -10,9 +10,9 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"wspf/app/domain/model"
-	"wspf/app/domain/model/config"
-	"wspf/app/usecase"
+	"github.com/mikyk10/wisp/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/usecase"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/dig"

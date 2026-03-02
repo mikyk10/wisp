@@ -43,9 +43,9 @@ The API server starts on port 9002 with air hot-reload enabled.
 ### 3. Scan images into the database
 
 ```bash
-docker compose exec api ./wspf catalog scan
+docker compose exec api ./wisp catalog scan
 # With verbose output:
-docker compose exec api ./wspf catalog scan --verbose
+docker compose exec api ./wisp catalog scan --verbose
 ```
 
 ### 4. Verify the server is running
@@ -60,7 +60,7 @@ Prerequisites: Go 1.26+
 
 ```bash
 make build
-./wspf web run
+./wisp web run
 ```
 
 ### Testing
@@ -90,7 +90,7 @@ log_level: INFO        # DEBUG | INFO | WARN | ERROR
 port: 9002
 database:
   driver: sqlite       # sqlite | mysql
-  dsn: /data/wspf.db
+  dsn: /data/wisp.db
   log: false           # true logs every GORM query
 ```
 
@@ -107,7 +107,7 @@ catalog:
   - key: photos
     type: file         # file | http | lua | colorbar
     file:
-      src_path: /mnt/wspf
+      src_path: /mnt/wisp
 
 displays:
   - name: my-frame
@@ -150,14 +150,14 @@ Base URL: `http://localhost:9002`
 ### CLI commands
 
 ```bash
-./wspf web run                    # Start API server (default port 9002)
-./wspf catalog scan               # Index images from all configured providers
-./wspf catalog scan --verbose     # Index images with per-file logging
-./wspf catalog purge-orphans      # Remove DB records with no matching source file
-./wspf catalog list               # List all catalogs
-./wspf catalog list-images        # List images in default catalog
-./wspf system prune               # Drop and recreate the Image table
-./wspf version                    # Show build version and commit hash
+./wisp web run                    # Start API server (default port 9002)
+./wisp catalog scan               # Index images from all configured providers
+./wisp catalog scan --verbose     # Index images with per-file logging
+./wisp catalog purge-orphans      # Remove DB records with no matching source file
+./wisp catalog list               # List all catalogs
+./wisp catalog list-images        # List images in default catalog
+./wisp system prune               # Drop and recreate the Image table
+./wisp version                    # Show build version and commit hash
 ```
 
 ### Catalog providers

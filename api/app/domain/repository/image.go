@@ -1,6 +1,6 @@
 package repository
 
-import "wspf/app/domain/model"
+import "github.com/mikyk10/wisp/app/domain/model"
 
 type ImageRepository interface {
 	RemoveImage(id model.PrimaryKey) error

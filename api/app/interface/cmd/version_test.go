@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"os"
 	"testing"
-	"wspf/app/di"
-	"wspf/app/domain/model"
-	"wspf/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/di"
+	"github.com/mikyk10/wisp/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model/config"
 
-	"wspf/app/interface/cmd"
+	"github.com/mikyk10/wisp/app/interface/cmd"
 
 	"github.com/goark/gocli/rwi"
 	"github.com/stretchr/testify/assert"

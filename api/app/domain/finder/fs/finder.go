@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"wspf/app/domain/finder"
+	"github.com/mikyk10/wisp/app/domain/finder"
 )
 
 func NewFsImageFilePathFinder(dirnames ...string) finder.PathStreamFinder {

@@ -6,10 +6,10 @@ import (
 	"image/color"
 	"maps"
 	"slices"
-	"wspf/app/domain/display/epaper"
-	"wspf/app/domain/improc"
-	"wspf/app/domain/model"
-	"wspf/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/improc"
+	"github.com/mikyk10/wisp/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model/config"
 
 	"github.com/makeworld-the-better-one/dither"
 )

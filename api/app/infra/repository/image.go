@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"math/rand/v2"
-	"wspf/app/domain/model"
-	"wspf/app/domain/repository"
+	"github.com/mikyk10/wisp/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/repository"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

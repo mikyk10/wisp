@@ -24,11 +24,11 @@ dev-setup:
 		read -r -p "  Choice [1]: " db_choice; \
 		case "$${db_choice:-1}" in \
 			2) \
-				default_dsn="user:pass@tcp(localhost:3306)/wspf?charset=utf8mb4&parseTime=True&loc=Local"; \
+				default_dsn="user:pass@tcp(localhost:3306)/wisp?charset=utf8mb4&parseTime=True&loc=Local"; \
 				read -r -p "  MySQL DSN [$$default_dsn]: " db_dsn; \
 				db_dsn=$${db_dsn:-$$default_dsn}; \
 				sed $(SEDOPT) "s|driver: sqlite|driver: mysql|g" api/config/config.yaml; \
-				sed $(SEDOPT) "s|dsn: /data/wspf.db|dsn: \"$$db_dsn\"|g" api/config/config.yaml; \
+				sed $(SEDOPT) "s|dsn: ./data/wisp.db|dsn: \"$$db_dsn\"|g" api/config/config.yaml; \
 				echo "  → driver=mysql";; \
 			*) \
 				echo "  → driver=sqlite";; \

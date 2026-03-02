@@ -3,7 +3,7 @@ package epaper
 import (
 	"fmt"
 	"slices"
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model"
 )
 
 type EPaperDisplayModel string

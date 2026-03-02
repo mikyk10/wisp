@@ -83,13 +83,13 @@ Click any photo to select it. A toolbar appears at the bottom showing the select
 
 ```bash
 # Build
-docker build -t wspf-frontend .
+docker build -t wisp-frontend .
 
 # Run in mock mode
-docker run -p 8080:80 wspf-frontend
+docker run -p 8080:80 wisp-frontend
 
 # Run in API mode
-docker run -p 8080:80 -e API_BASE_URL=http://your-backend:9002 wspf-frontend
+docker run -p 8080:80 -e API_BASE_URL=http://your-backend:9002 wisp-frontend
 ```
 
 ### Testing

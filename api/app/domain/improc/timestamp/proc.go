@@ -4,9 +4,9 @@ import (
 	"context"
 	"image"
 	"image/draw"
-	"wspf/app/domain/display/epaper/wsdisplay"
-	"wspf/app/domain/improc"
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/display/epaper/wsdisplay"
+	"github.com/mikyk10/wisp/app/domain/improc"
+	"github.com/mikyk10/wisp/app/domain/model"
 
 	"github.com/anthonynsimon/bild/blend"
 	"github.com/anthonynsimon/bild/transform"

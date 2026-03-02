@@ -2,8 +2,8 @@ package config
 
 import (
 	"testing"
-	domainConfig "wspf/app/domain/model/config"
-	"wspf/app/domain/finder/fs"
+	domainConfig "github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/domain/finder/fs"
 )
 
 func newLoaderFromDir(dir string) domainConfig.ConfigLoader {

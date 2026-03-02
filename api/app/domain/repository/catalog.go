@@ -1,8 +1,8 @@
 package repository
 
 import (
-	"wspf/app/domain/model"
-	"wspf/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model/config"
 )
 
 type ImageFileRepository interface {

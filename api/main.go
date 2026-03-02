@@ -2,9 +2,9 @@ package main
 
 import (
 	"os"
-	"wspf/app/di"
-	"wspf/app/infra/config"
-	"wspf/app/interface/cmd"
+	"github.com/mikyk10/wisp/app/di"
+	"github.com/mikyk10/wisp/app/infra/config"
+	"github.com/mikyk10/wisp/app/interface/cmd"
 
 	"github.com/goark/gocli/rwi"
 )

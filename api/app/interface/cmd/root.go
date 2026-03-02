@@ -53,7 +53,7 @@ func setupCommands(rootCmd *cobra.Command, container *dig.Container) {
 
 	systemCmd := &cobra.Command{
 		Use:   "system",
-		Short: "Manage wspf",
+		Short: "Manage wisp",
 	}
 	rootCmd.AddCommand(systemCmd)
 	systemCmd.AddCommand(NewSystemPruneCommand(container))

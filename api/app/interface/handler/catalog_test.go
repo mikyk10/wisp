@@ -10,12 +10,12 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 
-	"wspf/app/domain/model"
-	"wspf/app/domain/model/config"
-	"wspf/app/infra"
-	infraRepo "wspf/app/infra/repository"
-	"wspf/app/interface/handler"
-	"wspf/app/usecase"
+	"github.com/mikyk10/wisp/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/infra"
+	infraRepo "github.com/mikyk10/wisp/app/infra/repository"
+	"github.com/mikyk10/wisp/app/interface/handler"
+	"github.com/mikyk10/wisp/app/usecase"
 
 	"gorm.io/gorm"
 )

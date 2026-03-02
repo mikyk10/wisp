@@ -2,9 +2,9 @@ package catalog
 
 import (
 	"time"
-	"wspf/app/domain/display/epaper"
-	"wspf/app/domain/model/config"
-	"wspf/app/domain/repository"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/domain/repository"
 )
 
 func NewImageHttpProvider(now time.Time, epd epaper.DisplayMetadata, repo repository.ImageRepository, catalogKey string, config config.ImageHTTPProviderConfig) ImageLocator {

@@ -53,7 +53,7 @@ Install [PlatformIO](https://platformio.org/install) (CLI or VS Code extension).
 
 1. Flash the firmware (see Build & Flash below).
 2. On first boot the device enters SoftAP provisioning mode automatically. Subsequent re-provisioning requires a **double-reset** (press reset twice within ~3 seconds).
-3. Connect to the WiFi network broadcast by the device: `WSPF-AP-XXXXXX` (XXXXXX = last 6 hex chars of the ESP32 MAC address). No password.
+3. Connect to the WiFi network broadcast by the device: `WISP-AP-XXXXXX` (XXXXXX = last 6 hex chars of the ESP32 MAC address). No password.
 4. Open `http://192.168.254.1` in a browser.
 5. Enter your WiFi SSID, password, and the WiSP Server URL (e.g. `http://192.168.1.100:9002`).
 6. Submit — the device saves the credentials to NVS and reboots.
@@ -82,7 +82,7 @@ Build artifacts are written to `.pio/build/<env>/firmware.bin`. CI automatically
 
 WiFi credentials and server URL are configured through the SoftAP web UI and stored in ESP32 NVS (non-volatile storage). They persist across deep-sleep cycles without requiring reflashing.
 
-The SoftAP network address (`192.168.254.1`) and the SSID/hostname template (`WSPF-AP-XXXXXX`) are defined in `firmware/src/config/network.h`. Modify these constants if you need a different provisioning network.
+The SoftAP network address (`192.168.254.1`) and the SSID/hostname template (`WISP-AP-XXXXXX`) are defined in `firmware/src/config/network.h`. Modify these constants if you need a different provisioning network.
 
 Pin mappings and compile-time flags (display model, buffer size, PSRAM) are set as build flags in `firmware/platformio.ini` per environment.
 

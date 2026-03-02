@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"image"
 	"image/color"
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model"
 )
 
 type IndexPalette = map[int]color.Color

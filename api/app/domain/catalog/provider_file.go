@@ -8,10 +8,10 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"wspf/app/domain/display/epaper"
-	"wspf/app/domain/finder/fs"
-	"wspf/app/domain/model/config"
-	"wspf/app/domain/repository"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/finder/fs"
+	"github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/domain/repository"
 
 	"gorm.io/gorm"
 )

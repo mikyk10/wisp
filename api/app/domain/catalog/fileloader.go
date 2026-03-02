@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model"
 
 	"github.com/adrium/goheif"
 	"github.com/rwcarlsen/goexif/exif"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"wspf/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/domain/model/config"
 )
 
 func TestEnumerateImages(t *testing.T) {

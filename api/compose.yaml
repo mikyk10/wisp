@@ -14,7 +14,7 @@ services:
     volumes:
       - ./:/app
       - data:/data
-      - ${PHOTO_DIR}:/mnt/wspf:ro
+      - ${PHOTO_DIR}:/mnt/wisp:ro
     healthcheck:
       test: curl -f http://localhost:9002/health
       interval: 3s

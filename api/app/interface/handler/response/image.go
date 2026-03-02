@@ -1,7 +1,7 @@
 package response
 
 import (
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model"
 )
 
 type Image struct {

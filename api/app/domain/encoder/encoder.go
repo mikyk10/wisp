@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"image"
 	"image/color"
-	"wspf/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
 )
 
 type wsEpaperEncoder struct {

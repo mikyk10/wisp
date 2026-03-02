@@ -3,8 +3,8 @@ package rotation
 import (
 	"context"
 	"image"
-	"wspf/app/domain/improc"
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/improc"
+	"github.com/mikyk10/wisp/app/domain/model"
 
 	"github.com/anthonynsimon/bild/transform"
 )

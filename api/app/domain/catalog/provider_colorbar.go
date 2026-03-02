@@ -4,8 +4,8 @@ import (
 	"image"
 	"image/color"
 	"time"
-	"wspf/app/domain/display/epaper"
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/model"
 )
 
 func NewColorbarProvider(epd epaper.DisplayMetadata) ImageLocator {

@@ -1,5 +1,5 @@
-BINARY := wspf
-BASE_PACKAGE=wspf/app/domain/model
+BINARY := wisp
+BASE_PACKAGE=github.com/mikyk10/wisp/app/domain/model
 ENTRYPOINT=main.go
 
 .DEFAULT_GOAL := build
@@ -33,7 +33,7 @@ else
 endif
 
 
-PHOTO_DIR ?= $(HOME)/Pictures/wspf
+PHOTO_DIR ?= $(HOME)/Pictures/wisp
 SAMPLE_COUNT ?= 20
 
 ## ローカル開発環境の初期セットアップ
@@ -42,13 +42,13 @@ SAMPLE_COUNT ?= 20
 dev-setup:
 	@echo "==> [1/4] config ファイルを生成"
 	@if [ ! -f config/config.yaml ]; then \
-		printf 'log_level: DEBUG\nport: 9002\ndatabase:\n  driver: sqlite\n  dsn: /data/wspf.db\n  log: true\n' > config/config.yaml; \
+		printf 'log_level: DEBUG\nport: 9002\ndatabase:\n  driver: sqlite\n  dsn: /data/wisp.db\n  log: true\n' > config/config.yaml; \
 		echo "  created: config/config.yaml"; \
 	else \
 		echo "  skipped: config/config.yaml (already exists)"; \
 	fi
 	@if [ ! -f config/service.yaml ]; then \
-		printf 'catalog:\n  - key: photos\n    type: file\n    file:\n      src_path: /mnt/wspf\n\ndisplays:\n  - name: dev-display\n    mac_address: dev\n    api_version: 2025-03-01\n    model: ws7in3f\n    orientation: landscape\n    color_reduction:\n      type: floysteinberg\n    catalog:\n      - key: photos\n' > config/service.yaml; \
+		printf 'catalog:\n  - key: photos\n    type: file\n    file:\n      src_path: /mnt/wisp\n\ndisplays:\n  - name: dev-display\n    mac_address: dev\n    api_version: 2025-03-01\n    model: ws7in3f\n    orientation: landscape\n    color_reduction:\n      type: floysteinberg\n    catalog:\n      - key: photos\n' > config/service.yaml; \
 		echo "  created: config/service.yaml"; \
 	else \
 		echo "  skipped: config/service.yaml (already exists)"; \

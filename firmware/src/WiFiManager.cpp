@@ -302,11 +302,11 @@ bool WiFiManager::loadServerURL(String &url)
 
 void WiFiManager::enableMDNS()
 {
-    if (!MDNS.begin("wspf"))
+    if (!MDNS.begin("wisp"))
     {
         Serial.println("[mDNS] Error starting mDNS");
         return;
     }
-    Serial.println("[mDNS] Service started at http://wspf.local/");
+    Serial.println("[mDNS] Service started at http://wisp.local/");
     MDNS.addService("http", "tcp", 80);
 }

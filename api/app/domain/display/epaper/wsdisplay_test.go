@@ -6,12 +6,12 @@ import (
 	"image"
 	"slices"
 	"testing"
-	"wspf/app/domain/display/epaper"
-	"wspf/app/domain/display/epaper/wsdisplay"
-	"wspf/app/domain/encoder"
-	"wspf/app/domain/improc"
-	"wspf/app/domain/improc/crop"
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/display/epaper/wsdisplay"
+	"github.com/mikyk10/wisp/app/domain/encoder"
+	"github.com/mikyk10/wisp/app/domain/improc"
+	"github.com/mikyk10/wisp/app/domain/improc/crop"
+	"github.com/mikyk10/wisp/app/domain/model"
 
 	"github.com/stretchr/testify/assert"
 )

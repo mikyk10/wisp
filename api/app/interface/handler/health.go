@@ -2,7 +2,7 @@ package handler
 
 import (
 	"net/http"
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model"
 
 	"github.com/labstack/echo/v5"
 )

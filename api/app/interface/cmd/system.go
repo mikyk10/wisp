@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"log"
-	"wspf/app/interface/cmd/util"
-	"wspf/app/usecase"
+	"github.com/mikyk10/wisp/app/interface/cmd/util"
+	"github.com/mikyk10/wisp/app/usecase"
 
 	"github.com/goark/gocli/rwi"
 	"github.com/spf13/cobra"

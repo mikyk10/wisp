@@ -3,9 +3,9 @@ package crop
 import (
 	"context"
 	"image"
-	"wspf/app/domain/display/epaper"
-	"wspf/app/domain/improc"
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/improc"
+	"github.com/mikyk10/wisp/app/domain/model"
 
 	"github.com/anthonynsimon/bild/transform"
 	"github.com/sunshineplan/imgconv"

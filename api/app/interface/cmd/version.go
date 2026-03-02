@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"log"
-	"wspf/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model"
 
 	"github.com/goark/gocli/rwi"
 	"github.com/spf13/cobra"

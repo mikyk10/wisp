@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-	"wspf/app/domain/model"
-	"wspf/app/domain/model/config"
-	"wspf/app/domain/repository"
-	"wspf/app/infra"
-	infraRepo "wspf/app/infra/repository"
-	"wspf/app/usecase"
+	"github.com/mikyk10/wisp/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/domain/repository"
+	"github.com/mikyk10/wisp/app/infra"
+	infraRepo "github.com/mikyk10/wisp/app/infra/repository"
+	"github.com/mikyk10/wisp/app/usecase"
 )
 
 // setupScanUseCaseWithConfig builds a Scan() test environment with an arbitrary ServiceConfig.

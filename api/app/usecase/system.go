@@ -1,6 +1,6 @@
 package usecase
 
-import "wspf/app/domain/repository"
+import "github.com/mikyk10/wisp/app/domain/repository"
 
 type SystemUsecase interface {
 	Prune() error

@@ -1,88 +1,327 @@
 openapi: 3.0.4
 info:
-  title: wspf API
+  title: WiSP API
   description: |
-    <h2>WSPF (Waveshare Photoframe)</h2>
+    <h2>WiSP (Wireless Image Slideshow for Photoframes)</h2>
+
+    Backend API for the WiSP e-Paper photo frame system.
+    Serves processed images to ESP32 devices and provides catalog management endpoints for the admin SPA.
 
   version: "2025-03-01"
 
 servers:
   - url: 'http://localhost:9002/'
-    description: Docker environment
+    description: Local development
+
+tags:
+  - name: system
+    description: Health and version information
+  - name: catalogs
+    description: Catalog and image management
+  - name: device
+    description: Image delivery endpoints for ESP32 devices
 
 paths:
 
-  '/catalogs':
+  /health:
+    get:
+      tags:
+        - system
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Server is running
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /version:
+    get:
+      tags:
+        - system
+      summary: Build version and commit hash
+      responses:
+        '200':
+          description: Version string
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "v1.2.3 (abc1234) built 2025-03-01T00:00:00"
+
+  /catalogs:
     get:
       tags:
         - catalogs
       summary: List all configured catalogs
       responses:
         '200':
-          $ref: "#/components/responses/CatalogListResponse"
+          description: List of catalog keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  catalogs:
+                    type: array
+                    items:
+                      type: string
+                    example: ["photos", "dashboard"]
         '500':
-          $ref: "#/components/responses/InternalError"
-          
-  '/TBD':
+          $ref: '#/components/responses/InternalError'
+
+  /catalog/{catalogKey}/images:
     get:
-      tags: 
-        - movie
-      summary: Getting a list of movies filterable by a query
+      tags:
+        - catalogs
+      summary: Stream all images in a catalog
       description: |
-        Gets a list of movies filtered by a query. Returns an empty array if there are no result for a query, instead of returning 404.
+        Returns a newline-delimited JSON (NDJSON) stream of images indexed in the catalog.
+        Each line is a JSON object. The stream ends when all images have been sent.
       parameters:
-        - in: query
-          name: search
-          description: | 
-            Keywords to match.
+        - $ref: '#/components/parameters/CatalogKey'
+      responses:
+        '200':
+          description: NDJSON stream of images
+          content:
+            application/x-ndjson:
+              schema:
+                $ref: '#/components/schemas/ImageRecord'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /catalog/{catalogKey}/image/{imgid}:
+    get:
+      tags:
+        - catalogs
+      summary: Get a thumbnail image by ID
+      description: |
+        Returns the thumbnail for the specified image. The file format is determined by the
+        extension of `imgid` (`.jpg` or `.png`). If the image is not found or has no thumbnail,
+        a placeholder image is returned with HTTP 404.
+      parameters:
+        - $ref: '#/components/parameters/CatalogKey'
+        - in: path
+          name: imgid
+          required: true
+          description: Image ID with extension, e.g. `42.jpg`
           schema:
             type: string
+            example: "42.jpg"
       responses:
         '200':
-          $ref: "#/components/responses/MovieSearchResultResponse"
-        '400':
-          $ref: "#/components/responses/BadRequestError"
-        '500':
-          $ref: "#/components/responses/InternalError"
-        '503':
-          $ref: "#/components/responses/ServiceUnavailableError"
-
-  '/TBD/{id}':
-    get:
-      tags: 
-        - movie
-      summary: Returns detail of a movie by given ID.
-      description: |
-        Return a detail of a movie by a given ID.
-      parameters:
-        - in: path
-          name: id
-          description: movie id
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          $ref: "#/components/responses/MovieDetailResponse"
-        '400':
-          $ref: "#/components/responses/BadRequestError"
+          description: Image data
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
         '404':
-          $ref: "#/components/responses/ResourceNotFoundError"
+          description: Image not found — placeholder image is returned
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+
+  /catalog/selected/_toggle-visibility:
+    post:
+      tags:
+        - catalogs
+      summary: Toggle visibility for a list of images
+      description: |
+        Toggles the enabled/disabled state of the specified images within the given catalog.
+        Disabled images are excluded from random delivery to devices.
+      parameters:
+        - in: query
+          name: catalogKey
+          required: true
+          description: Catalog key
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 5, 12]
+      responses:
+        '200':
+          description: Visibility toggled successfully
         '500':
-          $ref: "#/components/responses/InternalError"
-        '503':
-          $ref: "#/components/responses/ServiceUnavailableError"
+          $ref: '#/components/responses/InternalError'
+
+  /pf/{displayKey}/image/{imgid}:
+    get:
+      tags:
+        - device
+      summary: Get a specific image for a device
+      description: |
+        Returns the image with the given ID, processed and encoded for the specified display.
+        The file format is determined by the extension of `imgid`.
+      parameters:
+        - $ref: '#/components/parameters/DisplayKey'
+        - in: path
+          name: imgid
+          required: true
+          description: Image ID with extension, e.g. `42.jpg`
+          schema:
+            type: string
+            example: "42.jpg"
+      responses:
+        '200':
+          description: Processed image data
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Image not found — placeholder image is returned
+
+  /pf/{displayKey}/image/random.bin:
+    get:
+      tags:
+        - device
+      summary: Get a random image for a device (Waveshare binary)
+      description: |
+        Picks a random enabled image from the catalogs assigned to the display, applies the full
+        image processing pipeline (EXIF rotation, crop, filters, color reduction, optional flip),
+        and returns it in Waveshare e-Paper proprietary binary format.
+
+        The `X-Sleep-Seconds` response header tells the ESP32 how many seconds to sleep before
+        the next request.
+      parameters:
+        - $ref: '#/components/parameters/DisplayKey'
+      responses:
+        '200':
+          description: Processed image in Waveshare binary format
+          headers:
+            X-Sleep-Seconds:
+              description: Seconds the device should sleep before the next request
+              schema:
+                type: integer
+                example: 300
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /pf/{displayKey}/image/random.jpg:
+    get:
+      tags:
+        - device
+      summary: Get a random image for a device (JPEG)
+      description: Same as `random.bin` but returns a JPEG instead of the vendor binary.
+      parameters:
+        - $ref: '#/components/parameters/DisplayKey'
+      responses:
+        '200':
+          description: Processed image in JPEG format
+          headers:
+            X-Sleep-Seconds:
+              description: Seconds the device should sleep before the next request
+              schema:
+                type: integer
+                example: 300
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /pf/{displayKey}/image/random.png:
+    get:
+      tags:
+        - device
+      summary: Get a random image for a device (PNG)
+      description: Same as `random.bin` but returns a PNG instead of the vendor binary.
+      parameters:
+        - $ref: '#/components/parameters/DisplayKey'
+      responses:
+        '200':
+          description: Processed image in PNG format
+          headers:
+            X-Sleep-Seconds:
+              description: Seconds the device should sleep before the next request
+              schema:
+                type: integer
+                example: 300
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
 components:
-  schemas:
 
-    TBDModel:
+  parameters:
+    CatalogKey:
+      in: path
+      name: catalogKey
+      required: true
+      description: Catalog identifier as defined in `service.yaml`
+      schema:
+        type: string
+        example: photos
+
+    DisplayKey:
+      in: path
+      name: displayKey
+      required: true
+      description: Display identifier — the ESP32 MAC address (e.g. `a1b2c3d4e5f6`) or `dev` for local testing
+      schema:
+        type: string
+        example: dev
+
+  schemas:
+    ImageRecord:
       type: object
+      description: A single image record in the NDJSON stream
       properties:
-        TBD:
-          description: TBD
+        id:
+          type: integer
+          description: Primary key of the image
+          example: 42
+        enabled:
+          type: boolean
+          description: Whether the image is visible (not soft-deleted)
+          example: true
+        timestamp:
           type: string
-          example: TBD
+          description: EXIF shooting date in UTC (ISO 8601), or empty string if not available
+          example: "2024-06-15T10:30:00Z"
 
     ErrorModel:
       type: object
@@ -90,249 +329,30 @@ components:
         error:
           type: object
           properties:
-            type:
-              description: |
-                API specific error_code string
-              type: string
             description:
-              description: |
-                Error description.
-                Each API implementaion MUST not disclose sensitive information here like design detail, program structure, envrionment variable and secrets...
               type: string
-
-      
-    AuthResultModel:
-      type: object
-      properties:
-        access_token:
-          description: access token
-          type: string
-          example: fc07c404-17e6-4c35-817e-c8f921df4495
-        AuthenticatedUser:
-          type: object
-          properties:
-            id:
-              description: user id
-              type: integer
-              example: 1234
-            name:
-              description: user name
+              description: Human-readable error message
+              example: "display not found"
+            trace_id:
               type: string
-              example: foobar
-            login_id:
-              description: login_id for the user
-              type: string
-              example: 'user0001'
-            created_at:
-              description: created time
-              type: string
-              example: '2023-04-11T18:13:23.447+09:00'
-            updated_at:
-              description: last modified at
-              type: string
-              example: '2023-04-11T18:13:23.447+09:00'
-            
-    MovieSearchResultModel:
-      type: array
-      items:
-        properties:
-          id:
-            description: movie id
-            type: integer
-            example: 1234
-          name:
-            description: name
-            type: string
-            example: Foreigner With A Spaceship
-          thumbnail_url:
-            description: image
-            type: integer
-            example: 'https://foobar.test/image.jpg'
-          created_at:
-            description: created time
-            type: string
-            example: '2023-04-11T18:13:23.447+09:00'
-          updated_at:
-            description: last modified at
-            type: string
-            example: '2023-04-11T18:13:23.447+09:00'
-
-    UserFavoriteMoviesModel:
-      type: array
-      items:
-        properties:
-          id:
-            description: the primary key
-            type: integer
-            example: 1234
-          user_id:
-            description: user_id
-            type: integer
-            example: 1
-          movie_id:
-            description: movie_id
-            type: integer
-            example: 2222
-          created_at:
-            description: created time
-            type: string
-            example: '2023-04-11T18:13:23.447+09:00'
-          updated_at:
-            description: last modified at
-            type: string
-            example: '2023-04-11T18:13:23.447+09:00'
-
-    MovieDetailModel:
-      type: object
-      properties:
-        id:
-          description: movie id
-          type: integer
-          example: 1234
-        name:
-          description: name
-          type: string
-          example: Foreigner With A Spaceship
-        thumbnail_url:
-          description: image
-          type: integer
-          example: 'https://foobar.test/image.jpg'
-        created_at:
-          description: created time
-          type: string
-          example: '2023-04-11T18:13:23.447+09:00'
-        updated_at:
-          description: last modified at
-          type: string
-          example: '2023-04-11T18:13:23.447+09:00'
-
-  parameters:
-    TBDParam:
-      in: path
-      name: tbd
-      description: TBD
-      required: true
-      schema:
-        type: integer
+              description: Request trace ID for log correlation
+              example: "abc123def456"
 
   responses:
-    # To indicate TBD for an API
-    TBDResponse:
-      description: undefined
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/TBDModel'
-
-    # empty object
-    EmptyResponse:
-      description: return empty 
-      content:
-        application/json:
-          schema:
-            type: object
-
-    BadRequestError:
-      description: Error someone send a malformed/invalid request
+    NotFoundError:
+      description: Resource not found
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorModel'
-          example:
-            error:
-              type: "example_nosuch_parameter"
-              description: "example message (can be not-machine-readable)"
 
-    UnauthorizedError:
-      description: Error when someone requested secured resouce without a valid credentials
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorModel'
-          example:
-            error:
-              type: "example_unauthorized"
-              description: "example message (can be not-machine-readable)"
-
-    ResourceNotFoundError:
-      description: Error when something is not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorModel'
-          example:
-            error:
-              type: "example_movie_not_found"
-              description: "example message (can be not-machine-readable)"
-
-    # サーバーエラー
     InternalError:
-      description: unexpected server error
+      description: Unexpected server error
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorModel'
           example:
             error:
-              type: "internal_error"
-              description: "some useful error messages."
-              stack: "...."
-
-    ServiceUnavailableError:
-      description: planned outage
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorModel'
-          example:
-            error:
-              type: "example_planned_outage"
-              description: "some useful error messages."
-
-    CatalogListResponse:
-      description: planned outage
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorModel'
-          example:
-            error:
-              type: "example_planned_outage"
-              description: "some useful error messages."
-
-    MovieSearchResultResponse:
-      description: Movie Search result
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/MovieSearchResultModel'
-              
-    AuthLoginResponse:
-      description: Authentication result
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: '#/components/schemas/AuthResultModel'
-
-    UserFavoriteMoviesResponse:
-      description: asdfasdfasdfasdfasdf
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/UserFavoriteMoviesModel'
-      
-    MovieDetailResponse:
-      description: Movie Search result
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/MovieDetailModel'
-              
-  securitySchemes:
-    AccessTokenAuth:
-        type: apiKey
-        in: header
-        name: X-Access-Token
-        description: |
-          AccessToken string. Since the API might support BASIC authentication for a development environment, header name is named this manner; The Authorization header cannot be duplicated in an HTTP header.
+              description: "internal server error"
+              trace_id: "abc123def456"

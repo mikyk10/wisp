@@ -4,8 +4,8 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"wspf/app/interface/handler"
-	"wspf/app/interface/handler/response"
+	"github.com/mikyk10/wisp/app/interface/handler"
+	"github.com/mikyk10/wisp/app/interface/handler/response"
 
 	"github.com/labstack/echo/v5"
 	"go.uber.org/dig"

@@ -31,10 +31,10 @@ WORKDIR /app
 ENV TZ=Asia/Tokyo
 
 # Copy app binary/stuffs
-COPY --from=builder /app/wspf .
+COPY --from=builder /app/wisp .
 COPY config config
 COPY resources resources
 #COPY --from=vue-builder /app/dist/ resources/public
 
-ENTRYPOINT ["./wspf"]
+ENTRYPOINT ["./wisp"]
 CMD ["web", "run"] 

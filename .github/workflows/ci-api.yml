@@ -6,10 +6,12 @@ on:
     paths:
       - 'api/**'
       - '.github/workflows/ci-api.yml'
+  workflow_dispatch:
   pull_request:
     paths:
       - 'api/**'
       - '.github/workflows/ci-api.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read

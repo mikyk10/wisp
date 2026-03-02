@@ -6,10 +6,12 @@ on:
     paths:
       - 'frontend/**'
       - '.github/workflows/ci-frontend.yml'
+  workflow_dispatch:
   pull_request:
     paths:
       - 'frontend/**'
       - '.github/workflows/ci-frontend.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read

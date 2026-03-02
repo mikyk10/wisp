@@ -6,10 +6,12 @@ on:
     paths:
       - 'firmware/**'
       - '.github/workflows/ci-firmware.yml'
+  workflow_dispatch:
   pull_request:
     paths:
       - 'firmware/**'
       - '.github/workflows/ci-firmware.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read

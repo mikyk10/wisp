@@ -17,9 +17,6 @@ RUN npm run build
 # 6. Production stage: Serve the built application with nginx
 FROM nginx:1.27-alpine AS production
 
-# python3 is used by docker-entrypoint.sh for JSON-safe env var encoding
-RUN apk add --no-cache python3
-
 # Copy built artifacts from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 

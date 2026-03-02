@@ -2,19 +2,12 @@
 # Generate runtime env config from environment variables.
 # This file is written to the nginx document root before nginx starts,
 # so the browser loads it before the app bundle.
-#
-# Values are JSON-encoded via python3 to handle special characters
-# (quotes, backslashes, newlines) that would break naive shell interpolation.
 
 set -eu
 
-json_encode() {
-  printf '%s' "$1" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()), end='')"
-}
-
 cat > /usr/share/nginx/html/env.js <<EOF
 window.__env__ = {
-  "API_BASE_URL": $(json_encode "${API_BASE_URL:-}")
+  "API_BASE_URL": "${API_BASE_URL:-}"
 };
 EOF
 

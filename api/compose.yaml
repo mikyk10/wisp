@@ -11,6 +11,13 @@ services:
       - TZ=Asia/Tokyo
       # Restrict CORS origins (comma-separated). Defaults to "*" if unset.
       # - ALLOWED_ORIGINS=http://192.168.1.10:3000
+      # --- catalog scan memory tuning ---
+      # HEIC (HEVC) decoding uses ~300-500 MB per image in the Go decoder.
+      # Default concurrency is min(NumCPU, 4); lower this on memory-constrained hosts.
+      # - WISP_SCAN_CONCURRENCY=2
+      # GOMEMLIMIT tells Go's GC to run more aggressively before hitting the OS limit.
+      # Set to ~80% of the container's memory limit (e.g. 6GiB for an 8 GB host).
+      # - GOMEMLIMIT=6GiB
     volumes:
       - ./:/app
       - data:/data

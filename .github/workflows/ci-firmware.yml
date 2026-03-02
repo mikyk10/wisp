@@ -6,6 +6,8 @@ on:
     paths:
       - 'firmware/**'
       - '.github/workflows/ci-firmware.yml'
+    tags:
+      - 'v*'
   workflow_dispatch:
   pull_request:
     paths:
@@ -13,24 +15,41 @@ on:
       - '.github/workflows/ci-firmware.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
-    name: Build
+    name: Build (${{ matrix.env }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env:
+          - seeed_xiao_esp32s3_epd7in3e
+          - seeed_xiao_esp32c3_epd4ine6
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.12'
       - uses: actions/cache@v4
         with:
           path: ~/.platformio
-          key: platformio-${{ hashFiles('firmware/platformio.ini') }}
+          key: ${{ runner.os }}-pio-${{ hashFiles('firmware/platformio.ini') }}
       - name: Install PlatformIO
         run: pip install platformio
-      - name: Build (epd7in3e)
-        run: cd firmware && pio run -e seeed_xiao_esp32s3_epd7in3e
-      - name: Build (epd4ine6)
-        run: cd firmware && pio run -e seeed_xiao_esp32c3_epd4ine6
+      - name: Build
+        run: pio run -e ${{ matrix.env }}
+        working-directory: firmware
+      - name: Rename binary for release
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          SHORT=$(echo "${{ matrix.env }}" \
+            | sed 's/seeed_xiao_esp32s3/xiaos3/' \
+            | sed 's/seeed_xiao_esp32c3/xiaoc3/')
+          cp firmware/.pio/build/${{ matrix.env }}/firmware.bin \
+             wisp_${SHORT}_${{ github.ref_name }}.bin
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wisp_*.bin

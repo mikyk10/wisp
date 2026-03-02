@@ -19,7 +19,10 @@
     </v-overlay>
 
     <!-- Photo grid -->
-    <v-container fluid class="photo-grid-content">
+    <v-container
+      fluid
+      class="photo-grid-content"
+    >
       <RecycleScroller
         ref="scrollerRef"
         class="photo-grid"
@@ -47,7 +50,6 @@
         />
         <span class="ml-3 stream-loading-text">Loading more…</span>
       </div>
-
     </v-container>
   </div>
 </template>

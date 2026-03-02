@@ -23,8 +23,7 @@ test.describe('App startup', () => {
     await page.goto('/')
 
     // Wait for the streaming to start and at least one photo to appear
-    // The chip shows "N枚" once photos are loaded
-    const countChip = page.locator('.v-chip').filter({ hasText: '枚' }).first()
+    const countChip = page.locator('.v-chip').filter({ hasText: 'photos' }).first()
     await expect(countChip).toBeVisible({ timeout: 15_000 })
   })
 })
@@ -54,8 +53,8 @@ test.describe('Photo selection', () => {
     const toolbar = page.locator('.selection-toolbar')
     await expect(toolbar).toBeVisible()
 
-    // Selection count chip in the app bar shows "1枚選択"
-    const selectionChip = page.locator('.v-chip').filter({ hasText: '枚選択' })
+    // Selection count chip in the app bar shows "1 selected"
+    const selectionChip = page.locator('.v-chip').filter({ hasText: 'selected' })
     await expect(selectionChip).toBeVisible()
   })
 
@@ -70,7 +69,7 @@ test.describe('Photo selection', () => {
     await expect(toolbar).toBeVisible()
 
     // Click the Cancel button
-    await toolbar.getByText('キャンセル').click()
+    await toolbar.getByText('Cancel').click()
 
     // Toolbar should disappear
     await expect(toolbar).not.toBeVisible()

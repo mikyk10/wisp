@@ -15,24 +15,33 @@
         class="photo-image"
         :class="{ 'photo-image--hovered': isHovered }"
       >
-        <template v-slot:placeholder>
+        <template #placeholder>
           <div class="d-flex align-center justify-center fill-height">
             <v-progress-circular
               color="grey-lighten-4"
               indeterminate
-            ></v-progress-circular>
+            />
           </div>
         </template>
-        <template v-slot:error>
+        <template #error>
           <div class="d-flex align-center justify-center fill-height">
-            <v-icon icon="mdi-image-broken-variant" color="grey-lighten-2" size="48"></v-icon>
+            <v-icon
+              icon="mdi-image-broken-variant"
+              color="grey-lighten-2"
+              size="48"
+            />
           </div>
         </template>
       </v-img>
       
       <!-- Hidden state overlay -->
       <div v-if="!photo.enabled" class="disabled-overlay">
-        <v-icon icon="mdi-eye-off" size="36" color="white" class="eye-off-icon"></v-icon>
+        <v-icon
+          icon="mdi-eye-off"
+          size="36"
+          color="white"
+          class="eye-off-icon"
+        />
       </div>
 
       <!-- Selection overlay -->
@@ -40,7 +49,11 @@
 
       <!-- Selection checkmark (top-left) -->
       <div v-if="isSelected" class="selection-checkmark">
-        <v-icon icon="mdi-check" size="14" color="white"></v-icon>
+        <v-icon
+          icon="mdi-check"
+          size="14"
+          color="white"
+        />
       </div>
     </div>
   </v-card>

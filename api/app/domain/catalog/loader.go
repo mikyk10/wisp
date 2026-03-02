@@ -94,3 +94,10 @@ func (i *imageLocalFilePointer) Load() (image.Image, *model.ImgMeta, error) {
 func (i *imageLocalFilePointer) GetSourcePath() string {
 	return i.path
 }
+
+// ClearImage releases the cached decoded image to allow GC.
+// Call this after thumbnail generation is complete and before any blocking operations (e.g. DB writes)
+// to avoid holding large images in memory while waiting for I/O.
+func (i *imageLocalFilePointer) ClearImage() {
+	i.img = nil
+}

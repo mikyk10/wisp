@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -108,9 +109,33 @@ func (cu *catalogUseCase) Scan() error {
 	return nil
 }
 
+// scanConcurrency returns the number of parallel image-processing goroutines for catalog scan.
+// Each goroutine holds a full decoded image in memory until the DB write completes.
+// Decoding a 20 MP HEIC photo uses ~300–500 MB in the pure-Go HEVC decoder; keeping
+// concurrency low avoids OOM on memory-constrained hosts.
+//
+// Important: runtime.NumCPU() returns the host node's CPU count, which ignores container
+// CPU limits (e.g. Kubernetes limits.cpu). We use runtime.GOMAXPROCS(0) instead so that
+// setting the GOMAXPROCS environment variable (or using automaxprocs) correctly reflects
+// the container's allocated CPUs.
+//
+// Override with WISP_SCAN_CONCURRENCY (e.g. "2") to decouple scan concurrency from GOMAXPROCS.
+func scanConcurrency() int {
+	if v := os.Getenv("WISP_SCAN_CONCURRENCY"); v != "" {
+		if c, err := strconv.Atoi(v); err == nil && c > 0 {
+			return c
+		}
+	}
+	// Default: min(GOMAXPROCS, 4) — enough for throughput without excessive memory pressure.
+	if n := runtime.GOMAXPROCS(0); n < 4 {
+		return n
+	}
+	return 4
+}
+
 // scanCatalog performs a file scan for a single catalog.
-// Concurrency is capped at NumCPU to maximise parallelism.
-// Use the GOMEMLIMIT environment variable to cap memory usage if needed (e.g. k8s).
+// Concurrency is capped by scanConcurrency() to balance throughput against memory usage.
+// Set GOMEMLIMIT (e.g. GOMEMLIMIT=400MiB) so Go's GC runs more aggressively under pressure.
 func (cu *catalogUseCase) scanCatalog(ctx context.Context, provConf *config.ImageProviderConfig) {
 	pconf := provConf.Config.(config.ImageFileProviderConfig) //nolint:forcetypeassert
 
@@ -119,7 +144,8 @@ func (cu *catalogUseCase) scanCatalog(ctx context.Context, provConf *config.Imag
 		return
 	}
 
-	concurrency := runtime.NumCPU()
+	concurrency := scanConcurrency()
+	slog.Debug("scan: concurrency", "workers", concurrency)
 	wg := &sync.WaitGroup{}
 	sem := make(chan struct{}, concurrency)
 
@@ -231,6 +257,13 @@ func (cu *catalogUseCase) processIncludedFile(ctx context.Context, catalogKey st
 		return
 	}
 	resized = nil //nolint:ineffassign // intentionally cleared to encourage GC (OOM mitigation)
+
+	// Release the full-size image cached inside the loader before the DB write.
+	// Without this, info holds the decoded image until the goroutine exits — which may be
+	// delayed significantly when all goroutines pile up waiting for the SQLite single connection.
+	if ptr, ok := info.(interface{ ClearImage() }); ok {
+		ptr.ClearImage()
+	}
 
 	rec := &model.Image{
 		CatalogKey: catalogKey,

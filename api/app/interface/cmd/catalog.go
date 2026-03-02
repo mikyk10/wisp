@@ -37,10 +37,12 @@ func NewAlbumScanCommand(c *dig.Container) *cobra.Command {
 					Level: slog.LevelDebug,
 				})))
 			}
-			return catUc.Scan()
+			workers, _ := cmd.Flags().GetInt("workers")
+			return catUc.Scan(workers)
 		},
 	}
 	cmd.Flags().BoolP("verbose", "v", false, "Show all included, excluded, and skipped files")
+	cmd.Flags().IntP("workers", "w", 0, "Number of parallel image-processing goroutines (0 = auto: min(GOMAXPROCS,4), or WISP_SCAN_CONCURRENCY)")
 
 	return cmd
 }

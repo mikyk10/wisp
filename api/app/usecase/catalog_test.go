@@ -122,7 +122,7 @@ func TestScan_IndexesNewImages(t *testing.T) {
 
 	uc, _ := setupScanUseCase(t, dir)
 
-	if err := uc.Scan(); err != nil {
+	if err := uc.Scan(0); err != nil {
 		t.Fatalf("Scan() error: %v", err)
 	}
 
@@ -147,7 +147,7 @@ func TestScan_SkipsUnchangedFile(t *testing.T) {
 
 	uc, repo := setupScanUseCase(t, dir)
 
-	if err := uc.Scan(); err != nil {
+	if err := uc.Scan(0); err != nil {
 		t.Fatalf("first Scan() error: %v", err)
 	}
 
@@ -166,7 +166,7 @@ func TestScan_SkipsUnchangedFile(t *testing.T) {
 	}
 	rnd1 := img1.Rnd
 
-	if err := uc.Scan(); err != nil {
+	if err := uc.Scan(0); err != nil {
 		t.Fatalf("second Scan() error: %v", err)
 	}
 
@@ -188,7 +188,7 @@ func TestScan_ReindexesModifiedFile(t *testing.T) {
 
 	uc, repo := setupScanUseCase(t, dir)
 
-	if err := uc.Scan(); err != nil {
+	if err := uc.Scan(0); err != nil {
 		t.Fatalf("first Scan() error: %v", err)
 	}
 
@@ -213,7 +213,7 @@ func TestScan_ReindexesModifiedFile(t *testing.T) {
 		t.Fatalf("Chtimes() error: %v", err)
 	}
 
-	if err := uc.Scan(); err != nil {
+	if err := uc.Scan(0); err != nil {
 		t.Fatalf("second Scan() error: %v", err)
 	}
 
@@ -231,7 +231,7 @@ func TestScan_ReindexesModifiedFile(t *testing.T) {
 func TestScan_SkipsNonexistentSourceDir(t *testing.T) {
 	uc, _ := setupScanUseCase(t, "/nonexistent/path/that/does/not/exist")
 
-	if err := uc.Scan(); err != nil {
+	if err := uc.Scan(0); err != nil {
 		t.Fatalf("Scan() should not error for nonexistent dir, got: %v", err)
 	}
 }
@@ -245,7 +245,7 @@ func TestScan_Idempotent(t *testing.T) {
 	uc, _ := setupScanUseCase(t, dir)
 
 	for i := range 2 {
-		if err := uc.Scan(); err != nil {
+		if err := uc.Scan(0); err != nil {
 			t.Fatalf("Scan() #%d error: %v", i+1, err)
 		}
 	}
@@ -285,7 +285,7 @@ func TestScan_ExcludesFilesViaCriteria(t *testing.T) {
 		Displays: map[string]*config.DisplayConfig{},
 	})
 
-	if err := uc.Scan(); err != nil {
+	if err := uc.Scan(0); err != nil {
 		t.Fatalf("Scan() error: %v", err)
 	}
 
@@ -335,7 +335,7 @@ func TestScan_MultipleCatalogs(t *testing.T) {
 		Displays: map[string]*config.DisplayConfig{},
 	})
 
-	if err := uc.Scan(); err != nil {
+	if err := uc.Scan(0); err != nil {
 		t.Fatalf("Scan() error: %v", err)
 	}
 
@@ -359,7 +359,7 @@ func TestScan_StoresThumbnail(t *testing.T) {
 
 	uc, repo := setupScanUseCase(t, dir)
 
-	if err := uc.Scan(); err != nil {
+	if err := uc.Scan(0); err != nil {
 		t.Fatalf("Scan() error: %v", err)
 	}
 

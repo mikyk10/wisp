@@ -47,7 +47,8 @@ type AlbumScanCallback func(callbacks ...ImageTaskCallback) error
 
 type CatalogUsecase interface {
 	// Scan enumerates all images from every ImageProvider under the catalog (File provider only).
-	Scan() error
+	// workers controls the number of parallel image-processing goroutines (0 = use default).
+	Scan(workers int) error
 	// PurgeOrphans removes images that are unreachable from the index.
 	PurgeOrphans() error
 
@@ -76,7 +77,7 @@ func NewCatalogUseCase(serviceConfig *config.ServiceConfig, imgr repository.Imag
 	}
 }
 
-func (cu *catalogUseCase) Scan() error {
+func (cu *catalogUseCase) Scan(workers int) error {
 	// Cancel gracefully on CTRL+C or SIGTERM.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -103,24 +104,26 @@ func (cu *catalogUseCase) Scan() error {
 	})
 
 	for _, provConf := range fileProviderConfigs {
-		cu.scanCatalog(ctx, provConf)
+		cu.scanCatalog(ctx, provConf, workers)
 	}
 
 	return nil
 }
 
-// scanConcurrency returns the number of parallel image-processing goroutines for catalog scan.
+// scanConcurrency resolves the number of parallel image-processing goroutines.
+// Priority: flagWorkers (--workers flag) > WISP_SCAN_CONCURRENCY env var > min(GOMAXPROCS, 4).
+//
 // Each goroutine holds a full decoded image in memory until the DB write completes.
 // Decoding a 20 MP HEIC photo uses ~300–500 MB in the pure-Go HEVC decoder; keeping
 // concurrency low avoids OOM on memory-constrained hosts.
 //
-// Important: runtime.NumCPU() returns the host node's CPU count, which ignores container
-// CPU limits (e.g. Kubernetes limits.cpu). We use runtime.GOMAXPROCS(0) instead so that
-// setting the GOMAXPROCS environment variable (or using automaxprocs) correctly reflects
-// the container's allocated CPUs.
-//
-// Override with WISP_SCAN_CONCURRENCY (e.g. "2") to decouple scan concurrency from GOMAXPROCS.
-func scanConcurrency() int {
+// Note: runtime.NumCPU() returns the host node's CPU count and ignores container CPU limits
+// (e.g. Kubernetes limits.cpu). GOMAXPROCS(0) respects the GOMAXPROCS env var, which can be
+// set from limits.cpu via Kubernetes resourceFieldRef or the automaxprocs library.
+func scanConcurrency(flagWorkers int) int {
+	if flagWorkers > 0 {
+		return flagWorkers
+	}
 	if v := os.Getenv("WISP_SCAN_CONCURRENCY"); v != "" {
 		if c, err := strconv.Atoi(v); err == nil && c > 0 {
 			return c
@@ -135,8 +138,8 @@ func scanConcurrency() int {
 
 // scanCatalog performs a file scan for a single catalog.
 // Concurrency is capped by scanConcurrency() to balance throughput against memory usage.
-// Set GOMEMLIMIT (e.g. GOMEMLIMIT=400MiB) so Go's GC runs more aggressively under pressure.
-func (cu *catalogUseCase) scanCatalog(ctx context.Context, provConf *config.ImageProviderConfig) {
+// Set GOMEMLIMIT (e.g. GOMEMLIMIT=6GiB) so Go's GC runs more aggressively under pressure.
+func (cu *catalogUseCase) scanCatalog(ctx context.Context, provConf *config.ImageProviderConfig, workers int) {
 	pconf := provConf.Config.(config.ImageFileProviderConfig) //nolint:forcetypeassert
 
 	if _, err := os.Stat(pconf.SrcPath); err != nil {
@@ -144,7 +147,7 @@ func (cu *catalogUseCase) scanCatalog(ctx context.Context, provConf *config.Imag
 		return
 	}
 
-	concurrency := scanConcurrency()
+	concurrency := scanConcurrency(workers)
 	slog.Debug("scan: concurrency", "workers", concurrency)
 	wg := &sync.WaitGroup{}
 	sem := make(chan struct{}, concurrency)

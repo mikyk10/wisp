@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - 'api/**'
+      - '!api/**/*.md'
       - '.github/workflows/ci-api.yml'
   workflow_dispatch:
   pull_request:
     paths:
       - 'api/**'
+      - '!api/**/*.md'
       - '.github/workflows/ci-api.yml'
 
 permissions:

@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - 'frontend/**'
+      - '!frontend/**/*.md'
       - '.github/workflows/ci-frontend.yml'
   workflow_dispatch:
   pull_request:
     paths:
       - 'frontend/**'
+      - '!frontend/**/*.md'
       - '.github/workflows/ci-frontend.yml'
 
 permissions:

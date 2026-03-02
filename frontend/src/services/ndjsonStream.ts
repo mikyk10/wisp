@@ -1,0 +1,62 @@
+import { getDataSourceUrl } from '../config'
+
+/**
+ * Reads a newline-delimited JSON stream and yields each parsed object.
+ *
+ * @template T The expected shape of each JSON record.
+ */
+export class NDJSONStreamReader<T = unknown> {
+  async *readStream(resourcePath: string): AsyncGenerator<T, void, unknown> {
+    const finalUrl = getDataSourceUrl(resourcePath)
+    const response = await fetch(finalUrl)
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('Response body is not readable')
+    }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) {
+          // Flush any remaining buffered data
+          if (buffer.trim()) {
+            try {
+              yield JSON.parse(buffer.trim()) as T
+            } catch (error) {
+              console.warn('Parse error on last line:', error, buffer)
+            }
+          }
+          break
+        }
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+
+        // Keep the last (potentially incomplete) chunk in the buffer
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          const trimmedLine = line.trim()
+          if (trimmedLine) {
+            try {
+              yield JSON.parse(trimmedLine) as T
+            } catch (error) {
+              console.warn('Parse error on line:', error, trimmedLine)
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+  }
+}

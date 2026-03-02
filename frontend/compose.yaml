@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      target: builder
+    ports:
+      - "8080:80" # Map host port 8080 to container port 80
+    environment:
+      # API base URL injected at container start via docker-entrypoint.sh
+      # Override with your server address (e.g. http://192.168.1.10:8080)
+      - API_BASE_URL=http://localhost:8080
+    stdin_open: true # Keeps stdin open for the container
+    tty: true        # Allocates a TTY
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 80"
+
+# It's good practice to define networks, though not strictly necessary for a single service.
+# networks:
+#   default:
+#     driver: bridge

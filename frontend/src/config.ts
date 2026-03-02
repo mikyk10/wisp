@@ -1,12 +1,13 @@
 /**
  * Resolve the API base URL at runtime.
  *
- * Source: window.__env__.API_BASE_URL — written by docker-entrypoint.sh (production)
- *         or public/env.js (local dev, gitignored).
- * Falls back to '' which activates mock mode.
+ * Priority:
+ *   1. window.__env__.API_BASE_URL — set by docker-entrypoint.sh at container start (nginx/production)
+ *   2. import.meta.env.VITE_API_BASE_URL — injected by Vite dev server (local dev via compose)
+ *   3. '' — mock mode
  */
 function resolveApiBaseUrl(): string {
-  return window.__env__?.API_BASE_URL ?? ''
+  return window.__env__?.API_BASE_URL ?? import.meta.env.VITE_API_BASE_URL ?? ''
 }
 
 export const API_BASE_URL: string = resolveApiBaseUrl()

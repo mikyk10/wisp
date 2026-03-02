@@ -27,6 +27,13 @@ export default defineConfig(async ({ mode }) => {
         '@': fileURLToPath(new URL('./src', import.meta.url))
       },
     },
+    server: {
+      watch: {
+        // macOS → Docker volume mount does not propagate inotify events.
+        // Polling ensures HMR works when running inside a container.
+        usePolling: true,
+      },
+    },
     preview: {
       host: '0.0.0.0',
       allowedHosts: true,

@@ -78,9 +78,9 @@ func Middlewares(logger *slog.Logger, e *echo.Echo) *echo.Echo {
 		Level: 5,
 	}))
 
-	// CORS: defaults to "*" (suitable for local home-network deployment).
-	// Set ALLOWED_ORIGINS to a comma-separated list of origins to restrict access
-	// (e.g. ALLOWED_ORIGINS=http://192.168.1.10:3000).
+	// CORS: defaults to "*" (allow all origins).
+	// Set ALLOWED_ORIGINS to a comma-separated list of allowed origins to restrict
+	// cross-origin access in production (e.g. ALLOWED_ORIGINS=https://your-frontend.example.com).
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 	if allowedOrigins == "" {
 		allowedOrigins = "*"

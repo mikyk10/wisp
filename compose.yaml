@@ -9,7 +9,10 @@ services:
       - "9002:9002"
     environment:
       - TZ=Asia/Tokyo
-      #- ALLOWED_ORIGINS=http://localhost:8080
+      # ALLOWED_ORIGINS: comma-separated list of allowed origins (default: * = allow all).
+      # Set this in production to restrict cross-origin access.
+      # Example: ALLOWED_ORIGINS=https://your-frontend.example.com
+      #- ALLOWED_ORIGINS=https://your-frontend.example.com
       # --- catalog scan memory tuning ---
       # HEIC (HEVC) decoding uses ~300-500 MB per image in the Go decoder.
       # Default concurrency is min(NumCPU, 4); lower this on memory-constrained hosts.

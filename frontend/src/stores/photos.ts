@@ -20,7 +20,7 @@ export const usePhotosStore = defineStore('photos', () => {
       .sort(([a], [b]) => b.localeCompare(a)) // descending order (newest first)
       .map(([key, data]) => ({
         key,
-        label: `${data.year}/${data.month}`,
+        label: `${data.year}/${String(data.month).padStart(2, '0')}`,
         ...data,
       }))
   })

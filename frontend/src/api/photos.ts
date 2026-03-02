@@ -6,6 +6,6 @@ export const photosApi = {
    * POST /catalog/selected/_toggle-visibility  { ids: number[] }
    */
   async toggleVisibility(ids: number[]): Promise<void> {
-    await apiClient.post('/catalog/selected/_toggle-visibility', { ids })
+    await apiClient.post('/api/catalog/selected/_toggle-visibility', { ids })
   },
 }

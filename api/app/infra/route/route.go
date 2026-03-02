@@ -15,36 +15,32 @@ import (
 func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 
 	if err := ctn.Invoke(func(h handler.CatalogHandler) { //nolint:contextcheck
-		// setup route
-		apis := e.Group("")
+		// Management API — requires authentication
+		api := e.Group("/api")
 		{
-			// /catalogs
-			// Returns the list of catalogs.
-			apis.GET("/catalogs", h.ListCatalogs)
+			// /api/catalogs
+			api.GET("/catalogs", h.ListCatalogs)
 
-			// /catalog/{catalog key}/images
-			// Returns the list of indexed images under the catalog.
-			apis.GET("/catalog/:catalogKey/images", h.List)
+			// /api/catalog/{catalog key}/images
+			api.GET("/catalog/:catalogKey/images", h.List)
 
-			// /catalog/{catalog key}/image/{ID Number}.{Extention}
-			// Returns the specified image in the catalog in the file format indicated by the extension.
-			apis.GET("/catalog/:catalogKey/image/:imgid", h.Img)
+			// /api/catalog/{catalog key}/image/{ID Number}.{Extension}
+			api.GET("/catalog/:catalogKey/image/:imgid", h.Img)
 
-			// /devices
-			// Returns all devices in use.
-			apis.GET("/devices", h.List)
+			// /api/devices
+			api.GET("/devices", h.List)
 
-			//
-			//
-			apis.POST("/catalog/selected/_toggle-visibility", h.ToggleVisibility)
+			// /api/catalog/selected/_toggle-visibility
+			api.POST("/catalog/selected/_toggle-visibility", h.ToggleVisibility)
+		}
 
-			// /pf/{DEVICE_MAC_ADDR}/image/{ID Number}.{Extention}
-			// Returns the specified image suitable for the device in the file format indicated by the extension.
-			apis.GET("/pf/:displayKey/image/:imgid", h.Img)
+		// Device API — no authentication required (called by ESP32 firmware)
+		{
+			// /pf/{display key}/image/{ID Number}.{Extension}
+			e.GET("/pf/:displayKey/image/:imgid", h.Img)
 
-			// /pf/{DEVICE_MAC_ADDR}/image/{ID Number}.{Extention}
-			// Selects an image from the catalog suitable for the device and returns it in the file format indicated by the extension.
-			apis.GET("/pf/:displayKey/image/random.*", h.RandomImg)
+			// /pf/{display key}/image/random.{Extension}
+			e.GET("/pf/:displayKey/image/random.*", h.RandomImg)
 		}
 
 		pages := e.Group("")

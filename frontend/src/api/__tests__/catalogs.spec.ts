@@ -19,7 +19,7 @@ describe('catalogsApi', () => {
       const { catalogsApi } = await import('../catalogs')
       const result = await catalogsApi.fetchAll()
 
-      expect(apiClient.get).toHaveBeenCalledWith('catalogs')
+      expect(apiClient.get).toHaveBeenCalledWith('api/catalogs')
       expect(result).toEqual(['album-a', 'album-b'])
     })
 

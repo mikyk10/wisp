@@ -19,7 +19,7 @@ describe('photosApi', () => {
       await photosApi.toggleVisibility([1, 2, 3])
 
       expect(apiClient.post).toHaveBeenCalledOnce()
-      expect(apiClient.post).toHaveBeenCalledWith('/catalog/selected/_toggle-visibility', {
+      expect(apiClient.post).toHaveBeenCalledWith('/api/catalog/selected/_toggle-visibility', {
         ids: [1, 2, 3],
       })
     })

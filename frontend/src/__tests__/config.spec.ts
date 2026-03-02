@@ -56,7 +56,7 @@ describe('buildImageUrl', () => {
     setWindowEnv('http://api.example.com')
     const { buildImageUrl } = await import('../config')
     expect(buildImageUrl('mycat', 42)).toBe(
-      'http://api.example.com/catalog/mycat/image/42.jpg'
+      'http://api.example.com/api/catalog/mycat/image/42.jpg'
     )
   })
 

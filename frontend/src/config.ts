@@ -23,8 +23,8 @@ export function buildApiUrl(path: string): string {
 
 /** Canonical API path segments. */
 export const API_PATHS = {
-  catalogs: (): string => 'catalogs',
-  catalogImages: (catalogKey: string): string => `catalog/${catalogKey}/images`,
+  catalogs: (): string => 'api/catalogs',
+  catalogImages: (catalogKey: string): string => `api/catalog/${catalogKey}/images`,
 }
 
 /**
@@ -34,7 +34,7 @@ export const API_PATHS = {
  */
 export function buildImageUrl(catalogKey: string, id: number): string {
   if (isApiMode()) {
-    return `${API_BASE_URL.replace(/\/$/, '')}/catalog/${catalogKey}/image/${id}.jpg`
+    return `${API_BASE_URL.replace(/\/$/, '')}/api/catalog/${catalogKey}/image/${id}.jpg`
   }
   return `https://picsum.photos/240/240?random=${id}`
 }

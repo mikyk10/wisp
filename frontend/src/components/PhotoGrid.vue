@@ -11,8 +11,10 @@
           indeterminate
           size="64"
           color="primary"
-        ></v-progress-circular>
-        <div class="mt-4 text-h6">Loading photos…</div>
+        />
+        <div class="mt-4 text-h6">
+          Loading photos…
+        </div>
       </div>
     </v-overlay>
 
@@ -42,7 +44,7 @@
           size="18"
           width="2"
           color="primary"
-        ></v-progress-circular>
+        />
         <span class="ml-3 stream-loading-text">Loading more…</span>
       </div>
 

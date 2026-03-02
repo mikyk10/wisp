@@ -8,12 +8,15 @@
     >
       <v-app-bar-title>
         <div class="d-flex align-center">
-          <WispLogo :size="36" class="mr-2" />
+          <WispLogo
+            :size="36"
+            class="mr-2"
+          />
           <span class="app-title-text">WiSP</span>
         </div>
       </v-app-bar-title>
 
-      <v-spacer></v-spacer>
+      <v-spacer />
 
       <div class="d-flex align-center">
         <v-select
@@ -26,7 +29,7 @@
           style="max-width: 150px"
           color="primary"
           item-color="primary"
-        ></v-select>
+        />
         <v-chip
           v-if="totalPhotos > 0"
           variant="outlined"
@@ -34,7 +37,10 @@
           class="mr-3"
           size="small"
         >
-          <v-icon icon="mdi-image-multiple" start></v-icon>
+          <v-icon
+            icon="mdi-image-multiple"
+            start
+          />
           {{ totalPhotos }} photos
         </v-chip>
 
@@ -44,7 +50,10 @@
           class="mr-3"
           size="small"
         >
-          <v-icon icon="mdi-check-circle" start></v-icon>
+          <v-icon
+            icon="mdi-check-circle"
+            start
+          />
           {{ selectedCount }} selected
         </v-chip>
       </div>

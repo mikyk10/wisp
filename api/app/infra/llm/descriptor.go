@@ -21,12 +21,14 @@ type descriptorClient struct {
 	prompt *Prompt
 }
 
-// NewDescriptorClient constructs a DescriptorClient using the configured prompt and provider settings.
+// NewDescriptorClient constructs a DescriptorClient.
+// If cfg.AI.DescriptorPromptPath is set, the prompt is loaded from that file;
+// otherwise the built-in embedded prompt is used.
 func NewDescriptorClient(cfg *config.GlobalConfig) (ai.DescriptorClient, error) {
 	var prompt *Prompt
-	if cfg.AI.DescriptorPrompt != "" {
+	if cfg.AI.DescriptorPromptPath != "" {
 		var err error
-		prompt, err = LoadPrompt(cfg.AI.DescriptorPrompt)
+		prompt, err = LoadPrompt(cfg.AI.DescriptorPromptPath)
 		if err != nil {
 			return nil, fmt.Errorf("descriptor client: %w", err)
 		}
@@ -36,8 +38,25 @@ func NewDescriptorClient(cfg *config.GlobalConfig) (ai.DescriptorClient, error) 
 	return &descriptorClient{cfg: cfg, prompt: prompt}, nil
 }
 
+func (c *descriptorClient) Validate() error {
+	if _, ok := c.cfg.AI.Providers[c.prompt.Config.Provider]; !ok {
+		return fmt.Errorf("provider %q not found in ai.providers config", c.prompt.Config.Provider)
+	}
+	return nil
+}
+
 func (c *descriptorClient) PromptModel() string {
 	return c.prompt.Config.Model
+}
+
+// WithPromptPath returns a new DescriptorClient that loads its prompt from path.
+// The original client is unchanged.
+func (c *descriptorClient) WithPromptPath(path string) (ai.DescriptorClient, error) {
+	prompt, err := LoadPrompt(path)
+	if err != nil {
+		return nil, fmt.Errorf("descriptor: load prompt from %q: %w", path, err)
+	}
+	return &descriptorClient{cfg: c.cfg, prompt: prompt}, nil
 }
 
 func (c *descriptorClient) Describe(ctx context.Context, thumbJPEG []byte) (string, error) {
@@ -93,6 +112,9 @@ func (c *descriptorClient) Describe(ctx context.Context, thumbJPEG []byte) (stri
 
 		resp, err := provider.Completion(ctx, params)
 		if err != nil {
+			if ctx.Err() != nil {
+				return "", ctx.Err()
+			}
 			lastErr = err
 			slog.Warn("descriptor: completion failed", "attempt", attempt, "err", err)
 			continue

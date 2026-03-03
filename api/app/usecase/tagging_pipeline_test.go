@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mikyk10/wisp/app/domain/ai"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/mikyk10/wisp/app/domain/repository"
@@ -29,11 +30,15 @@ type mockDescriptorClient struct {
 	callCount int
 }
 
+func (m *mockDescriptorClient) Validate() error { return nil }
 func (m *mockDescriptorClient) Describe(_ context.Context, _ []byte) (string, error) {
 	m.callCount++
 	return m.response, m.err
 }
 func (m *mockDescriptorClient) PromptModel() string { return m.modelName }
+func (m *mockDescriptorClient) WithPromptPath(_ string) (ai.DescriptorClient, error) {
+	return m, nil
+}
 
 type mockTaggerClient struct {
 	modelName string
@@ -42,11 +47,15 @@ type mockTaggerClient struct {
 	callCount int
 }
 
+func (m *mockTaggerClient) Validate() error { return nil }
 func (m *mockTaggerClient) Tag(_ context.Context, _ string) ([]string, error) {
 	m.callCount++
 	return m.tags, m.err
 }
 func (m *mockTaggerClient) PromptModel() string { return m.modelName }
+func (m *mockTaggerClient) WithPromptPath(_ string) (ai.TaggerClient, error) {
+	return m, nil
+}
 
 // --- Test setup ---
 

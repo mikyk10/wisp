@@ -53,13 +53,13 @@ type GlobalConfig struct {
 		}
 	}
 	AI struct {
-		Providers         map[string]AIProviderConfig `yaml:"providers"`
-		DescriptorPrompt  string                      `yaml:"descriptor_prompt" env:"WISP_AI_DESCRIPTOR_PROMPT"`
-		TaggerPrompt      string                      `yaml:"tagger_prompt"     env:"WISP_AI_TAGGER_PROMPT"`
-		Workers           int                         `yaml:"workers"             env:"WISP_AI_WORKERS"`
-		RequestTimeoutSec int                         `yaml:"request_timeout_sec" env:"WISP_AI_REQUEST_TIMEOUT_SEC"`
-		MaxTags           int                         `yaml:"max_tags"            env:"WISP_AI_MAX_TAGS"`
-		MaxRetries        int                         `yaml:"max_retries"         env:"WISP_AI_MAX_RETRIES"`
+		Providers            map[string]AIProviderConfig `yaml:"providers"`
+		DescriptorPromptPath string                      `yaml:"descriptor_prompt_path" env:"WISP_AI_DESCRIPTOR_PROMPT_PATH"`
+		TaggerPromptPath     string                      `yaml:"tagger_prompt_path"     env:"WISP_AI_TAGGER_PROMPT_PATH"`
+		Workers              int                         `yaml:"workers"                env:"WISP_AI_WORKERS"`
+		RequestTimeoutSec    int                         `yaml:"request_timeout_sec"    env:"WISP_AI_REQUEST_TIMEOUT_SEC"`
+		MaxTags              int                         `yaml:"max_tags"               env:"WISP_AI_MAX_TAGS"`
+		MaxRetries           int                         `yaml:"max_retries"            env:"WISP_AI_MAX_RETRIES"`
 	} `yaml:"ai"`
 }
 

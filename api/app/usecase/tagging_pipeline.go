@@ -32,10 +32,10 @@ type TaggingRunOptions struct {
 	Workers          int    // 0 = config default
 	Limit            int    // 0 = no limit
 	Rebuild          bool
-	Stage            int    // 0 = all, 2 = tagging only (--rebuild required)
-	DryRun           bool
-	DescriptorPrompt string // file path; "" = config/default embedded
-	TaggerPrompt     string // file path; "" = config/default embedded
+	Stage                int    // 0 = all, 2 = tagging only (--rebuild required)
+	DryRun               bool
+	DescriptorPromptPath string // prompt file path for descriptor; "" = use the client's built-in prompt
+	TaggerPromptPath     string // prompt file path for tagger;     "" = use the client's built-in prompt
 }
 
 // TaggingPipelineStats collects run counters for progress reporting.
@@ -91,11 +91,33 @@ func (p *taggingPipelineUsecase) Run(ctx context.Context, opts TaggingRunOptions
 		}
 	}()
 
-	if opts.DescriptorPrompt != "" {
-		slog.Info("tagging: custom descriptor prompt specified (configured at DI level)", "path", opts.DescriptorPrompt)
+	// Validate client configuration before spawning any workers.
+	// Errors here are structural (e.g. provider not in config) and will affect every image.
+	if err := p.descriptor.Validate(); err != nil {
+		return fmt.Errorf("descriptor client: %w", err)
 	}
-	if opts.TaggerPrompt != "" {
-		slog.Info("tagging: custom tagger prompt specified (configured at DI level)", "path", opts.TaggerPrompt)
+	if err := p.tagger.Validate(); err != nil {
+		return fmt.Errorf("tagger client: %w", err)
+	}
+
+	// If a prompt file path is specified, build a new client that uses that file.
+	descriptor := p.descriptor
+	tagger := p.tagger
+	if opts.DescriptorPromptPath != "" {
+		d, err := p.descriptor.WithPromptPath(opts.DescriptorPromptPath)
+		if err != nil {
+			return fmt.Errorf("load descriptor prompt: %w", err)
+		}
+		descriptor = d
+		slog.Info("tagging: using custom descriptor prompt", "path", opts.DescriptorPromptPath)
+	}
+	if opts.TaggerPromptPath != "" {
+		t, err := p.tagger.WithPromptPath(opts.TaggerPromptPath)
+		if err != nil {
+			return fmt.Errorf("load tagger prompt: %w", err)
+		}
+		tagger = t
+		slog.Info("tagging: using custom tagger prompt", "path", opts.TaggerPromptPath)
 	}
 
 	// Resolve workers.
@@ -177,7 +199,7 @@ func (p *taggingPipelineUsecase) Run(ctx context.Context, opts TaggingRunOptions
 		go func(img *model.Image) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			p.processImage(ctx, img, opts, stats)
+			p.processImage(ctx, img, opts, descriptor, tagger, stats)
 		}(img)
 	}
 	wg.Wait()
@@ -191,7 +213,7 @@ func (p *taggingPipelineUsecase) Run(ctx context.Context, opts TaggingRunOptions
 	return nil
 }
 
-func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Image, opts TaggingRunOptions, stats *TaggingPipelineStats) {
+func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Image, opts TaggingRunOptions, descriptor ai.DescriptorClient, tagger ai.TaggerClient, stats *TaggingPipelineStats) {
 	defer stats.Processed.Add(1)
 
 	log := slog.With("image_id", img.ID, "catalog", img.CatalogKey)
@@ -264,7 +286,7 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 		run := &model.AIRun{
 			ImageID:   img.ID,
 			Stage:     model.AIRunStageDescriptor,
-			ModelName: p.descriptor.PromptModel(),
+			ModelName: descriptor.PromptModel(),
 			Status:    model.AIRunStatusRunning,
 			StartedAt: time.Now(),
 			InputHash: img.SrcHash,
@@ -276,13 +298,16 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 		}
 
 		start := time.Now()
-		desc, err := p.descriptor.Describe(ctx, img.ThumbJPG)
+		desc, err := descriptor.Describe(ctx, img.ThumbJPG)
 		latency := time.Since(start).Milliseconds()
 
 		run.LatencyMs = latency
 		run.FinishedAt = sql.NullTime{Time: time.Now(), Valid: true}
 
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			run.Status = model.AIRunStatusFailed
 			run.ErrorCode = ErrCodeDescriptorFailed
 			run.ErrorMessage = err.Error()
@@ -322,7 +347,7 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 		run := &model.AIRun{
 			ImageID:   img.ID,
 			Stage:     model.AIRunStageTagging,
-			ModelName: p.tagger.PromptModel(),
+			ModelName: tagger.PromptModel(),
 			Status:    model.AIRunStatusRunning,
 			StartedAt: time.Now(),
 			InputHash: img.SrcHash,
@@ -334,13 +359,16 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 		}
 
 		start := time.Now()
-		tags, err := p.tagger.Tag(ctx, description)
+		tags, err := tagger.Tag(ctx, description)
 		latency := time.Since(start).Milliseconds()
 
 		run.LatencyMs = latency
 		run.FinishedAt = sql.NullTime{Time: time.Now(), Valid: true}
 
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			run.Status = model.AIRunStatusFailed
 			run.ErrorCode = ErrCodeTaggingFailed
 			run.ErrorMessage = err.Error()

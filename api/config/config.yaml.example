@@ -19,8 +19,8 @@ ai:
     # openai:
     #   endpoint: https://api.openai.com/v1
     #   api_key: sk-...
-  # descriptor_prompt: /path/to/descriptor.md  # omit to use the built-in default
-  # tagger_prompt: /path/to/tagger.md           # omit to use the built-in default
+  # descriptor_prompt_path: /path/to/descriptor.md  # omit to use the built-in embedded prompt
+  # tagger_prompt_path: /path/to/tagger.md           # omit to use the built-in embedded prompt
   workers: 2
   request_timeout_sec: 90
   max_tags: 15

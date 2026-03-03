@@ -36,12 +36,14 @@ type taggerClient struct {
 	prompt *Prompt
 }
 
-// NewTaggerClient constructs a TaggerClient using the configured prompt and provider settings.
+// NewTaggerClient constructs a TaggerClient.
+// If cfg.AI.TaggerPromptPath is set, the prompt is loaded from that file;
+// otherwise the built-in embedded prompt is used.
 func NewTaggerClient(cfg *config.GlobalConfig) (ai.TaggerClient, error) {
 	var prompt *Prompt
-	if cfg.AI.TaggerPrompt != "" {
+	if cfg.AI.TaggerPromptPath != "" {
 		var err error
-		prompt, err = LoadPrompt(cfg.AI.TaggerPrompt)
+		prompt, err = LoadPrompt(cfg.AI.TaggerPromptPath)
 		if err != nil {
 			return nil, fmt.Errorf("tagger client: %w", err)
 		}
@@ -56,8 +58,25 @@ type taggerTemplateVars struct {
 	Description string
 }
 
+func (c *taggerClient) Validate() error {
+	if _, ok := c.cfg.AI.Providers[c.prompt.Config.Provider]; !ok {
+		return fmt.Errorf("provider %q not found in ai.providers config", c.prompt.Config.Provider)
+	}
+	return nil
+}
+
 func (c *taggerClient) PromptModel() string {
 	return c.prompt.Config.Model
+}
+
+// WithPromptPath returns a new TaggerClient that loads its prompt from path.
+// The original client is unchanged.
+func (c *taggerClient) WithPromptPath(path string) (ai.TaggerClient, error) {
+	prompt, err := LoadPrompt(path)
+	if err != nil {
+		return nil, fmt.Errorf("tagger: load prompt from %q: %w", path, err)
+	}
+	return &taggerClient{cfg: c.cfg, prompt: prompt}, nil
 }
 
 func (c *taggerClient) Tag(ctx context.Context, description string) ([]string, error) {
@@ -118,6 +137,9 @@ func (c *taggerClient) Tag(ctx context.Context, description string) ([]string, e
 
 		resp, err := provider.Completion(ctx, params)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			lastErr = err
 			slog.Warn("tagger: completion failed", "attempt", attempt, "err", err)
 			continue

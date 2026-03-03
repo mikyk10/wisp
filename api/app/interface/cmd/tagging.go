@@ -29,18 +29,18 @@ func NewCatalogTaggingRunCommand(c *dig.Container) *cobra.Command {
 			rebuild, _ := cmd.Flags().GetBool("rebuild")
 			stage, _ := cmd.Flags().GetInt("stage")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
-			descriptorPrompt, _ := cmd.Flags().GetString("descriptor-prompt")
-			taggerPrompt, _ := cmd.Flags().GetString("tagger-prompt")
+			descriptorPromptPath, _ := cmd.Flags().GetString("descriptor-prompt-path")
+			taggerPromptPath, _ := cmd.Flags().GetString("tagger-prompt-path")
 
 			return pipelineUc.Run(context.Background(), usecase.TaggingRunOptions{
-				CatalogKey:       catalog,
-				Workers:          workers,
-				Limit:            limit,
-				Rebuild:          rebuild,
-				Stage:            stage,
-				DryRun:           dryRun,
-				DescriptorPrompt: descriptorPrompt,
-				TaggerPrompt:     taggerPrompt,
+				CatalogKey:           catalog,
+				Workers:              workers,
+				Limit:                limit,
+				Rebuild:              rebuild,
+				Stage:                stage,
+				DryRun:               dryRun,
+				DescriptorPromptPath: descriptorPromptPath,
+				TaggerPromptPath:     taggerPromptPath,
 			})
 		},
 	}
@@ -51,8 +51,8 @@ func NewCatalogTaggingRunCommand(c *dig.Container) *cobra.Command {
 	cmd.Flags().Bool("rebuild", false, "Re-tag all images, including already-tagged ones")
 	cmd.Flags().Int("stage", 0, "Start from stage N (0 = all; 2 = tagging only, requires --rebuild)")
 	cmd.Flags().Bool("dry-run", false, "Show what would be done without writing to the DB")
-	cmd.Flags().String("descriptor-prompt", "", "Path to a custom descriptor prompt file (default: built-in)")
-	cmd.Flags().String("tagger-prompt", "", "Path to a custom tagger prompt file (default: built-in)")
+	cmd.Flags().String("descriptor-prompt-path", "", "Path to a custom descriptor prompt .md file (default: built-in)")
+	cmd.Flags().String("tagger-prompt-path", "", "Path to a custom tagger prompt .md file (default: built-in)")
 
 	_ = cmd.MarkFlagRequired("catalog")
 

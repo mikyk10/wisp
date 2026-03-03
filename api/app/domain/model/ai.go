@@ -53,18 +53,18 @@ const (
 )
 
 type AIRun struct {
-	ID            PrimaryKey   `gorm:"primaryKey;autoIncrement"`
-	ImageID       PrimaryKey   `gorm:"not null;index:idx_run_image_stage_status,priority:1"`
-	Stage         AIRunStage   `gorm:"type:varchar(32);not null;index:idx_run_image_stage_status,priority:2"`
-	ModelName     string       `gorm:"type:varchar(128);not null"`
-	PromptVersion string       `gorm:"type:varchar(32)"`
-	PromptHash    string       `gorm:"type:char(12)"`
-	Status        AIRunStatus  `gorm:"type:varchar(32);not null;index:idx_run_image_stage_status,priority:3"`
-	StartedAt     time.Time    `gorm:"not null"`
+	ID            PrimaryKey  `gorm:"primaryKey;autoIncrement"`
+	ImageID       PrimaryKey  `gorm:"not null;index:idx_run_image_stage_status,priority:1"`
+	Stage         AIRunStage  `gorm:"type:varchar(32);not null;index:idx_run_image_stage_status,priority:2"`
+	ModelName     string      `gorm:"type:varchar(128);not null"`
+	PromptVersion string      `gorm:"type:varchar(32)"`
+	PromptHash    string      `gorm:"type:char(12)"`
+	Status        AIRunStatus `gorm:"type:varchar(32);not null;index:idx_run_image_stage_status,priority:3"`
+	StartedAt     time.Time   `gorm:"not null"`
 	FinishedAt    sql.NullTime
-	RetryCount    int          `gorm:"not null;default:0"`
-	ErrorCode     string       `gorm:"type:varchar(64)"`
-	ErrorMessage  string       `gorm:"type:text"`
+	RetryCount    int    `gorm:"not null;default:0"`
+	ErrorCode     string `gorm:"type:varchar(64)"`
+	ErrorMessage  string `gorm:"type:text"`
 	LatencyMs     int64
 	InputHash     string `gorm:"type:char(40)"`
 	CreatedAt     time.Time

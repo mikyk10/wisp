@@ -148,6 +148,21 @@ func (r *taggingRepositoryImpl) FindImagesForTagging(catalogKey string, limit in
 	return images, nil
 }
 
+// FindTagNamesByImageID returns tag names for a single image via a JOIN query.
+func (r *taggingRepositoryImpl) FindTagNamesByImageID(imageID model.PrimaryKey) ([]string, error) {
+	var names []string
+	err := r.conn.Raw(`
+		SELECT t.name_normalized
+		FROM image_tags it
+		JOIN tags t ON it.tag_id = t.id
+		WHERE it.image_id = ?
+	`, imageID).Scan(&names).Error
+	if err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
 // FindAllImages returns all non-excluded, non-deleted images in the given catalog.
 func (r *taggingRepositoryImpl) FindAllImages(catalogKey string, limit int) ([]*model.Image, error) {
 	var images []*model.Image

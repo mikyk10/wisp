@@ -14,7 +14,7 @@ import (
 // Associates each URL to a controller action
 func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 
-	if err := ctn.Invoke(func(h handler.CatalogHandler) { //nolint:contextcheck
+	if err := ctn.Invoke(func(h handler.CatalogHandler, th *handler.ImageTagsHandler) { //nolint:contextcheck
 		// Management API — requires authentication
 		api := e.Group("/api")
 		{
@@ -32,6 +32,9 @@ func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 
 			// /api/catalog/selected/_toggle-visibility
 			api.POST("/catalog/selected/_toggle-visibility", h.ToggleVisibility)
+
+			// /api/images/{id}/tags
+			api.GET("/images/:id/tags", th.GetTags)
 		}
 
 		// Device API — no authentication required (called by ESP32 firmware)

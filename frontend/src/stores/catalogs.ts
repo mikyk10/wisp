@@ -42,6 +42,7 @@ export const useCatalogsStore = defineStore('catalogs', () => {
 
   async function setCurrentCatalog(catalog: string) {
     currentCatalog.value = catalog
+    usePhotosStore().filterTags = []
     await _loadCatalog(catalog)
   }
 

@@ -29,12 +29,13 @@ const (
 
 // TaggingRunOptions configures a single pipeline run.
 type TaggingRunOptions struct {
-	CatalogKey       string
-	Workers          int    // 0 = config default
-	Limit            int    // 0 = no limit
-	Rebuild          bool
-	Stage                int    // 0 = all, 2 = tagging only (--rebuild required)
+	CatalogKey           string
+	Workers              int              // 0 = config default
+	Limit                int              // 0 = no limit
+	Rebuild              bool
+	Stage                model.AIRunStage // "" = all stages; "tagging" = tagging only (requires --rebuild)
 	DryRun               bool
+	Verbose              bool
 	DescriptorPromptPath string // prompt file path for descriptor; "" = use the client's built-in prompt
 	TaggerPromptPath     string // prompt file path for tagger;     "" = use the client's built-in prompt
 }
@@ -76,6 +77,13 @@ func NewTaggingPipelineUsecase(
 }
 
 func (p *taggingPipelineUsecase) Run(ctx context.Context, opts TaggingRunOptions) error {
+	if opts.Stage != "" && !opts.Stage.IsValid() {
+		return fmt.Errorf("invalid --stage %q: valid values are %v", opts.Stage, model.ValidStages())
+	}
+	if opts.Stage == model.AIRunStageTagging && !opts.Rebuild {
+		return fmt.Errorf("--stage=tagging requires --rebuild")
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -189,7 +197,7 @@ func (p *taggingPipelineUsecase) Run(ctx context.Context, opts TaggingRunOptions
 	// Worker pool.
 	sem := make(chan struct{}, workers)
 	var wg sync.WaitGroup
-	for _, img := range images {
+	for i, img := range images {
 		select {
 		case <-ctx.Done():
 			break
@@ -197,11 +205,11 @@ func (p *taggingPipelineUsecase) Run(ctx context.Context, opts TaggingRunOptions
 		}
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(img *model.Image) {
+		go func(img *model.Image, pos int) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			p.processImage(ctx, img, opts, descriptor, tagger, stats)
-		}(img)
+			p.processImage(ctx, img, pos, stats.Total, opts, descriptor, tagger, stats)
+		}(img, i+1)
 	}
 	wg.Wait()
 
@@ -214,10 +222,10 @@ func (p *taggingPipelineUsecase) Run(ctx context.Context, opts TaggingRunOptions
 	return nil
 }
 
-func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Image, opts TaggingRunOptions, descriptor ai.DescriptorClient, tagger ai.TaggerClient, stats *TaggingPipelineStats) {
+func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Image, pos int, total int64, opts TaggingRunOptions, descriptor ai.DescriptorClient, tagger ai.TaggerClient, stats *TaggingPipelineStats) {
 	defer stats.Processed.Add(1)
 
-	log := slog.With("image_id", img.ID, "catalog", img.CatalogKey)
+	log := slog.With("image_id", img.ID, "catalog", img.CatalogKey, "pos", fmt.Sprintf("%d/%d", pos, total))
 
 	// --rebuild: check for empty thumbnail first.
 	if opts.Rebuild && len(img.ThumbJPG) == 0 {
@@ -236,6 +244,7 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 	// Determine what needs to run.
 	runDescriptor := true
 	runTagging := true
+	var cachedDescRun *model.AIRun // set when an existing descriptor run will be reused
 
 	if !opts.Rebuild {
 		// Normal mode: skip if already tagged.
@@ -260,18 +269,30 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 		}
 		if descRun != nil {
 			runDescriptor = false
+			cachedDescRun = descRun
+			if opts.Verbose {
+				log.Info("tagging: reusing existing descriptor output", "run_id", descRun.ID)
+			}
 		}
-	} else if opts.Stage == 2 {
-		// --rebuild --stage=2: use existing descriptor if available; otherwise run descriptor too.
+	} else if opts.Stage == model.AIRunStageTagging {
+		// --rebuild --stage=tagging: use existing descriptor if available; otherwise run descriptor too.
 		descRun, err := p.taggingRepo.FindLatestSuccessfulDescriptor(img.ID)
 		if err != nil {
-			log.Error("tagging: find descriptor run (stage=2)", "err", err)
+			log.Error("tagging: find descriptor run (stage=tagging)", "err", err)
 			stats.Failed.Add(1)
 			return
 		}
 		if descRun != nil {
 			runDescriptor = false
+			cachedDescRun = descRun
+			if opts.Verbose {
+				log.Info("tagging: reusing existing descriptor output (stage=tagging)", "run_id", descRun.ID)
+			}
 		}
+	}
+
+	if opts.Verbose {
+		log.Info("tagging: stage plan", "run_descriptor", runDescriptor, "run_tagging", runTagging)
 	}
 
 	// Run descriptor stage.
@@ -298,6 +319,9 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 			return
 		}
 
+		if opts.Verbose {
+			log.Info("tagging: calling descriptor", "model", descriptor.PromptModel())
+		}
 		start := time.Now()
 		desc, err := descriptor.Describe(ctx, img.ThumbJPG)
 		latency := time.Since(start).Milliseconds()
@@ -328,12 +352,14 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 		}); err != nil {
 			log.Error("tagging: save descriptor output", "err", err)
 		}
+		if opts.Verbose {
+			log.Info("tagging: descriptor done", "latency_ms", latency, "description", desc)
+		}
 		description = desc
 	} else {
-		// Load description from previous run.
-		descRun, _ := p.taggingRepo.FindLatestSuccessfulDescriptor(img.ID)
-		if descRun != nil {
-			output, err := p.taggingRepo.FindAIOutputByRunID(descRun.ID)
+		// Load description from the cached run (no extra DB query).
+		if cachedDescRun != nil {
+			output, err := p.taggingRepo.FindAIOutputByRunID(cachedDescRun.ID)
 			if err != nil || output == nil {
 				log.Error("tagging: load descriptor output", "err", err)
 				stats.Failed.Add(1)
@@ -359,6 +385,9 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 			return
 		}
 
+		if opts.Verbose {
+			log.Info("tagging: calling tagger", "model", tagger.PromptModel())
+		}
 		start := time.Now()
 		tags, err := tagger.Tag(ctx, description)
 		latency := time.Since(start).Milliseconds()
@@ -389,6 +418,9 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 		}); err != nil {
 			log.Error("tagging: save tagger output", "err", err)
 		}
+		if opts.Verbose {
+			log.Info("tagging: tagger done", "latency_ms", latency, "tags", tags)
+		}
 
 		// Resolve tag IDs and persist.
 		tagIDs := make([]model.PrimaryKey, 0, len(tags))
@@ -408,7 +440,9 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 			return
 		}
 
-		log.Info("tagging: image tagged", "tags", tags)
+		if !opts.Verbose {
+			log.Info("tagging: image tagged", "tags", tags)
+		}
 	}
 
 	stats.Success.Add(1)

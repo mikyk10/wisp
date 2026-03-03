@@ -28,6 +28,21 @@ const (
 	AIRunStageTagging    AIRunStage = "tagging"
 )
 
+var validStages = []AIRunStage{AIRunStageDescriptor, AIRunStageTagging}
+
+// ValidStages returns all known pipeline stages.
+func ValidStages() []AIRunStage { return validStages }
+
+// IsValid reports whether s is a known pipeline stage.
+func (s AIRunStage) IsValid() bool {
+	for _, v := range validStages {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
+
 type AIRunStatus string
 
 const (

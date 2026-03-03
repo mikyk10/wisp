@@ -96,6 +96,7 @@ func setupDefaultDependency(d *digBuilder) {
 	d.mustProvide(usecase.NewSystemUsecase)
 	d.mustProvide(usecase.NewCatalogUseCase)
 	d.mustProvide(usecase.NewTaggingPipelineUsecase)
+	d.mustProvide(usecase.NewTaggingResetUsecase)
 	d.mustProvide(handler.NewCatalogHandler)
 	d.mustProvide(func(cfg *config.GlobalConfig) (ai.DescriptorClient, error) {
 		return llm.NewDescriptorClient(cfg)

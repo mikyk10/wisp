@@ -255,7 +255,7 @@ func TestTaggingPipeline_RebuildStage2_UsesExistingDescriptor(t *testing.T) {
 		CatalogKey: "cat1",
 		Workers:    1,
 		Rebuild:    true,
-		Stage:      2,
+		Stage:      model.AIRunStageTagging,
 	}))
 
 	assert.Equal(t, 0, e.desc.callCount, "descriptor should be reused in stage=2")

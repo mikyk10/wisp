@@ -14,4 +14,8 @@ type TaggingRepository interface {
 	FindAIOutputByRunID(runID model.PrimaryKey) (*model.AIOutput, error)
 	FindImagesForTagging(catalogKey string, limit int) ([]*model.Image, error)
 	FindAllImages(catalogKey string, limit int) ([]*model.Image, error)
+	// ResetImageTagging deletes all tagging data (image_tags, ai_runs, ai_outputs) for a single image.
+	ResetImageTagging(imageID model.PrimaryKey) error
+	// ResetCatalogTagging deletes all tagging data for every image in the given catalog.
+	ResetCatalogTagging(catalogKey string) error
 }

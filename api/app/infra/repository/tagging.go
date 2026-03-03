@@ -65,7 +65,7 @@ func (r *taggingRepositoryImpl) UpdateAIRun(run *model.AIRun) error {
 func (r *taggingRepositoryImpl) FindLatestSuccessfulDescriptor(imageID model.PrimaryKey) (*model.AIRun, error) {
 	run := &model.AIRun{}
 	err := r.conn.Where("image_id = ? AND stage = ? AND status = ?", imageID, model.AIRunStageDescriptor, model.AIRunStatusSuccess).
-		Order("created_at DESC").
+		Order("id DESC").
 		First(run).Error
 	if err == gorm.ErrRecordNotFound {
 		return nil, nil
@@ -92,6 +92,46 @@ func (r *taggingRepositoryImpl) FindAIOutputByRunID(runID model.PrimaryKey) (*mo
 	return output, nil
 }
 
+// ResetImageTagging deletes all tagging data for a single image in dependency order.
+func (r *taggingRepositoryImpl) ResetImageTagging(imageID model.PrimaryKey) error {
+	return r.conn.Transaction(func(tx *gorm.DB) error {
+		// ai_outputs depend on ai_runs, so delete them first.
+		if err := tx.Where("run_id IN (SELECT id FROM ai_runs WHERE image_id = ?)", imageID).
+			Delete(&model.AIOutput{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("image_id = ?", imageID).Delete(&model.AIRun{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("image_id = ?", imageID).Delete(&model.ImageTag{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// ResetCatalogTagging deletes all tagging data for every image in the given catalog.
+func (r *taggingRepositoryImpl) ResetCatalogTagging(catalogKey string) error {
+	return r.conn.Transaction(func(tx *gorm.DB) error {
+		imageIDsSubquery := tx.Model(&model.Image{}).
+			Select("id").
+			Where("catalog_key = ?", catalogKey)
+		if err := tx.Where("run_id IN (?)", tx.Model(&model.AIRun{}).
+			Select("id").
+			Where("image_id IN (?)", imageIDsSubquery)).
+			Delete(&model.AIOutput{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("image_id IN (?)", imageIDsSubquery).Delete(&model.AIRun{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("image_id IN (?)", imageIDsSubquery).Delete(&model.ImageTag{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
 // FindImagesForTagging returns images in the given catalog that have no image_tags yet.
 func (r *taggingRepositoryImpl) FindImagesForTagging(catalogKey string, limit int) ([]*model.Image, error) {
 	var images []*model.Image
@@ -102,7 +142,7 @@ func (r *taggingRepositoryImpl) FindImagesForTagging(catalogKey string, limit in
 	if limit > 0 {
 		q = q.Limit(limit)
 	}
-	if err := q.Find(&images).Error; err != nil {
+	if err := q.Order("id ASC").Find(&images).Error; err != nil {
 		return nil, err
 	}
 	return images, nil
@@ -115,7 +155,7 @@ func (r *taggingRepositoryImpl) FindAllImages(catalogKey string, limit int) ([]*
 	if limit > 0 {
 		q = q.Limit(limit)
 	}
-	if err := q.Find(&images).Error; err != nil {
+	if err := q.Order("id ASC").Find(&images).Error; err != nil {
 		return nil, err
 	}
 	return images, nil

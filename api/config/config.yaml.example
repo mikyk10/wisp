@@ -10,3 +10,18 @@ database:
   # dsn: "user:pass@tcp(localhost:3306)/wspf?charset=utf8mb4&parseTime=True&loc=Local"
 
   log: true
+
+ai:
+  providers:
+    ollama_local:
+      endpoint: http://localhost:11434/v1
+      api_key: ""
+    # openai:
+    #   endpoint: https://api.openai.com/v1
+    #   api_key: sk-...
+  # descriptor_prompt: /path/to/descriptor.md  # omit to use the built-in default
+  # tagger_prompt: /path/to/tagger.md           # omit to use the built-in default
+  workers: 2
+  request_timeout_sec: 90
+  max_tags: 15
+  max_retries: 3

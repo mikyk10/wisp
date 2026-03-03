@@ -33,6 +33,9 @@ func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 			// /api/catalog/selected/_toggle-visibility
 			api.POST("/catalog/selected/_toggle-visibility", h.ToggleVisibility)
 
+			// /api/catalog/{catalog key}/tags
+			api.GET("/catalog/:catalogKey/tags", th.GetCatalogTags)
+
 			// /api/images/{id}/tags
 			api.GET("/images/:id/tags", th.GetTags)
 		}

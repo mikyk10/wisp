@@ -13,7 +13,7 @@ type ImageRepository interface {
 
 	FindByRandom(catalogKey string, ori model.CanonicalOrientation) (*model.Image, error)
 
-	ListByCatalog(catalogKey string, cb func(*model.Image) error) error
+	ListByCatalog(catalogKey string, tags []string, cb func(*model.Image) error) error
 
 	// CountByCatalog returns the number of active images matching the given catalog key and orientation.
 	CountByCatalog(catalogKey string, ori model.CanonicalOrientation) (int64, error)

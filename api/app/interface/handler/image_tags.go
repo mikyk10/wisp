@@ -18,6 +18,19 @@ func NewImageTagsHandler(taggingRepo repository.TaggingRepository) *ImageTagsHan
 	return &ImageTagsHandler{taggingRepo: taggingRepo}
 }
 
+// GetCatalogTags handles GET /api/catalog/:catalogKey/tags
+func (h *ImageTagsHandler) GetCatalogTags(c *echo.Context) error {
+	catalogKey := c.Param("catalogKey")
+	tags, err := h.taggingRepo.FindTagsByCatalog(catalogKey)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Error")
+	}
+	if tags == nil {
+		tags = []string{}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"tags": tags})
+}
+
 // GetTags handles GET /api/images/:id/tags
 func (h *ImageTagsHandler) GetTags(c *echo.Context) error {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

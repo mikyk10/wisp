@@ -127,7 +127,7 @@ func TestScan_IndexesNewImages(t *testing.T) {
 	}
 
 	count := 0
-	if err := uc.ListImages("cat1", func(*model.Image) error {
+	if err := uc.ListImages("cat1", nil, func(*model.Image) error {
 		count++
 		return nil
 	}); err != nil {
@@ -152,7 +152,7 @@ func TestScan_SkipsUnchangedFile(t *testing.T) {
 	}
 
 	var imgID model.PrimaryKey
-	_ = uc.ListImages("cat1", func(img *model.Image) error {
+	_ = uc.ListImages("cat1", nil, func(img *model.Image) error {
 		imgID = img.ID
 		return nil
 	})
@@ -193,7 +193,7 @@ func TestScan_ReindexesModifiedFile(t *testing.T) {
 	}
 
 	var imgID model.PrimaryKey
-	_ = uc.ListImages("cat1", func(img *model.Image) error {
+	_ = uc.ListImages("cat1", nil, func(img *model.Image) error {
 		imgID = img.ID
 		return nil
 	})
@@ -251,7 +251,7 @@ func TestScan_Idempotent(t *testing.T) {
 	}
 
 	count := 0
-	_ = uc.ListImages("cat1", func(*model.Image) error {
+	_ = uc.ListImages("cat1", nil, func(*model.Image) error {
 		count++
 		return nil
 	})
@@ -291,7 +291,7 @@ func TestScan_ExcludesFilesViaCriteria(t *testing.T) {
 
 	// ListImages must not return catalog-excluded images (excluded=true).
 	var listed int
-	if err := uc.ListImages("cat1", func(img *model.Image) error {
+	if err := uc.ListImages("cat1", nil, func(img *model.Image) error {
 		listed++
 		return nil
 	}); err != nil {
@@ -340,8 +340,8 @@ func TestScan_MultipleCatalogs(t *testing.T) {
 	}
 
 	count1, count2 := 0, 0
-	_ = uc.ListImages("cat1", func(*model.Image) error { count1++; return nil })
-	_ = uc.ListImages("cat2", func(*model.Image) error { count2++; return nil })
+	_ = uc.ListImages("cat1", nil, func(*model.Image) error { count1++; return nil })
+	_ = uc.ListImages("cat2", nil, func(*model.Image) error { count2++; return nil })
 
 	if count1 != 1 {
 		t.Errorf("cat1: expected 1 image, got %d", count1)
@@ -364,7 +364,7 @@ func TestScan_StoresThumbnail(t *testing.T) {
 	}
 
 	var imgID model.PrimaryKey
-	_ = uc.ListImages("cat1", func(img *model.Image) error {
+	_ = uc.ListImages("cat1", nil, func(img *model.Image) error {
 		imgID = img.ID
 		return nil
 	})

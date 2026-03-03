@@ -20,4 +20,6 @@ type TaggingRepository interface {
 	ResetImageTagging(imageID model.PrimaryKey) error
 	// ResetCatalogTagging deletes all tagging data for every image in the given catalog.
 	ResetCatalogTagging(catalogKey string) error
+	// FindTagsByCatalog returns all tag names used in the given catalog, sorted alphabetically.
+	FindTagsByCatalog(catalogKey string) ([]string, error)
 }

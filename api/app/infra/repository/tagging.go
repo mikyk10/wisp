@@ -163,6 +163,22 @@ func (r *taggingRepositoryImpl) FindTagNamesByImageID(imageID model.PrimaryKey) 
 	return names, nil
 }
 
+// FindTagsByCatalog returns all tag names used in the given catalog, sorted alphabetically.
+func (r *taggingRepositoryImpl) FindTagsByCatalog(catalogKey string) ([]string, error) {
+	var names []string
+	err := r.conn.Raw(`
+		SELECT DISTINCT t.name_normalized
+		FROM image_tags it
+		JOIN tags t ON it.tag_id = t.id
+		WHERE it.image_id IN (
+			SELECT id FROM images
+			WHERE catalog_key = ? AND excluded = false AND deleted_at IS NULL
+		)
+		ORDER BY t.name_normalized
+	`, catalogKey).Scan(&names).Error
+	return names, err
+}
+
 // FindAllImages returns all non-excluded, non-deleted images in the given catalog.
 func (r *taggingRepositoryImpl) FindAllImages(catalogKey string, limit int) ([]*model.Image, error) {
 	var images []*model.Image

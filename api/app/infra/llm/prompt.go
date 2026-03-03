@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-//go:embed prompts/descriptor_v1.md prompts/tagger_v1.md
+//go:embed prompts/descriptor_v2.md prompts/tagger_v2.md
 var embeddedPrompts embed.FS
 
 // PromptConfig is the parsed YAML front-matter of a prompt file.
@@ -41,7 +41,7 @@ func LoadPrompt(path string) (*Prompt, error) {
 
 // DefaultDescriptorPrompt returns the embedded default descriptor prompt.
 func DefaultDescriptorPrompt() *Prompt {
-	data, err := embeddedPrompts.ReadFile("prompts/descriptor_v1.md")
+	data, err := embeddedPrompts.ReadFile("prompts/descriptor_v2.md")
 	if err != nil {
 		panic(fmt.Sprintf("missing embedded descriptor prompt: %v", err))
 	}
@@ -54,7 +54,7 @@ func DefaultDescriptorPrompt() *Prompt {
 
 // DefaultTaggerPrompt returns the embedded default tagger prompt.
 func DefaultTaggerPrompt() *Prompt {
-	data, err := embeddedPrompts.ReadFile("prompts/tagger_v1.md")
+	data, err := embeddedPrompts.ReadFile("prompts/tagger_v2.md")
 	if err != nil {
 		panic(fmt.Sprintf("missing embedded tagger prompt: %v", err))
 	}

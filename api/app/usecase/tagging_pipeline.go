@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -381,6 +382,12 @@ func (p *taggingPipelineUsecase) processImage(ctx context.Context, img *model.Im
 		run.Status = model.AIRunStatusSuccess
 		if err := p.taggingRepo.UpdateAIRun(run); err != nil {
 			log.Error("tagging: update tagger run", "err", err)
+		}
+		if err := p.taggingRepo.CreateAIOutput(&model.AIOutput{
+			RunID:       run.ID,
+			ContentText: strings.Join(tags, " "),
+		}); err != nil {
+			log.Error("tagging: save tagger output", "err", err)
 		}
 
 		// Resolve tag IDs and persist.

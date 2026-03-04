@@ -2,9 +2,9 @@ package epaper
 
 import (
 	"bytes"
+	"github.com/mikyk10/wisp/app/domain/model"
 	"image"
 	"image/color"
-	"github.com/mikyk10/wisp/app/domain/model"
 )
 
 type IndexPalette = map[int]color.Color

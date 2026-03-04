@@ -2,9 +2,10 @@ package encoder
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"image"
 	"image/color"
-	"github.com/mikyk10/wisp/app/domain/display/epaper"
 )
 
 type wsEpaperEncoder struct {
@@ -26,25 +27,25 @@ func NewWaveshareEPEncoder(epd epaper.DisplayMetadata) epaper.Encoder {
 	switch epaper.EPaperDisplayModel(epd.ModelName()) {
 	case epaper.WS13in3EPaperE:
 		encoder = &ws13in3EpaperEEncoder{
-			colorIndex: buildIndex(epd.Palette()),
+			colorIndex: BuildIndex(epd.Palette()),
 		}
 	case epaper.WS13in3EPaperK:
 		encoder = &ws13in3EpaperKEncoder{
-			colorIndex: buildIndex(epd.Palette()),
+			colorIndex: BuildIndex(epd.Palette()),
 		}
 	default:
 		encoder = &wsEpaperEncoder{
-			colorIndex: buildIndex(epd.Palette()),
+			colorIndex: BuildIndex(epd.Palette()),
 		}
 	}
 
 	return encoder
 }
 
-// buildIndex builds a lookup table for converting RGB to indexed color.
+// BuildIndex builds a lookup table for converting RGB to indexed color.
 // To reduce computation, only the red component of RGB is used as the key to resolve the palette index.
 // Therefore, the red component of each palette color must be unique.
-func buildIndex(paletteMap map[int]color.Color) map[uint32]int {
+func BuildIndex(paletteMap map[int]color.Color) map[uint32]int {
 	colorIndex := map[uint32]int{}
 	for i, px := range paletteMap {
 		red, _, _, _ := px.RGBA()
@@ -52,6 +53,11 @@ func buildIndex(paletteMap map[int]color.Color) map[uint32]int {
 	}
 
 	return colorIndex
+}
+
+// TypeOf returns the type name of the encoder (for testing purposes).
+func TypeOf(enc epaper.Encoder) string {
+	return fmt.Sprintf("%T", enc)
 }
 
 // default encoder

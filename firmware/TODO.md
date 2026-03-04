@@ -5,7 +5,7 @@
 ### ~~busyHigh() タイムアウトなし~~ 対応済み
 
 60秒タイムアウトを追加。超過時は `esp_deep_sleep_start()` で1時間スリープ後にリトライ。
-全3ドライバ（epd7in3e / epd4ine6 / epd13in3e）に適用済み。
+全3ドライバ（epd7in3e / epd4in0e / epd13in3e）に適用済み。
 
 ---
 
@@ -17,49 +17,18 @@
 
 ---
 
-### epd4ine6 enterSleep() — POWER_OFF コマンド抜け（要調査）
+### epd4in0e enterSleep() — POWER_OFF コマンド抜け（要調査）
 
-**対象**: `epd4ine6/EPaperDisplayImpl.cpp:192`
+**対象**: `epd4in0e/EPaperDisplayImpl.cpp:192`
 
 `epd7in3e` は `enterSleep()` 冒頭で `POWER_OFF (0x02)` を送ってから Deep Sleep (0x07) を送るが、
-`epd4ine6` は POWER_OFF なしでいきなり 0x07 を送っている。
+`epd4in0e` は POWER_OFF なしでいきなり 0x07 を送っている。
 
 デバイスのサンプルプログラムからの移植のため意図が不明。
 Waveshare の `epd4in0e` 系データシートと公式サンプルコードで正しいシーケンスを確認すること。
 
 ---
 
-### epd4ine6 の解像度定義が疑わしい（要調査）
-
-**対象**: `epd4ine6/EPaperDisplayImpl.cpp`
-
-```cpp
-#define EPD_WIDTH  600
-#define EPD_HEIGHT 400
-```
-
-`initialize()` 内の解像度設定コマンド (0x61) は以下を送信している：
-
-```
-0x01 0x90 → 0x0190 = 400
-0x02 0x58 → 0x0258 = 600
-```
-
-コマンドの引数が幅・高さどちらの順かはデータシート次第だが、`epd7in3e` のコードをそのままコピーしている可能性が高い。
-Waveshare の 4.0inch E-Paper E のデータシートで実際の解像度とコマンド仕様を確認すること。
-送るデータ量がパネルの実際の画素数と一致しない場合、表示が崩れるか最終行が欠ける。
-
----
-
-### epd7in3e / epd4ine6 コードの重複（リファクタリング候補）
-
-**対象**: 両実装全体
-
-`sendImageData`, `sendCommand`, `sendData`, `busyHigh`, `reset`, `moduleInit` の実装が
-2ファイルでほぼ同一。ハードウェア差分（初期化コマンド列）以外の共通ロジックを
-基底クラス `WaveshareEPaperBase` 等に切り出すことで保守性が上がる。優先度は低い。
-
----
 
 ### EPD13IN3E — 実機テスト前の準備
 

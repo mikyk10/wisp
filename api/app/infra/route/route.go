@@ -14,7 +14,7 @@ import (
 // Associates each URL to a controller action
 func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 
-	if err := ctn.Invoke(func(h handler.CatalogHandler) { //nolint:contextcheck
+	if err := ctn.Invoke(func(h handler.CatalogHandler, th *handler.ImageTagsHandler) { //nolint:contextcheck
 		// Management API — requires authentication
 		api := e.Group("/api")
 		{
@@ -25,13 +25,19 @@ func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 			api.GET("/catalog/:catalogKey/images", h.List)
 
 			// /api/catalog/{catalog key}/image/{ID Number}.{Extension}
-			api.GET("/catalog/:catalogKey/image/:imgid", h.Img)
+			api.GET("/catalog/:catalogKey/image/:imgid", h.ImgManagement)
 
 			// /api/devices
 			api.GET("/devices", h.List)
 
 			// /api/catalog/selected/_toggle-visibility
 			api.POST("/catalog/selected/_toggle-visibility", h.ToggleVisibility)
+
+			// /api/catalog/{catalog key}/tags
+			api.GET("/catalog/:catalogKey/tags", th.GetCatalogTags)
+
+			// /api/images/{id}/tags
+			api.GET("/images/:id/tags", th.GetTags)
 		}
 
 		// Device API — no authentication required (called by ESP32 firmware)
@@ -62,6 +68,9 @@ func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 		var he *echo.HTTPError
 		if errors.As(err, &he) {
 			code = he.Code
+		} else if err.Error() == "Not Found" {
+			// Handle "Not Found" from static file handler
+			code = http.StatusNotFound
 		}
 
 		// slog-echo handles logging of unhandled errors, so no additional logging is needed here.

@@ -29,7 +29,7 @@ func (i *imageLuaScriptProvider) Resolve() (ImageLoader, error) {
 	nfProviderFunc := func(msg string) ImageLocator {
 		return &imageErrorMessageProvider{i.epd, &config.ImageErrorMessageProviderConfig{
 			Message: msg,
-		}}
+		}, nil}
 	}
 
 	return nfProviderFunc("WIP").Resolve()

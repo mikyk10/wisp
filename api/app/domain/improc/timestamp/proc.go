@@ -2,11 +2,11 @@ package timestamp
 
 import (
 	"context"
-	"image"
-	"image/draw"
 	"github.com/mikyk10/wisp/app/domain/display/epaper/wsdisplay"
 	"github.com/mikyk10/wisp/app/domain/improc"
 	"github.com/mikyk10/wisp/app/domain/model"
+	"image"
+	"image/draw"
 
 	"github.com/anthonynsimon/bild/blend"
 	"github.com/anthonynsimon/bild/transform"

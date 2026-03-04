@@ -1,4 +1,5 @@
-wspf
+wisp
+main
 app/tmp/*
 .envrc
 tmp/*

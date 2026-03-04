@@ -29,8 +29,6 @@ type ImgMeta struct {
 	//TODO: should be better naming
 	RequiredCorrectionAngle float64
 
-	SkipColorReduction bool
-
 	//TODO: implement these
 	//GPSLatitude     string
 	//GPSLatitudeRef  string

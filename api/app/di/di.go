@@ -3,9 +3,11 @@ package di
 import (
 	"fmt"
 	"log"
+	"github.com/mikyk10/wisp/app/domain/ai"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/mikyk10/wisp/app/infra"
+	"github.com/mikyk10/wisp/app/infra/llm"
 	"github.com/mikyk10/wisp/app/infra/repository"
 	"github.com/mikyk10/wisp/app/interface/handler"
 	"github.com/mikyk10/wisp/app/usecase"
@@ -60,7 +62,7 @@ func (d *digBuilder) WithDatabase(globalConfig *config.GlobalConfig) *digBuilder
 			return nil, fmt.Errorf("failed to open database: %w", err)
 		}
 
-		conn.AutoMigrate(&model.Image{}) //nolint:errcheck
+		conn.AutoMigrate(&model.Image{}, &model.Tag{}, &model.ImageTag{}, &model.AIRun{}, &model.AIOutput{}) //nolint:errcheck
 
 		return conn, nil
 	})
@@ -72,7 +74,7 @@ func (d *digBuilder) WithSQLiteMock() *digBuilder {
 		if err != nil {
 			return nil, err
 		}
-		conn.AutoMigrate(&model.Image{}) //nolint:errcheck
+		conn.AutoMigrate(&model.Image{}, &model.Tag{}, &model.ImageTag{}, &model.AIRun{}, &model.AIOutput{}) //nolint:errcheck
 		return conn, nil
 	})
 }
@@ -90,9 +92,19 @@ func (d *digBuilder) Build() *dig.Container {
 func setupDefaultDependency(d *digBuilder) {
 	d.mustProvide(repository.NewImageRepositoryImpl)
 	d.mustProvide(repository.NewSystemRepositoryImpl)
+	d.mustProvide(repository.NewTaggingRepositoryImpl)
 	d.mustProvide(usecase.NewSystemUsecase)
 	d.mustProvide(usecase.NewCatalogUseCase)
+	d.mustProvide(usecase.NewTaggingPipelineUsecase)
+	d.mustProvide(usecase.NewTaggingResetUsecase)
 	d.mustProvide(handler.NewCatalogHandler)
+	d.mustProvide(handler.NewImageTagsHandler)
+	d.mustProvide(func(cfg *config.GlobalConfig) (ai.DescriptorClient, error) {
+		return llm.NewDescriptorClient(cfg)
+	})
+	d.mustProvide(func(cfg *config.GlobalConfig) (ai.TaggerClient, error) {
+		return llm.NewTaggerClient(cfg)
+	})
 }
 
 //nolint:unparam

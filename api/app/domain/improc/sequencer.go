@@ -2,8 +2,8 @@ package improc
 
 import (
 	"context"
-	"image"
 	"github.com/mikyk10/wisp/app/domain/model"
+	"image"
 )
 
 // Sequencer manages and applies image processors in order.

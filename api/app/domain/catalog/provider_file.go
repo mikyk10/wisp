@@ -40,7 +40,7 @@ func (i *imageIndexedFileProvider) Resolve() (ImageLoader, error) {
 	nfProviderFunc := func(msg string) ImageLocator {
 		return &imageErrorMessageProvider{i.epd, &config.ImageErrorMessageProviderConfig{
 			Message: msg,
-		}}
+		}, nil}
 	}
 
 	selectedImage, err := i.repo.FindByRandom(i.catalogKey, i.epd.InstalledOrientation())
@@ -114,7 +114,7 @@ func (i *imageLocalFileProvider) Resolve() (ImageLoader, error) {
 	nfProviderFunc := func(msg string) ImageLocator {
 		return &imageErrorMessageProvider{i.epd, &config.ImageErrorMessageProviderConfig{
 			Message: msg,
-		}}
+		}, nil}
 	}
 
 	img, meta, err := load(i.targetPath)

@@ -4,8 +4,8 @@
 #include "devices/epd/waveshare/epd13in3e/EPaperDisplayImpl.h"
 #elif defined(EPD_WAVESHARE_EPD7IN3E)
 #include "devices/epd/waveshare/epd7in3e/EPaperDisplayImpl.h"
-#elif defined(EPD_WAVESHARE_EPD4INE6)
-#include "devices/epd/waveshare/epd4ine6/EPaperDisplayImpl.h"
+#elif defined(EPD_WAVESHARE_EPD4IN0E)
+#include "devices/epd/waveshare/epd4in0e/EPaperDisplayImpl.h"
 #endif
 
 EPaperDisplay *EPaperFactory::create()
@@ -14,7 +14,7 @@ EPaperDisplay *EPaperFactory::create()
     return new EPD13In3EImpl();
 #elif defined(EPD_WAVESHARE_EPD7IN3E)
     return new EPD7In3EImpl();
-#elif defined(EPD_WAVESHARE_EPD4INE6)
+#elif defined(EPD_WAVESHARE_EPD4IN0E)
     return new EPD4InE6Impl();
 #else
     Serial.println("[EPaperFactory] No valid model selected!");

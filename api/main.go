@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+
 	"github.com/mikyk10/wisp/app/di"
 	"github.com/mikyk10/wisp/app/infra/config"
 	"github.com/mikyk10/wisp/app/interface/cmd"

@@ -34,6 +34,7 @@ func NewImageConvertCommand(c *dig.Container) *cobra.Command {
 			flip, _ := cmd.Flags().GetBool("flip")
 			format, _ := cmd.Flags().GetString("format")
 			outPath, _ := cmd.Flags().GetString("output")
+			colorReductionType, _ := cmd.Flags().GetString("color-reduction")
 
 			if !epaper.IsValidModel(epaper.EPaperDisplayModel(displayModel)) {
 				return fmt.Errorf("unknown display model %q — valid models: %s", displayModel, strings.Join(epaper.ValidModels(), ", "))
@@ -71,7 +72,12 @@ func NewImageConvertCommand(c *dig.Container) *cobra.Command {
 			// Post-processing: color reduction, optional 180° flip.
 			postSeq := improc.NewSequencer()
 			imseqGroup.Push(postSeq)
-			postSeq.Push(color_reduction.NewImageColorReduction(display, config.ColorReduction{Type: config.ColorReductionTypeFloydSteinberg}))
+			colorRedConfig := config.ColorReduction{
+				Type:     colorReductionType,
+				Size:     4,
+				Strength: 1.0,
+			}
+			postSeq.Push(color_reduction.NewImageColorReduction(display, colorRedConfig))
 			if flip {
 				postSeq.Push(rotation.NewRotation())
 			}
@@ -120,6 +126,7 @@ func NewImageConvertCommand(c *dig.Container) *cobra.Command {
 	cmd.Flags().Bool("flip", false, "Rotate 180° (flip)")
 	cmd.Flags().StringP("format", "f", "bin", "Output format: jpg, png, bin")
 	cmd.Flags().StringP("output", "o", "", "Output file path (default: out.<format>)")
+	cmd.Flags().StringP("color-reduction", "c", config.ColorReductionTypeFloydSteinberg, "Color reduction algorithm: simple, bayer, floysteinberg, sierra3")
 
 	return cmd
 }

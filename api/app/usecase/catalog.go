@@ -56,10 +56,14 @@ type CatalogUsecase interface {
 	FindLocalImageById(catalogKey string, id model.PrimaryKey) (*model.Image, error)
 
 	// ListImages retrieves the list of indexed images under the catalog using a callback.
-	ListImages(catalogKey string, cb func(*model.Image) error) error
+	// tags filters results to images possessing all of the specified tag names (AND semantics).
+	ListImages(catalogKey string, tags []string, cb func(*model.Image) error) error
 
 	// ToggleLocalImageFileVisibility toggles the visibility state of images by ID.
 	ToggleLocalImageFileVisibility(catalogKey string, ids []model.PrimaryKey) error
+
+	// GetSequencerGroupForDisplay returns the image processing sequence group for a given display key.
+	GetSequencerGroupForDisplay(displayKey string) (improc.SequencerGroup, epaper.DisplayMetadata, error)
 
 	//
 	Pick(displayKey string) (catalog.ImageLoader, epaper.DisplayMetadata, improc.SequencerGroup, error)
@@ -320,19 +324,20 @@ func (uc *catalogUseCase) FindLocalImageById(catalogKey string, id model.Primary
 	return uc.imgr.FindById(id)
 }
 
-func (uc *catalogUseCase) ListImages(catalogKey string, cb func(*model.Image) error) error {
-	return uc.imgr.ListByCatalog(catalogKey, cb)
+func (uc *catalogUseCase) ListImages(catalogKey string, tags []string, cb func(*model.Image) error) error {
+	return uc.imgr.ListByCatalog(catalogKey, tags, cb)
 }
 
 func (uc *catalogUseCase) ToggleLocalImageFileVisibility(catalogKey string, ids []model.PrimaryKey) error {
 	return uc.imgr.ToggleDeletedAt(ids)
 }
 
-func (uc *catalogUseCase) Pick(displayKey string) (catalog.ImageLoader, epaper.DisplayMetadata, improc.SequencerGroup, error) {
-
+// GetSequencerGroupForDisplay returns the image processing sequence group for a given display key.
+// Returns the sequencer group, display metadata, and any error if the display is not found.
+func (uc *catalogUseCase) GetSequencerGroupForDisplay(displayKey string) (improc.SequencerGroup, epaper.DisplayMetadata, error) {
 	displayConfigInUse, ok := uc.serviceConfig.Displays[displayKey]
 	if !ok {
-		return nil, nil, nil, fmt.Errorf("display not found: %s", displayKey)
+		return nil, nil, &catalog.DisplayNotFoundError{Key: displayKey}
 	}
 
 	display := epaper.NewDisplay(epaper.EPaperDisplayModel(displayConfigInUse.DisplayModel), model.CanonicalOrientation(displayConfigInUse.Orientation))
@@ -383,17 +388,35 @@ func (uc *catalogUseCase) Pick(displayKey string) (catalog.ImageLoader, epaper.D
 		imPostProcessorSeq.Push(rotation.NewRotation())
 	}
 
-	var imgPtr catalog.ImageLoader
-	var err error
+	return imseqGroup, display, nil
+}
 
+func (uc *catalogUseCase) Pick(displayKey string) (catalog.ImageLoader, epaper.DisplayMetadata, improc.SequencerGroup, error) {
+
+	imseqGroup, display, err := uc.GetSequencerGroupForDisplay(displayKey)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	displayConfigInUse, ok := uc.serviceConfig.Displays[displayKey]
+	if !ok {
+		return nil, nil, nil, &catalog.DisplayNotFoundError{Key: displayKey}
+	}
+
+	var imgPtr catalog.ImageLoader
 	if len(displayConfigInUse.Catalog) == 0 {
+		var err error
 		imgPtr, err = catalog.NewColorbarProvider(display).Resolve()
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to resolve image provider for display %s: %w", displayKey, err)
+		}
 	} else {
 		imgProvider := catalog.PickImageProvider(time.Now(), display, uc.imgr, displayConfigInUse.Catalog...)
+		var err error
 		imgPtr, err = imgProvider.Resolve()
-	}
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to resolve image provider for display %s: %w", displayKey, err)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to resolve image provider for display %s: %w", displayKey, err)
+		}
 	}
 
 	return imgPtr, display, imseqGroup, nil

@@ -2,8 +2,8 @@ package improc
 
 import (
 	"context"
-	"image"
 	"github.com/mikyk10/wisp/app/domain/model"
+	"image"
 )
 
 // ImageProcessor is the interface for image processing processors.

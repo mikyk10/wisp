@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"strings"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"github.com/mikyk10/wisp/app/domain/display/epaper/wsdisplay"
 	"github.com/mikyk10/wisp/app/domain/improc"
@@ -23,21 +24,32 @@ import (
 //go:embed error-icon.png
 var errorPng []byte
 
-func NewErrorMessageProviderFactory(epd epaper.DisplayMetadata, msg string) ImageLocator {
+func NewErrorMessageProviderFactory(epd epaper.DisplayMetadata, msg string, err error) ImageLocator {
 	return &imageErrorMessageProvider{
 		epd: epd,
 		providerConfig: &config.ImageErrorMessageProviderConfig{
 			Message: msg,
 		},
+		err: err,
 	}
 }
 
 type imageErrorMessageProvider struct {
 	epd            epaper.DisplayMetadata
 	providerConfig *config.ImageErrorMessageProviderConfig
+	err            error
 }
 
 func (ip *imageErrorMessageProvider) Resolve() (ImageLoader, error) {
+	msg := ip.providerConfig.Message
+
+	// Classify error details, unless it's a display-not-found error
+	// TODO: improve error type detection using errors.As or errors.Is
+	if ip.err != nil {
+		if _, ok := ip.err.(*DisplayNotFoundError); !ok {
+			msg = ip.classifyDatabaseError(ip.err)
+		}
+	}
 
 	width := ip.epd.Width()
 	height := ip.epd.Height()
@@ -80,38 +92,50 @@ func (ip *imageErrorMessageProvider) Resolve() (ImageLoader, error) {
 	}
 	d.DrawString("Ooops!")
 
-	face = truetype.NewFace(unkempt, &truetype.Options{
-		Size:            28,
-		Hinting:         font.HintingFull,
-		SubPixelsX:      0, // Disable sub-pixel rendering (anti-aliasing)
-		SubPixelsY:      0,
-	})
-	d = &font.Drawer{
-		Dst:  fgcanvas,
-		Src:  image.NewUniform(wsdisplay.White),
-		Face: face,
-		Dot:  fixed.Point26_6{X: fixed.I(20), Y: fixed.I(iconY + size + 40)},
-	}
-	d.DrawString("The server's in trouble!!")
-
 	face = basicfont.Face7x13
-	d = &font.Drawer{
-		Dst:  fgcanvas,
-		Src:  image.NewUniform(wsdisplay.White),
-		Face: face,
-		Dot:  fixed.Point26_6{X: fixed.I(20), Y: fixed.I(iconY + size + 75)},
+	lines := strings.Split(msg, "\n")
+	lineHeight := 16
+	for i, line := range lines {
+		d := &font.Drawer{
+			Dst:  fgcanvas,
+			Src:  image.NewUniform(wsdisplay.White),
+			Face: face,
+			Dot:  fixed.Point26_6{X: fixed.I(20), Y: fixed.I(iconY + size + 40 + i*lineHeight)},
+		}
+		d.DrawString(line)
 	}
-
-	d.DrawString(ip.providerConfig.Message)
 
 	return &imageLoader{
 		img: fgcanvas,
 		meta: &model.ImgMeta{
 			ImageSourcePath:  "NOT_FOUND",
 			ImageOrientation: ip.epd.NativeOrientation(),
-			// Available color indices differ by display (probably fine, but there are compatibility concerns).
-			// White and black are available on almost every display, so as long as the mapping logic is correct...
-			SkipColorReduction: true,
 		},
 	}, nil
+}
+
+// classifyDatabaseError analyzes a database error and returns a user-friendly message
+// TODO: replace string matching with proper error type detection (e.g., errors.As for driver-specific errors)
+func (ip *imageErrorMessageProvider) classifyDatabaseError(err error) string {
+	errStr := err.Error()
+
+	// Connection errors (database unavailable, network issue, auth failure)
+	if strings.Contains(errStr, "connection") ||
+		strings.Contains(errStr, "refused") ||
+		strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "dial") {
+		return "Database connection failed.\nCheck server availability and credentials."
+	}
+
+	// Query errors (schema mismatch, syntax error, constraint violation)
+	if strings.Contains(errStr, "syntax") ||
+		strings.Contains(errStr, "column") ||
+		strings.Contains(errStr, "unknown") ||
+		strings.Contains(errStr, "constraint") ||
+		strings.Contains(errStr, "no such table") {
+		return "Database schema error.\nTables may be missing. Restart server to initialize database."
+	}
+
+	// Generic database error with actual error message
+	return "Database error:\n" + errStr
 }

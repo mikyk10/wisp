@@ -336,7 +336,7 @@ func (uc *catalogUseCase) ToggleLocalImageFileVisibility(catalogKey string, ids 
 func (uc *catalogUseCase) GetSequencerGroupForDisplay(displayKey string) (improc.SequencerGroup, epaper.DisplayMetadata, error) {
 	displayConfigInUse, ok := uc.serviceConfig.Displays[displayKey]
 	if !ok {
-		return nil, nil, fmt.Errorf("display not found: %s", displayKey)
+		return nil, nil, &catalog.DisplayNotFoundError{Key: displayKey}
 	}
 
 	display := epaper.NewDisplay(epaper.EPaperDisplayModel(displayConfigInUse.DisplayModel), model.CanonicalOrientation(displayConfigInUse.Orientation))
@@ -399,7 +399,7 @@ func (uc *catalogUseCase) Pick(displayKey string) (catalog.ImageLoader, epaper.D
 
 	displayConfigInUse, ok := uc.serviceConfig.Displays[displayKey]
 	if !ok {
-		return nil, nil, nil, fmt.Errorf("display not found: %s", displayKey)
+		return nil, nil, nil, &catalog.DisplayNotFoundError{Key: displayKey}
 	}
 
 	var imgPtr catalog.ImageLoader

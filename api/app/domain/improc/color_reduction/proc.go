@@ -49,10 +49,6 @@ func NewImageColorReduction(epd epaper.DisplayMetadata, algorithm config.ColorRe
 
 func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgMeta) (image.Image, *model.ImgMeta) {
 
-	if meta.SkipColorReduction {
-		return src, meta
-	}
-
 	if p.skipDithering {
 		return p.simpleQuantize(src), meta
 	}

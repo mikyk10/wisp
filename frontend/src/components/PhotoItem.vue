@@ -35,7 +35,10 @@
       </v-img>
       
       <!-- Hidden state overlay -->
-      <div v-if="!photo.enabled" class="disabled-overlay">
+      <div
+        v-if="!photo.enabled"
+        class="disabled-overlay"
+      >
         <v-icon
           icon="mdi-eye-off"
           size="36"
@@ -45,10 +48,16 @@
       </div>
 
       <!-- Selection overlay -->
-      <div v-if="isSelected" class="selection-overlay"></div>
+      <div
+        v-if="isSelected"
+        class="selection-overlay"
+      />
 
       <!-- Selection checkmark (top-left) -->
-      <div v-if="isSelected" class="selection-checkmark">
+      <div
+        v-if="isSelected"
+        class="selection-checkmark"
+      >
         <v-icon
           icon="mdi-check"
           size="14"
@@ -57,8 +66,15 @@
       </div>
 
       <!-- Tag overlay (bottom, on hover) -->
-      <div v-if="isHovered && tags.length > 0" class="tag-overlay">
-        <span v-for="tag in tags" :key="tag" class="tag-chip">{{ tag }}</span>
+      <div
+        v-if="isHovered && tags.length > 0"
+        class="tag-overlay"
+      >
+        <span
+          v-for="tag in tags"
+          :key="tag"
+          class="tag-chip"
+        >{{ tag }}</span>
       </div>
     </div>
   </v-card>

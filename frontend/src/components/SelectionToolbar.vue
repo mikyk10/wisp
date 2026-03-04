@@ -7,32 +7,48 @@
     >
       <v-card-text class="d-flex align-center justify-space-between pa-4">
         <div class="selection-info">
-          <v-icon icon="mdi-check-circle" class="mr-2"></v-icon>
+          <v-icon
+            icon="mdi-check-circle"
+            class="mr-2"
+          />
           <span class="text-h6">{{ selectedCount }} selected</span>
         </div>
         
         <div class="toolbar-actions">
-          <span v-if="error" class="error-text mr-4">
-            <v-icon icon="mdi-alert-circle-outline" size="16" class="mr-1"></v-icon>{{ error }}
+          <span
+            v-if="error"
+            class="error-text mr-4"
+          >
+            <v-icon
+              icon="mdi-alert-circle-outline"
+              size="16"
+              class="mr-1"
+            />{{ error }}
           </span>
 
           <v-btn
             variant="outlined"
             class="mr-3"
-            @click="clearSelection"
             :disabled="updating"
+            @click="clearSelection"
           >
-            <v-icon icon="mdi-close" class="mr-1"></v-icon>
+            <v-icon
+              icon="mdi-close"
+              class="mr-1"
+            />
             Cancel
           </v-btn>
 
           <v-btn
             color="primary"
-            @click="toggleStatus"
             :loading="updating"
             :disabled="updating"
+            @click="toggleStatus"
           >
-            <v-icon icon="mdi-toggle-switch" class="mr-1"></v-icon>
+            <v-icon
+              icon="mdi-toggle-switch"
+              class="mr-1"
+            />
             Toggle Status
           </v-btn>
         </div>

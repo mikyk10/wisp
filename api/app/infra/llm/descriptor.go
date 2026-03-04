@@ -140,7 +140,7 @@ func providerAPIKey(key string) string {
 
 // backoffDuration returns exponential backoff with jitter: base * 2^(attempt-1) + jitter.
 func backoffDuration(attempt int) time.Duration {
-	base := time.Duration(1<<uint(attempt-1)) * time.Second
+	base := time.Duration(1<<uint(attempt-1)) * time.Second //nolint:gosec // attempt is always >= 1, safe to cast
 	jitter := time.Duration(rand.Int64N(int64(500 * time.Millisecond)))
 	return base + jitter
 }

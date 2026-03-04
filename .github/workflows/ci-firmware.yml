@@ -27,7 +27,7 @@ jobs:
       matrix:
         env:
           - seeed_xiao_esp32s3_epd7in3e
-          - seeed_xiao_esp32c3_epd4ine6
+          - seeed_xiao_esp32c3_epd4in0e
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

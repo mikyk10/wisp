@@ -33,7 +33,7 @@ If the run is interrupted, re-running 'tagging run' resumes from where it left o
 
 			return resetUc.Run(context.Background(), usecase.TaggingResetOptions{
 				CatalogKey: catalog,
-				ImageID:    model.PrimaryKey(imageID),
+				ImageID:    model.PrimaryKey(imageID), //nolint:gosec // imageID is an auto-increment PK, always positive
 			})
 		},
 	}

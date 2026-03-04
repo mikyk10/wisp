@@ -36,7 +36,7 @@ type ConfigLoader interface {
 // AIProviderConfig holds connection details for a single LLM provider.
 type AIProviderConfig struct {
 	Endpoint string `yaml:"endpoint"`
-	APIKey   string `yaml:"api_key"`
+	APIKey   string `yaml:"api_key"` //nolint:gosec // G117: struct field name, not an actual secret
 }
 
 // GlobalConfig holds application-wide configuration.

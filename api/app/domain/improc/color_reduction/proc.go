@@ -68,17 +68,17 @@ func (p *processor) simpleQuantize(src image.Image) image.Image {
 
 			// Find nearest color in palette
 			nearest := p.palette[0]
-			minDist := colorDistance(color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a >> 8)}, nearest)
+			minDist := colorDistance(color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a >> 8)}, nearest) //nolint:gosec // r,g,b are >>8 so 0-255; a>>8 is also 0-255
 
 			for _, c := range p.palette[1:] {
-				dist := colorDistance(color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a >> 8)}, c)
+				dist := colorDistance(color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a >> 8)}, c) //nolint:gosec
 				if dist < minDist {
 					minDist = dist
 					nearest = c
 				}
 			}
 
-			dst.SetRGBA(x, y, color.RGBAModel.Convert(nearest).(color.RGBA))
+			dst.SetRGBA(x, y, color.RGBAModel.Convert(nearest).(color.RGBA)) //nolint:forcetypeassert // RGBAModel.Convert always returns color.RGBA
 		}
 	}
 
@@ -95,5 +95,5 @@ func colorDistance(c1, c2 color.Color) uint32 {
 	bd := int32(b1>>8) - int32(b2>>8)
 	ad := int32(a1>>8) - int32(a2>>8)
 
-	return uint32(rd*rd + gd*gd + bd*bd + ad*ad)
+	return uint32(rd*rd + gd*gd + bd*bd + ad*ad) //nolint:gosec // max diff per channel is 255, sum of squares fits in uint32
 }

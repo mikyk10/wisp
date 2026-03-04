@@ -79,7 +79,7 @@ func TestImgFound(t *testing.T) {
 		{Name: "imgid", Value: "1.jpg"},
 	})
 
-	if assert.NoError(t, h.Img(c)) {
+	if assert.NoError(t, h.ImgManagement(c)) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Equal(t, "image/jpeg", rec.Header().Get(echo.HeaderContentType))
 		assert.Equal(t, "jpgdata", rec.Body.String())

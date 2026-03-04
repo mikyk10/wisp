@@ -16,7 +16,6 @@ import (
 	"github.com/mikyk10/wisp/app/domain/catalog"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"github.com/mikyk10/wisp/app/domain/encoder"
-	"github.com/mikyk10/wisp/app/domain/improc"
 	"github.com/mikyk10/wisp/app/domain/improc/color_reduction"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
@@ -71,11 +70,11 @@ func (uc *catalogHandler) Img(c *echo.Context) error {
 	id, err := strconv.ParseUint(idstr, 10, 64)
 	if err != nil {
 		// Invalid image ID format (400 Bad Request, not a DB error)
-		return uc.renderErrorImage(c, ext, display, nil, errMsgPhotoNotFound, http.StatusBadRequest, nil)
+		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusBadRequest, nil)
 	}
-	imsecgrp, _, displayErr := uc.imguc.GetSequencerGroupForDisplay(displayKey)
+	_, _, displayErr := uc.imguc.GetSequencerGroupForDisplay(displayKey)
 	if displayErr != nil {
-		return uc.renderErrorImage(c, ext, display, nil, errMsgDisplayNotFound, http.StatusNotFound, displayErr)
+		return uc.renderErrorImage(c, ext, display,errMsgDisplayNotFound, http.StatusNotFound, displayErr)
 	}
 
 	img, err := uc.imguc.FindLocalImageById("", model.PrimaryKey(id))
@@ -84,18 +83,18 @@ func (uc *catalogHandler) Img(c *echo.Context) error {
 		if err == gorm.ErrRecordNotFound {
 			err = nil
 		}
-		return uc.renderErrorImage(c, ext, display, imsecgrp, errMsgPhotoNotFound, http.StatusNotFound, err)
+		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusNotFound, err)
 	}
 
 	// If ThumbJPG is empty (e.g. catalog-excluded images), returning 0 bytes
 	// would cause NS_BINDING_ABORTED in the browser, so return a dummy image instead.
 	if len(img.ThumbJPG) == 0 {
-		return uc.renderErrorImage(c, ext, display, imsecgrp, errMsgPhotoNotFound, http.StatusNotFound, nil)
+		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusNotFound, nil)
 	}
 
 	rdr, mime, err := uc.img(ext, img)
 	if err != nil {
-		return uc.renderErrorImage(c, ext, display, imsecgrp, errMsgPhotoNotFound, http.StatusNotFound, err)
+		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusNotFound, err)
 	}
 
 	return c.Stream(http.StatusOK, mime, rdr)
@@ -120,20 +119,20 @@ func (uc *catalogHandler) ImgManagement(c *echo.Context) error {
 		if imgErr == gorm.ErrRecordNotFound {
 			imgErr = nil
 		}
-		return uc.renderErrorImage(c, ext, display, nil, errMsgPhotoNotFound, http.StatusNotFound, imgErr)
+		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusNotFound, imgErr)
 	}
 
 	// If ThumbJPG is empty (e.g. catalog-excluded images), returning 0 bytes
 	// would cause NS_BINDING_ABORTED in the browser, so return a dummy image instead.
 	if len(img.ThumbJPG) == 0 {
 		display := uc.resolveDisplay(c)
-		return uc.renderErrorImage(c, ext, display, nil, errMsgPhotoNotFound, http.StatusNotFound, nil)
+		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusNotFound, nil)
 	}
 
 	rdr, mime, err := uc.img(ext, img)
 	if err != nil {
 		display := uc.resolveDisplay(c)
-		return uc.renderErrorImage(c, ext, display, nil, errMsgPhotoNotFound, http.StatusNotFound, err)
+		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusNotFound, err)
 	}
 
 	return c.Stream(http.StatusOK, mime, rdr)
@@ -170,12 +169,10 @@ func (uc *catalogHandler) resolveDisplay(c *echo.Context) epaper.DisplayMetadata
 }
 
 // renderErrorImage generates and returns an error image.
-// If imsecgrp is nil, it skips the Apply step and returns the raw error image.
 func (uc *catalogHandler) renderErrorImage(
 	c *echo.Context,
 	ext string,
 	display epaper.DisplayMetadata,
-	imsecgrp improc.SequencerGroup,
 	msg string,
 	statusCode int,
 	err error,
@@ -291,7 +288,7 @@ func (uc *catalogHandler) RandomImg(c *echo.Context) error {
 		if _, ok := pickErr.(*catalog.DisplayNotFoundError); ok {
 			msg = errMsgDisplayNotFound
 		}
-		return uc.renderErrorImage(c, ext, display, nil, msg, http.StatusOK, pickErr)
+		return uc.renderErrorImage(c, ext, display,msg, http.StatusOK, pickErr)
 	}
 
 	sleepSecs := uc.svc.Displays[displayKey].SleepDurationSeconds
@@ -301,7 +298,7 @@ func (uc *catalogHandler) RandomImg(c *echo.Context) error {
 	img, meta, err := imgPtr.Load()
 	if err != nil {
 		ext := filepath.Ext(strings.ToLower(c.Request().URL.Path))
-		return uc.renderErrorImage(c, ext, display, imsecgrp, errMsgPhotoNotFound, http.StatusOK, err)
+		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusOK, err)
 	}
 
 	img, _ = imsecgrp.Apply(ctx, img, meta)

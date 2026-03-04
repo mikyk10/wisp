@@ -2,9 +2,9 @@ package exif_rotation
 
 import (
 	"context"
-	"image"
 	"github.com/mikyk10/wisp/app/domain/improc"
 	"github.com/mikyk10/wisp/app/domain/model"
+	"image"
 
 	"github.com/anthonynsimon/bild/transform"
 )

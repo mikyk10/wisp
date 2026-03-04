@@ -2,14 +2,14 @@ package color_reduction
 
 import (
 	"context"
-	"image"
-	"image/color"
-	"maps"
-	"slices"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"github.com/mikyk10/wisp/app/domain/improc"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
+	"image"
+	"image/color"
+	"maps"
+	"slices"
 
 	"github.com/makeworld-the-better-one/dither"
 )

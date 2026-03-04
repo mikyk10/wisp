@@ -1,9 +1,9 @@
 package epaper
 
 import (
-	"image/color"
 	"github.com/mikyk10/wisp/app/domain/display/epaper/wsdisplay"
 	"github.com/mikyk10/wisp/app/domain/model"
+	"image/color"
 )
 
 func NewWS7in3F(orientation model.CanonicalOrientation) DisplayMetadata {

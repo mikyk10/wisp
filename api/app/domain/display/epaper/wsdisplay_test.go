@@ -14,6 +14,7 @@ import (
 	"github.com/mikyk10/wisp/app/domain/improc/crop"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type procs struct {
@@ -301,4 +302,99 @@ func TestWS13in3KEncoder(t *testing.T) {
 	}
 
 	testEncoderWithCases(t, p, "WS13in3K", cases)
+}
+
+func TestIsValidModel(t *testing.T) {
+	tests := []struct {
+		model    epaper.EPaperDisplayModel
+		expected bool
+	}{
+		{epaper.WS4in0EPaperE, true},
+		{epaper.WS7in3EPaperE, true},
+		{epaper.WS7in3EPaperF, true},
+		{epaper.WS13in3EPaperE, true},
+		{epaper.WS13in3EPaperK, true},
+		{epaper.EPaperDisplayModel("invalid_model"), false},
+		{epaper.EPaperDisplayModel(""), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.model), func(t *testing.T) {
+			result := epaper.IsValidModel(tt.model)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestValidModels(t *testing.T) {
+	models := epaper.ValidModels()
+
+	assert.NotEmpty(t, models)
+	assert.Greater(t, len(models), 0)
+
+	// Check that all known models are in the list
+	assert.Contains(t, models, string(epaper.WS4in0EPaperE))
+	assert.Contains(t, models, string(epaper.WS7in3EPaperE))
+	assert.Contains(t, models, string(epaper.WS7in3EPaperF))
+	assert.Contains(t, models, string(epaper.WS13in3EPaperE))
+	assert.Contains(t, models, string(epaper.WS13in3EPaperK))
+
+	// Verify list is sorted
+	sortedModels := slices.Clone(models)
+	slices.Sort(sortedModels)
+	assert.Equal(t, sortedModels, models)
+}
+
+func TestNewDisplay(t *testing.T) {
+	tests := []struct {
+		name         string
+		model        epaper.EPaperDisplayModel
+		orientation  model.CanonicalOrientation
+		expectedType string
+	}{
+		{
+			"WS4in0E",
+			epaper.WS4in0EPaperE,
+			model.ImgCanonicalOrientationPortrait,
+			"*epaper.wsDisplay",
+		},
+		{
+			"WS7in3E",
+			epaper.WS7in3EPaperE,
+			model.ImgCanonicalOrientationLandscape,
+			"*epaper.wsDisplay",
+		},
+		{
+			"WS13in3E",
+			epaper.WS13in3EPaperE,
+			model.ImgCanonicalOrientationPortrait,
+			"*epaper.wsDisplay",
+		},
+		{
+			"WS13in3K",
+			epaper.WS13in3EPaperK,
+			model.ImgCanonicalOrientationLandscape,
+			"*epaper.wsDisplay",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			display := epaper.NewDisplay(tt.model, tt.orientation)
+			require.NotNil(t, display)
+
+			assert.Equal(t, string(tt.model), display.ModelName())
+			assert.Equal(t, tt.orientation, display.InstalledOrientation())
+		})
+	}
+}
+
+func TestNewDisplayPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected panic for invalid model")
+		}
+	}()
+
+	epaper.NewDisplay(epaper.EPaperDisplayModel("invalid"), model.ImgCanonicalOrientationPortrait)
 }

@@ -2,8 +2,8 @@ package epaper
 
 import (
 	"fmt"
-	"slices"
 	"github.com/mikyk10/wisp/app/domain/model"
+	"slices"
 )
 
 type EPaperDisplayModel string

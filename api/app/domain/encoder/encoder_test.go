@@ -13,9 +13,9 @@ import (
 
 func TestNewWaveshareEPEncoder(t *testing.T) {
 	tests := []struct {
-		name          string
-		displayModel  epaper.DisplayMetadata
-		expectedType  string
+		name         string
+		displayModel epaper.DisplayMetadata
+		expectedType string
 	}{
 		{
 			"WS4in0E returns default encoder",
@@ -144,4 +144,98 @@ func TestEncodeBasicFunctionality(t *testing.T) {
 	// All black should be 0x00 for each byte
 	assert.Equal(t, byte(0x00), buf.Bytes()[0])
 	assert.Equal(t, byte(0x00), buf.Bytes()[1])
+}
+
+func TestWS13in3EpaperEEncoder_Encode(t *testing.T) {
+	tests := []struct {
+		name         string
+		color        color.Color
+		expectedByte uint8
+	}{
+		{
+			"black",
+			color.RGBA{0x42, 0x42, 0x42, 0xff},
+			0x00,
+		},
+		{
+			"white",
+			color.RGBA{0xe3, 0xe3, 0xe3, 0xff},
+			0x11,
+		},
+		{
+			"green",
+			color.RGBA{0x60, 0x97, 0x54, 0xff},
+			0x66,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create 4x2 image (left 2px and right 2px)
+			img := image.NewRGBA(image.Rect(0, 0, 4, 2))
+
+			// Fill with color
+			for y := 0; y < 2; y++ {
+				for x := 0; x < 4; x++ {
+					img.Set(x, y, tt.color)
+				}
+			}
+
+			display := epaper.NewWS13in3E(model.ImgCanonicalOrientationPortrait)
+			enc := encoder.NewWaveshareEPEncoder(display)
+
+			buf, err := enc.Encode(img)
+			assert.Nil(t, err)
+
+			// Should encode correctly (check at least first byte pattern)
+			assert.Greater(t, buf.Len(), 0)
+			bytes := buf.Bytes()
+			assert.NotEqual(t, 0, bytes[0], "encoded result should not be zero")
+		})
+	}
+}
+
+func TestWS13in3EpaperKEncoder_Encode(t *testing.T) {
+	tests := []struct {
+		name  string
+		color color.Color
+	}{
+		{
+			"black",
+			color.RGBA{0x42, 0x42, 0x42, 0xff},
+		},
+		{
+			"darkgray",
+			color.RGBA{0x61, 0x60, 0x60, 0xff},
+		},
+		{
+			"lightgray",
+			color.RGBA{0xa0, 0xa0, 0xa0, 0xff},
+		},
+		{
+			"white",
+			color.RGBA{0xe3, 0xe3, 0xe3, 0xff},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create 4x1 image (4 pixels for 4-bit encoding)
+			img := image.NewRGBA(image.Rect(0, 0, 4, 1))
+
+			// Fill with color
+			for x := 0; x < 4; x++ {
+				img.Set(x, 0, tt.color)
+			}
+
+			display := epaper.NewWS13in3K(model.ImgCanonicalOrientationLandscape)
+			enc := encoder.NewWaveshareEPEncoder(display)
+
+			buf, err := enc.Encode(img)
+			assert.Nil(t, err)
+
+			// 4 pixels in 2-bit encoding should produce 1 byte
+			assert.Equal(t, 1, buf.Len())
+		})
+	}
 }

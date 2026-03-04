@@ -3,9 +3,9 @@ package encoder
 import (
 	"bytes"
 	"fmt"
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"image"
 	"image/color"
-	"github.com/mikyk10/wisp/app/domain/display/epaper"
 )
 
 type wsEpaperEncoder struct {

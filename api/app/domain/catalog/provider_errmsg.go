@@ -3,6 +3,7 @@ package catalog
 import (
 	"bytes"
 	"image"
+	"image/color"
 	"image/draw"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"github.com/mikyk10/wisp/app/domain/display/epaper/wsdisplay"
@@ -46,55 +47,59 @@ func (ip *imageErrorMessageProvider) Resolve() (ImageLoader, error) {
 	}
 
 	fgcanvas := image.NewRGBA(image.Rect(0, 0, width, height))
-	draw.Draw(fgcanvas, fgcanvas.Bounds(), &image.Uniform{wsdisplay.White}, image.Point{}, draw.Src)
+	draw.Draw(fgcanvas, fgcanvas.Bounds(), &image.Uniform{color.RGBA{0x00, 0x00, 0x00, 0xff}}, image.Point{}, draw.Src)
 
 	fgcBounds := fgcanvas.Bounds()
 
 	confusedPFIcon, _, _ := image.Decode(bytes.NewReader(errorPng))
 
-	size := int(float64(fgcBounds.Max.X) * 0.1)
+	size := int(float64(fgcBounds.Max.X) * 0.08)
 	confusedPFIcon = imgconv.Resize(confusedPFIcon, &imgconv.ResizeOption{Width: size, Height: size})
 
-	xxx1 := (fgcBounds.Max.X / 2) - (size / 2)
-	yyy1 := (fgcBounds.Max.Y / 2) - (size / 2)
+	// Position icon at top-left
+	iconX := 20
+	iconY := 20
 
-	xxx2 := (fgcBounds.Max.X / 2) + (size / 2)
-	yyy2 := (fgcBounds.Max.Y / 2) + (size / 2)
-
-	draw.Draw(fgcanvas, image.Rectangle{image.Point{xxx1, yyy1}, image.Point{xxx2, yyy2}}, confusedPFIcon, image.Point{0, 0}, draw.Over)
+	draw.Draw(fgcanvas, image.Rectangle{image.Point{iconX, iconY}, image.Point{iconX + size, iconY + size}}, confusedPFIcon, image.Point{0, 0}, draw.Over)
 
 	unkempt, _ := truetype.Parse(improc.Unkempt)
 
 	face := truetype.NewFace(unkempt, &truetype.Options{
-		Size: 64,
+		Size:            48,
+		Hinting:         font.HintingFull,
+		SubPixelsX:      0, // Disable sub-pixel rendering (anti-aliasing)
+		SubPixelsY:      0,
 	})
 
-	// Set up the struct for drawing.
+	// Position "Ooops!" to the right of the icon
 	d := &font.Drawer{
 		Dst:  fgcanvas,
-		Src:  image.NewUniform(wsdisplay.Black),
+		Src:  image.NewUniform(wsdisplay.White),
 		Face: face,
-		Dot:  fixed.Point26_6{X: fixed.I(20), Y: fixed.I(70)},
+		Dot:  fixed.Point26_6{X: fixed.I(iconX + size + 20), Y: fixed.I(iconY + size - 10)},
 	}
 	d.DrawString("Ooops!")
 
 	face = truetype.NewFace(unkempt, &truetype.Options{
-		Size: 32,
+		Size:            28,
+		Hinting:         font.HintingFull,
+		SubPixelsX:      0, // Disable sub-pixel rendering (anti-aliasing)
+		SubPixelsY:      0,
 	})
 	d = &font.Drawer{
 		Dst:  fgcanvas,
-		Src:  image.NewUniform(wsdisplay.Black),
+		Src:  image.NewUniform(wsdisplay.White),
 		Face: face,
-		Dot:  fixed.Point26_6{X: fixed.I(30), Y: fixed.I(125)},
+		Dot:  fixed.Point26_6{X: fixed.I(20), Y: fixed.I(iconY + size + 40)},
 	}
 	d.DrawString("The server's in trouble!!")
 
 	face = basicfont.Face7x13
 	d = &font.Drawer{
 		Dst:  fgcanvas,
-		Src:  image.NewUniform(wsdisplay.Black),
+		Src:  image.NewUniform(wsdisplay.White),
 		Face: face,
-		Dot:  fixed.Point26_6{X: fixed.I(30), Y: fixed.I(140)},
+		Dot:  fixed.Point26_6{X: fixed.I(20), Y: fixed.I(iconY + size + 75)},
 	}
 
 	d.DrawString(ip.providerConfig.Message)

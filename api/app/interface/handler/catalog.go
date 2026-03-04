@@ -9,6 +9,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -51,6 +52,13 @@ func (uc *catalogHandler) ListCatalogs(c *echo.Context) error {
 }
 
 func (uc *catalogHandler) Img(c *echo.Context) error {
+	// Debug mode: always return error image when WISP_DEBUG_ERROR_IMAGE is set
+	if os.Getenv("WISP_DEBUG_ERROR_IMAGE") != "" {
+		imgid := c.Param("imgid")
+		ext := strings.ToLower(filepath.Ext(imgid))
+		return uc.dummyImage(c, ext)
+	}
+
 	imgid := c.Param("imgid")
 	ext := strings.ToLower(filepath.Ext(imgid))
 	idstr := strings.TrimSuffix(imgid, ext)

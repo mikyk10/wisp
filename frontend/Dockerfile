@@ -17,6 +17,9 @@ RUN npm run build
 # 6. Production stage: Serve the built application with nginx
 FROM nginx:1.27-alpine AS production
 
+# Upgrade all packages to get latest security patches
+RUN apk upgrade --no-cache
+
 # Copy built artifacts from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 

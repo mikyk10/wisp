@@ -8,7 +8,7 @@ Arduino/PlatformIO firmware for ESP32-based e-paper photo frames. Wakes from dee
 
 - Deep-sleep power management — minimal current draw between updates
 - WiFi provisioning via SoftAP web UI — credentials stored in ESP32 NVS, not hardcoded
-- Double-reset to re-enter provisioning mode without reflashing
+- BOOT-button config mode — press RST then immediately hold BOOT to re-enter provisioning without reflashing
 - Supports 7.3″ 7-color and 4.0″ black/white Waveshare displays
 - Sleep duration controlled by `X-Sleep-Seconds` response header from server (default 300 s, minimum 180 s)
 - Error screen displayed on failed image fetch, followed by 1-hour sleep
@@ -25,7 +25,7 @@ The following is a minimum BOM for the 7.3″ 7-color build:
 | Battery management PCB | Protection + charging circuit |
 | Connecting wires and enclosure | — |
 
-For the 4.0″ build, substitute Seeed XIAO ESP32-C3 and Waveshare EPD4INE6.
+For the 4.0″ build, substitute Seeed XIAO ESP32-C3 and Waveshare EPD4IN0E.
 
 ### Pin mapping
 
@@ -41,7 +41,7 @@ For the 4.0″ build, substitute Seeed XIAO ESP32-C3 and Waveshare EPD4INE6.
 | EPD_SCK | 7 | D8 |
 | EPD_MOSI | 9 | D10 |
 
-**seeed_xiao_esp32c3_epd4ine6** (4.0″ B/W) uses the same logical mapping on its own GPIO numbers — see `firmware/platformio.ini` for details.
+**seeed_xiao_esp32c3_epd4in0e** (4.0″ B/W) uses the same logical mapping on its own GPIO numbers — see `firmware/platformio.ini` for details.
 
 ## Getting Started
 
@@ -52,7 +52,7 @@ Install [PlatformIO](https://platformio.org/install) (CLI or VS Code extension).
 ### First-boot WiFi setup
 
 1. Flash the firmware (see Build & Flash below).
-2. On first boot the device enters SoftAP provisioning mode automatically. Subsequent re-provisioning requires a **double-reset** (press reset twice within ~3 seconds).
+2. On first boot the device enters SoftAP provisioning mode automatically. To re-enter provisioning later, press RST then immediately hold the BOOT button.
 3. Connect to the WiFi network broadcast by the device: `WISP-AP-XXXXXX` (XXXXXX = last 6 hex chars of the ESP32 MAC address). No password.
 4. Open `http://192.168.254.1` in a browser.
 5. Enter your WiFi SSID, password, and the WiSP Server URL (e.g. `http://192.168.1.100:9002`).
@@ -67,13 +67,13 @@ After setup the device operates autonomously.
 pio run -e seeed_xiao_esp32s3_epd7in3e
 
 # Build for 4.0″ B/W display
-pio run -e seeed_xiao_esp32c3_epd4ine6
+pio run -e seeed_xiao_esp32c3_epd4in0e
 
 # Flash (replace <env> with the environment name above)
 pio run --target upload -e seeed_xiao_esp32s3_epd7in3e
 
 # Build + flash in one step
-pio run --target upload -e seeed_xiao_esp32c3_epd4ine6
+pio run --target upload -e seeed_xiao_esp32c3_epd4in0e
 ```
 
 Build artifacts are written to `.pio/build/<env>/firmware.bin`. CI automatically builds both environments and attaches binaries to GitHub Releases on version tags.
@@ -92,8 +92,7 @@ Pin mappings and compile-time flags (display model, buffer size, PSRAM) are set 
 
 After provisioning, each wake cycle follows this sequence:
 
-1. Determine wake cause. If it's a button press (not deep-sleep timer), wait 3 seconds to detect a double-reset.
-2. Connect to the configured WiFi network (15-second timeout).
+1. Connect to the configured WiFi network (15-second timeout).
 3. GET `{serverURL}/pf/{MAC}/image/random.bin`.
 4. Stream binary image data to the e-paper display.
 5. Read the `X-Sleep-Seconds` header from the response (default 300, minimum enforced at 180).
@@ -101,12 +100,12 @@ After provisioning, each wake cycle follows this sequence:
 
 On any error (WiFi failure, HTTP error, timeout), the firmware displays an error screen and sleeps for 1 hour before retrying.
 
-### Double-reset behavior
+### Entering config mode
 
 | Action | Result |
 |--------|--------|
-| Single reset | Normal wake — starts WiFi connection |
-| Double reset (within ~3 s) | Enters SoftAP provisioning mode |
+| Press RST | Normal wake — starts WiFi connection |
+| Press RST, then immediately hold BOOT | Enters SoftAP provisioning mode |
 
 ### Battery notes
 
@@ -135,7 +134,7 @@ go run main.go
 ## Contributing
 
 1. Fork the [WiSP monorepo](https://github.com/mikyk10/wisp) and create a branch from `main`.
-2. Build both environments (from `firmware/`) before submitting a pull request: `pio run -e seeed_xiao_esp32s3_epd7in3e && pio run -e seeed_xiao_esp32c3_epd4ine6`.
+2. Build both environments (from `firmware/`) before submitting a pull request: `pio run -e seeed_xiao_esp32s3_epd7in3e && pio run -e seeed_xiao_esp32c3_epd4in0e`.
 3. CI automatically builds both environments on every pull request.
 4. Keep pull requests focused — one concern per PR.
 

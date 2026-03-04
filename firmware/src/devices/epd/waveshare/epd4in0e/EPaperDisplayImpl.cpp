@@ -1,4 +1,4 @@
-#ifdef EPD_WAVESHARE_EPD4INE6
+#ifdef EPD_WAVESHARE_EPD4IN0E
 
 #include <Arduino.h>
 #include <HTTPClient.h>

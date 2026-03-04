@@ -1,5 +1,5 @@
-#ifndef EPD_WAVESHARE_EPD4INE6_H
-#define EPD_WAVESHARE_EPD4INE6_H
+#ifndef EPD_WAVESHARE_EPD4IN0E_H
+#define EPD_WAVESHARE_EPD4IN0E_H
 
 #include <Arduino.h>
 #include <EPaperDisplay.h>

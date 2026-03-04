@@ -1,0 +1,3 @@
+# Stub config required by `wisp image convert`. See config.yaml for details.
+catalog: []
+displays: []

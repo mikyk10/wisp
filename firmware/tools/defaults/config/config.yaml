@@ -1,0 +1,9 @@
+# Stub config required by `wisp image convert`.
+# The command itself does not use any of these values, but main() loads config
+# before dispatching to any subcommand and exits fatally if files are not found.
+# Placing this file under ./config/ satisfies the search path without side effects.
+log_level: ERROR
+port: 8080
+database:
+  driver: sqlite
+  dsn: ":memory:"

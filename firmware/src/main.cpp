@@ -126,7 +126,7 @@ void setup() {
     Serial.setDebugOutput(true);
     //delay(5000); // Wait for serial monitor to connect
 
-    // Check BOOT button early: press RST then immediately hold BOOT to enter config mode
+    // Check BOOT button early: press and release RST then immediately hold BOOT to enter config mode
     // Must be checked before the serial delay, as the user holds BOOT right after RST release
     pinMode(BOOT_PIN, INPUT_PULLUP);
     delay(500); // Let pin settle
@@ -136,10 +136,26 @@ void setup() {
         return;
     }
 
+    Serial.printf("Free heap before new: %d\n", ESP.getFreeHeap());
+
+    Serial.println("[EPD] Creating display...");
+    epaper = EPaperFactory::create();
+    Serial.println("[EPD] Initializing...");
+    epaper->initialize();
+    Serial.println("[EPD] Initialized.");
+
     String ssid, password;
     if (!wifiManager.loadCredentials(ssid, password) ||
         !wifiManager.connectToWiFi(ssid.c_str(), password.c_str(), 15000)) {
-        Serial.println("[WiFi] Switching to SoftAP mode with Web UI");
+        Serial.println("[WiFi] Connection failed, showing error and entering SoftAP mode...");
+        epaper->sendErrorScreen();
+        epaper->displayImage();
+        epaper->enterSleep();
+
+        // Display error and keep SoftAP active for reconfiguration:
+        // - User sees error screen on display (device not broken)
+        // - User can access Web UI at http://wisp.local without manual reset
+        // - No sleep delay: user gets immediate feedback and can reconfigure
         wifiManager.startSoftAPWithWebServer();
         return;
     }
@@ -180,11 +196,17 @@ void setup() {
         return;
     }
 
-    Serial.println("[Epaper] All sources failed, retrying later...");
+    Serial.println("[Epaper] All sources failed, entering SoftAP mode...");
     epaper->sendErrorScreen();
     epaper->displayImage();
     epaper->enterSleep();
-    deepSleep(3600);
+
+    // Keep SoftAP active instead of sleeping for 1 hour:
+    // - User sees error screen and immediately understands action needed
+    // - User can access Web UI at http://192.168.254.1 to reconfigure WiFi/Server without manual reset
+    // - Tradeoff: Higher battery consumption, but better UX (no need to press RST+BOOT again)
+    // - Alternative considered: 1-hour sleep + Welcome screen (would require unnecessary reset)
+    wifiManager.startSoftAPWithWebServer();
 }
 
 void loop() {

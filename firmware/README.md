@@ -8,7 +8,7 @@ Arduino/PlatformIO firmware for ESP32-based e-paper photo frames. Wakes from dee
 
 - Deep-sleep power management — minimal current draw between updates
 - WiFi provisioning via SoftAP web UI — credentials stored in ESP32 NVS, not hardcoded
-- BOOT-button config mode — press RST then immediately hold BOOT to re-enter provisioning without reflashing
+- BOOT-button config mode — press and release RST then immediately hold BOOT to re-enter provisioning without reflashing
 - Supports 7.3″ 7-color and 4.0″ black/white Waveshare displays
 - Sleep duration controlled by `X-Sleep-Seconds` response header from server (default 300 s, minimum 180 s)
 - Error screen displayed on failed image fetch, followed by 1-hour sleep
@@ -52,7 +52,7 @@ Install [PlatformIO](https://platformio.org/install) (CLI or VS Code extension).
 ### First-boot WiFi setup
 
 1. Flash the firmware (see Build & Flash below).
-2. On first boot the device enters SoftAP provisioning mode automatically. To re-enter provisioning later, press RST then immediately hold the BOOT button.
+2. On first boot the device enters SoftAP provisioning mode automatically. To re-enter provisioning later, press and release RST then immediately hold the BOOT button.
 3. Connect to the WiFi network broadcast by the device: `WISP-AP-XXXXXX` (XXXXXX = last 6 hex chars of the ESP32 MAC address). No password.
 4. Open `http://192.168.254.1` in a browser.
 5. Enter your WiFi SSID, password, and the WiSP Server URL (e.g. `http://192.168.1.100:9002`).
@@ -105,7 +105,7 @@ On any error (WiFi failure, HTTP error, timeout), the firmware displays an error
 | Action | Result |
 |--------|--------|
 | Press RST | Normal wake — starts WiFi connection |
-| Press RST, then immediately hold BOOT | Enters SoftAP provisioning mode |
+| Press and release RST, then immediately hold BOOT | Enters SoftAP provisioning mode |
 
 ### Battery notes
 

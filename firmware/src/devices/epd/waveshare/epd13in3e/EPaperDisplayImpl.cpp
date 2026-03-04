@@ -7,6 +7,8 @@
 #include "EPaperDisplayImpl.h"
 #include "EPaperDisplay.h"
 #include "../../../../error_icon.h"
+#include "../../../../RLEDecoder.h"
+#include "../../../../assets/error/epd13in3e.bin.rle.h"
 
 // Each IC handles 600 columns x 1600 rows, at 4bpp (2 pixels per byte) = 300 bytes/row
 #define EPD_WIDTH              1200
@@ -158,34 +160,35 @@ void EPD13In3EImpl::initialize() {
 }
 
 void EPD13In3EImpl::sendErrorScreen() {
-    // Absolute-column icon lookup (columns 0-1199 across both panels)
-    static auto iconColor = [](int row, int col, int ix, int iy) -> uint8_t {
-        int ir = row - iy, ic = col - ix;
-        if (ir < 0 || ir >= ERROR_ICON_HEIGHT || ic < 0 || ic >= ERROR_ICON_WIDTH)
-            return EPD_WHITE;
-        uint8_t b = pgm_read_byte(&error_icon[ir * ((ERROR_ICON_WIDTH + 7) / 8) + ic / 8]);
-        return ((b >> (7 - (ic % 8))) & 1) ? EPD_WHITE : EPD_BLACK;
-    };
-    const int ix = (EPD_WIDTH  - ERROR_ICON_WIDTH)  / 2;
-    const int iy = (EPD_HEIGHT - ERROR_ICON_HEIGHT) / 2;
+    RLEDecoder decoder(error_screen_epd13in3e, error_screen_epd13in3e_size);
 
-    // CS_M: left panel (absolute columns 0-599)
+    // CS_M: left panel
     digitalWrite(EPD_CS_PIN, LOW);
     SPI.transfer(0x10);  // DTM
     for (int row = 0; row < EPD_HEIGHT; row++) {
         for (int col = 0; col < EPD_WIDTH / 2; col += 2) {
-            SPI.transfer((iconColor(row, col, ix, iy) << 4) | iconColor(row, col + 1, ix, iy));
+            uint8_t b1 = (uint8_t)decoder.nextByte();
+            uint8_t b2 = (uint8_t)decoder.nextByte();
+            SPI.transfer((b1 << 4) | b2);
         }
         delay(1);
     }
     csAll(HIGH);
 
-    // CS_S: right panel (absolute columns 600-1199)
+    // CS_S: right panel
+    decoder.reset();
+    // Skip to the second half of the data
+    for (int i = 0; i < EPD_HEIGHT * EPD_WIDTH / 4; i++) {
+        decoder.nextByte();
+    }
+
     digitalWrite(EPD_CS_S_PIN, LOW);
     SPI.transfer(0x10);  // DTM
     for (int row = 0; row < EPD_HEIGHT; row++) {
         for (int col = EPD_WIDTH / 2; col < EPD_WIDTH; col += 2) {
-            SPI.transfer((iconColor(row, col, ix, iy) << 4) | iconColor(row, col + 1, ix, iy));
+            uint8_t b1 = (uint8_t)decoder.nextByte();
+            uint8_t b2 = (uint8_t)decoder.nextByte();
+            SPI.transfer((b1 << 4) | b2);
         }
         delay(1);
     }

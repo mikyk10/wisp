@@ -7,9 +7,11 @@
 #include "EPaperDisplayImpl.h"
 #include "EPaperDisplay.h"
 #include "../../../../error_icon.h"
+#include "../../../../RLEDecoder.h"
+#include "../../../../assets/error/epd7in3e.bin.rle.h"
 
-#define EPD_WIDTH       600
-#define EPD_HEIGHT      400
+#define EPD_WIDTH       800
+#define EPD_HEIGHT      480
 
 static constexpr uint8_t EPD_BLACK = 0x00;
 static constexpr uint8_t EPD_WHITE = 0x01;
@@ -134,20 +136,12 @@ void EPD7In3EImpl::sendClearScreenData(unsigned char color) {
 }
 
 void EPD7In3EImpl::sendErrorScreen() {
-  static auto iconColor = [](int row, int col, int ix, int iy) -> uint8_t {
-    int ir = row - iy, ic = col - ix;
-    if (ir < 0 || ir >= ERROR_ICON_HEIGHT || ic < 0 || ic >= ERROR_ICON_WIDTH)
-      return EPD_WHITE;
-    uint8_t b = pgm_read_byte(&error_icon[ir * ((ERROR_ICON_WIDTH + 7) / 8) + ic / 8]);
-    return ((b >> (7 - (ic % 8))) & 1) ? EPD_WHITE : EPD_BLACK;
-  };
-  const int ix = (EPD_WIDTH  - ERROR_ICON_WIDTH)  / 2;
-  const int iy = (EPD_HEIGHT - ERROR_ICON_HEIGHT) / 2;
   sendCommand(0x10);
-  for (int row = 0; row < EPD_HEIGHT; row++) {
-    for (int col = 0; col < EPD_WIDTH; col += 2) {
-      sendData((iconColor(row, col, ix, iy) << 4) | iconColor(row, col + 1, ix, iy));
-    }
+
+  RLEDecoder decoder(error_screen_epd7in3e, error_screen_epd7in3e_size);
+  int byte;
+  while ((byte = decoder.nextByte()) != -1) {
+    sendData((uint8_t)byte);
   }
 }
 

@@ -15,17 +15,31 @@ Arduino/PlatformIO firmware for ESP32-based e-paper photo frames. Wakes from dee
 
 ## Hardware Requirements
 
-The following is a minimum BOM for the 7.3″ 7-color build:
+> **No warranty.** Specific hardware combinations are not guaranteed to be compatible or safe. Any damage resulting from the use of this firmware and hardware is your own responsibility.
+
+### Tested MCUs
+
+| MCU | Notes |
+|-----|-------|
+| Seeed XIAO ESP32-S3 | |
+| Seeed XIAO ESP32-C3 | |
+
+### Tested displays
+
+| Display | Resolution | Colors |
+|---------|-----------|--------|
+| Waveshare EPD7IN3E | 600 × 448 | 7 |
+| Waveshare EPD4IN0E | 400 × 300 | 7 |
+| Waveshare EPD13IN3E | 1200 × 1600 | 7 |
+
+Combinations other than those reflected in the PlatformIO environments are untested.
+
+### Other parts
 
 | Part | Notes |
 |------|-------|
-| Seeed XIAO ESP32-S3 | For the 4.0″ build use XIAO ESP32-C3 |
-| Waveshare 7.3″ e-Paper (EPD7IN3E) + driver board | 600 × 448, 7 colors |
-| 18650 Li-Ion cell | 3.7 V, 2000–3500 mAh recommended |
-| Battery management PCB | Protection + charging circuit |
+| Li-Ion / LiPo cell | Voltage and capacity depend on your circuit; XIAO includes an onboard charge controller |
 | Connecting wires and enclosure | — |
-
-For the 4.0″ build, substitute Seeed XIAO ESP32-C3 and Waveshare EPD4IN0E.
 
 ### Pin mapping
 
@@ -113,19 +127,6 @@ TLS is disabled by default to reduce CPU load and battery consumption. Deploy Wi
 
 Removing the red power LED from the Waveshare driver board reduces standby current draw noticeably on long deployments.
 
-## Legacy Web Server (`web/`)
-
-The `web/` subdirectory contains an earlier single-file Go image server (module `pf`, Go 1.15). It scans `./imgs/`, applies gamma correction, aspect-ratio crop, and Floyd-Steinberg dithering to 7 e-paper colors, then encodes images to the same vendor binary format.
-
-This server has been superseded by [`api/`](../api/README.md). Use that instead for new deployments.
-
-To run the legacy server (requires Go 1.15+):
-
-```bash
-cd web
-go run main.go
-# Serves on port 9002; endpoint: /random.bin
-```
 
 ## Gallery
 

@@ -1,5 +1,9 @@
 # WiSP
 
+[![CI - API](https://github.com/mikyk10/wisp/actions/workflows/ci-api.yml/badge.svg)](https://github.com/mikyk10/wisp/actions/workflows/ci-api.yml)
+[![CI - Frontend](https://github.com/mikyk10/wisp/actions/workflows/ci-frontend.yml/badge.svg)](https://github.com/mikyk10/wisp/actions/workflows/ci-frontend.yml)
+[![CI - Firmware](https://github.com/mikyk10/wisp/actions/workflows/ci-firmware.yml/badge.svg)](https://github.com/mikyk10/wisp/actions/workflows/ci-firmware.yml)
+
 DIY battery-powered digital photo frame using Waveshare e-Paper displays and ESP32 microcontrollers.
 
 ## Components
@@ -69,3 +73,5 @@ API_BASE_URL=http://192.168.1.10:9002
 
 See [`firmware/`](firmware/) for build and flash instructions.
 Configure Wi-Fi credentials and the API server URL via the SoftAP setup on first boot.
+The SoftAP network address (`192.168.254.1`) and the SSID/hostname template (`WISP-AP-XXXXXX`) are defined in `firmware/src/config/network.h`.
+After connecting to Wi-Fi, the device registers itself as `wisp.local` via mDNS (reachable at `http://wisp.local/` on the same network).

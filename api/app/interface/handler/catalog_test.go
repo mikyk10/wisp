@@ -2,7 +2,6 @@ package handler_test
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -106,8 +105,7 @@ func TestImgNotFound(t *testing.T) {
 	}
 }
 
-// TestRandomImg_UnknownDisplay: passing an unknown display key to RandomImg should return a 404 error.
-// (Regression test for the change from panic to error return in Pick().)
+// TestRandomImg_UnknownDisplay: passing an unknown display key to RandomImg should return error image with default display.
 func TestRandomImg_UnknownDisplay(t *testing.T) {
 	e, h, _ := setupHandler()
 
@@ -119,11 +117,9 @@ func TestRandomImg_UnknownDisplay(t *testing.T) {
 		{Name: "displayKey", Value: "nonexistent"},
 	})
 
-	err := h.RandomImg(c)
-	if assert.Error(t, err) {
-		var he *echo.HTTPError
-		if assert.True(t, errors.As(err, &he), "expected *echo.HTTPError") {
-			assert.Equal(t, http.StatusNotFound, he.Code)
-		}
+	if assert.NoError(t, h.RandomImg(c)) {
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "image/jpeg", rec.Header().Get(echo.HeaderContentType))
+		assert.NotEmpty(t, rec.Body.Bytes())
 	}
 }

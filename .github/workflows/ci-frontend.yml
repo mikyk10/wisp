@@ -99,7 +99,6 @@ jobs:
         uses: aquasecurity/trivy-action@0.34.0
         with:
           image-ref: ghcr.io/mikyk10/wisp/frontend:latest
-          image-src: docker
           severity: CRITICAL,HIGH
           exit-code: '1'
           ignore-unfixed: true

@@ -30,6 +30,7 @@ type CatalogHandler interface {
 	ListCatalogs(*echo.Context) error
 	List(*echo.Context) error
 	Img(*echo.Context) error
+	ImgManagement(*echo.Context) error
 	ToggleVisibility(*echo.Context) error
 	RandomImg(*echo.Context) error
 }
@@ -52,6 +53,43 @@ func (uc *catalogHandler) ListCatalogs(c *echo.Context) error {
 }
 
 func (uc *catalogHandler) Img(c *echo.Context) error {
+	imgid := c.Param("imgid")
+	ext := strings.ToLower(filepath.Ext(imgid))
+	idstr := strings.TrimSuffix(imgid, ext)
+
+	id, err := strconv.ParseUint(idstr, 10, 64)
+	if err != nil {
+		return c.NoContent(http.StatusBadRequest)
+	}
+
+	img, err := uc.imguc.FindLocalImageById("", model.PrimaryKey(id))
+	if err != nil {
+		display := uc.resolveDisplay(c)
+		imsecgrp, _, _ := uc.imguc.GetSequencerGroupForDisplay(c.Param("displayKey"))
+		return uc.renderErrorImage(c, ext, display, imsecgrp, "Image Not Found", http.StatusNotFound)
+	}
+
+	// If ThumbJPG is empty (e.g. catalog-excluded images), returning 0 bytes
+	// would cause NS_BINDING_ABORTED in the browser, so return a dummy image instead.
+	if len(img.ThumbJPG) == 0 {
+		display := uc.resolveDisplay(c)
+		imsecgrp, _, _ := uc.imguc.GetSequencerGroupForDisplay(c.Param("displayKey"))
+		return uc.renderErrorImage(c, ext, display, imsecgrp, "Image Not Found", http.StatusNotFound)
+	}
+
+	rdr, mime, err := uc.img(ext, img)
+	if err != nil {
+		display := uc.resolveDisplay(c)
+		imsecgrp, _, _ := uc.imguc.GetSequencerGroupForDisplay(c.Param("displayKey"))
+		return uc.renderErrorImage(c, ext, display, imsecgrp, "Image Not Found", http.StatusNotFound)
+	}
+
+	return c.Stream(http.StatusOK, mime, rdr)
+}
+
+// ImgManagement serves images for Management API (/api/catalog/:catalogKey/image/:imgid).
+// Returns error images without color reduction processing.
+func (uc *catalogHandler) ImgManagement(c *echo.Context) error {
 	imgid := c.Param("imgid")
 	ext := strings.ToLower(filepath.Ext(imgid))
 	idstr := strings.TrimSuffix(imgid, ext)

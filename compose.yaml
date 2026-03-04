@@ -20,6 +20,9 @@ services:
       # GOMEMLIMIT tells Go's GC to run more aggressively before hitting the OS limit.
       # Set to ~80% of the container's memory limit (e.g. 6GiB for an 8 GB host).
       # - GOMEMLIMIT=6GiB
+
+      - WISP_DEBUG_ERROR_IMAGE=true
+      - WISP_TEST_ERROR_WITH_COLOR_REDUCTION=1
     volumes:
       - ./api:/app
       - api-data:/data

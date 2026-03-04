@@ -90,6 +90,7 @@ type ColorReduction struct {
 }
 
 const (
+	ColorReductionTypeSimple         ColorReductionType = "simple"
 	ColorReductionTypeBayer          ColorReductionType = "bayer"
 	ColorReductionTypeFloydSteinberg ColorReductionType = "floysteinberg"
 	ColorReductionTypeSierra3        ColorReductionType = "sierra3"

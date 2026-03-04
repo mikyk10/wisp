@@ -1,5 +1,8 @@
 <template>
-  <div ref="scrollbarEl" class="timeline-scrollbar">
+  <div
+    ref="scrollbarEl"
+    class="timeline-scrollbar"
+  >
     <div class="timeline-content">
       <div
         v-for="entry in timelineEntries"
@@ -8,8 +11,12 @@
         :class="{ 'timeline-entry--active': entry.key === activeEntry }"
         @click="scrollToEntry(entry)"
       >
-        <div class="timeline-label">{{ entry.label }}</div>
-        <div class="timeline-count">{{ entry.count }} photos</div>
+        <div class="timeline-label">
+          {{ entry.label }}
+        </div>
+        <div class="timeline-count">
+          {{ entry.count }} photos
+        </div>
       </div>
     </div>
   </div>

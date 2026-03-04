@@ -66,10 +66,10 @@
     <!-- 3. Frame body -->
     <rect x="0" y="0" width="120" height="120" rx="4" fill="#222b3a"/>
     <!-- 4. Outer bevel edges (4px) -->
-    <rect x="0"   y="0"   width="120" height="4"   fill="url(#hl_top)"/>
-    <rect x="0"   y="0"   width="4"   height="120" fill="url(#hl_left)"/>
-    <rect x="116" y="0"   width="4"   height="120" fill="url(#sh_right)"/>
-    <rect x="0"   y="116" width="120" height="4"   fill="url(#sh_bottom)"/>
+    <rect x="0" y="0" width="120" height="4" fill="url(#hl_top)"/>
+    <rect x="0" y="0" width="4" height="120" fill="url(#hl_left)"/>
+    <rect x="116" y="0" width="4" height="120" fill="url(#sh_right)"/>
+    <rect x="0" y="116" width="120" height="4" fill="url(#sh_bottom)"/>
     <!-- 5. Display area -->
     <rect x="16" y="16" width="88" height="88" rx="2" fill="#0d1520"/>
     <!-- 6. Display inner shadow (10px fade) -->
@@ -77,9 +77,9 @@
     <rect x="16" y="16" width="10" height="88" fill="url(#inner_left)"/>
     <!-- 7. Mat groove bevel (reversed, 3px wide) -->
     <rect x="20" y="20" width="80" height="3" fill="url(#mat_top)"/>
-    <rect x="20" y="20" width="3"  height="80" fill="url(#mat_left)"/>
-    <rect x="97" y="20" width="3"  height="80" fill="url(#mat_right)"/>
-    <rect x="20" y="97" width="80" height="3"  fill="url(#mat_bottom)"/>
+    <rect x="20" y="20" width="3" height="80" fill="url(#mat_left)"/>
+    <rect x="97" y="20" width="3" height="80" fill="url(#mat_right)"/>
+    <rect x="20" y="97" width="80" height="3" fill="url(#mat_bottom)"/>
     <!-- 8. Photo area -->
     <rect x="25" y="25" width="70" height="70" rx="1" fill="#090d14"/>
     <!-- 9. Dot group (W-shape, clipped by photo_clip) -->

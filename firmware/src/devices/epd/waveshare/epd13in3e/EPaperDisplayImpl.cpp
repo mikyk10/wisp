@@ -71,6 +71,7 @@ void EPD13In3EImpl::reset() {
 }
 
 void EPD13In3EImpl::busyHigh() {
+    // NOTE: "Entered busyHigh" and dot logging are verbose; consider removing once stable.
     Serial.println("Entered busyHigh");
     unsigned long start = millis();
     while (!digitalRead(EPD_BUSY_PIN)) {

@@ -233,6 +233,7 @@ void EPD4InE6Impl::sendData(unsigned char data){
 
 void EPD4InE6Impl::busyHigh(){
   //LOW: busy, HIGH: idle
+  // NOTE: "Entered busyHigh" and dot logging are verbose; consider removing once stable.
   Serial.println("Entered busyHigh");
   unsigned long start = millis();
   while (!(digitalRead(EPD_BUSY_PIN))){

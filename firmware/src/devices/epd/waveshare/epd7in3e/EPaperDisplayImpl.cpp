@@ -211,10 +211,7 @@ void EPD7In3EImpl::displayImage() {
 }
 
 void EPD7In3EImpl::enterSleep() {
-  sendCommand(0x02); // POWER_OFF
-  sendData(0X00);
-  busyHigh();
-
+  // POWER_OFF is already sent at the end of displayImage(); skip here to avoid double send.
   delay(100);
   sendCommand(0x07);
   sendData(0xA5);
@@ -243,6 +240,7 @@ void EPD7In3EImpl::sendData(unsigned char data){
 
 void EPD7In3EImpl::busyHigh(){
   //LOW: busy, HIGH: idle
+  // NOTE: "Entered busyHigh" and dot logging are verbose; consider removing once stable.
   Serial.println("Entered busyHigh");
   unsigned long start = millis();
   while (!(digitalRead(EPD_BUSY_PIN))){
@@ -261,7 +259,7 @@ void EPD7In3EImpl::reset(){
   digitalWrite(EPD_RST_PIN, HIGH);
   delay(20);
   digitalWrite(EPD_RST_PIN, LOW);
-  delay(2);
+  delay(20);
   digitalWrite(EPD_RST_PIN, HIGH);
   delay(20);
 }

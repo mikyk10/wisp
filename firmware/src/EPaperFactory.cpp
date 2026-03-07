@@ -2,6 +2,8 @@
 
 #ifdef EPD_WAVESHARE_EPD13IN3E
 #include "devices/epd/waveshare/epd13in3e/EPaperDisplayImpl.h"
+#elif defined(EPD_WAVESHARE_EPD13IN3K)
+#include "devices/epd/waveshare/epd13in3k/EPaperDisplayImpl.h"
 #elif defined(EPD_WAVESHARE_EPD7IN3E)
 #include "devices/epd/waveshare/epd7in3e/EPaperDisplayImpl.h"
 #elif defined(EPD_WAVESHARE_EPD4IN0E)
@@ -12,6 +14,8 @@ EPaperDisplay *EPaperFactory::create()
 {
 #ifdef EPD_WAVESHARE_EPD13IN3E
     return new EPD13In3EImpl();
+#elif defined(EPD_WAVESHARE_EPD13IN3K)
+    return new EPD13In3KImpl();
 #elif defined(EPD_WAVESHARE_EPD7IN3E)
     return new EPD7In3EImpl();
 #elif defined(EPD_WAVESHARE_EPD4IN0E)

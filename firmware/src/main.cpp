@@ -75,45 +75,9 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
     httpClient.end();
     delete secureClient;
 
-    epaper->displayImage();
-
     return sleepSeconds;
 }
 
-int fetchImageFallback(EPaperDisplay* epaper) {
-    WiFiClientSecure secureClient;
-    secureClient.setInsecure();
-
-    HTTPClient httpClient;
-    httpClient.setTimeout(HTTP_TIMEOUT);
-    httpClient.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-
-    Serial.printf("[fallback] Fetching: %s\n", FALLBACK_IMAGE_URL);
-    if (!httpClient.begin(secureClient, FALLBACK_IMAGE_URL)) {
-        Serial.println("[fallback] Failed to begin request");
-        return -1;
-    }
-
-    int httpCode = httpClient.GET();
-    Serial.printf("[fallback] HTTP status: %d\n", httpCode);
-    if (httpCode != HTTP_CODE_OK) {
-        httpClient.end();
-        return -1;
-    }
-
-    int contentLength = httpClient.getSize();
-    if (contentLength <= 0) {
-        Serial.println("[fallback] No content received");
-        httpClient.end();
-        return -1;
-    }
-
-    epaper->sendImageData(&httpClient, contentLength);
-    httpClient.end();
-    epaper->displayImage();
-
-    return FALLBACK_SLEEP_SECONDS;
-}
 
 void deepSleep(int seconds) {
     Serial.printf("[sys] Entering deep sleep for %d seconds...\n", seconds);
@@ -121,10 +85,23 @@ void deepSleep(int seconds) {
     esp_deep_sleep_start();
 }
 
+void initEPaper() {
+    Serial.println("[EPD] Creating display...");
+    epaper = EPaperFactory::create();
+    if (!epaper) {
+        EPaperDisplay::sleepOnError("EPaperFactory::create() returned nullptr — no EPD model defined");
+    }
+    Serial.println("[EPD] Initializing...");
+    epaper->initialize();
+    Serial.println("[EPD] Initialized.");
+}
+
 void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(true);
     //delay(5000); // Wait for serial monitor to connect
+
+    Serial.printf("Free heap before new: %d\n", ESP.getFreeHeap());
 
     // Check BOOT button early: press and release RST then immediately hold BOOT to enter config mode
     // Must be checked before the serial delay, as the user holds BOOT right after RST release
@@ -132,22 +109,24 @@ void setup() {
     delay(500); // Let pin settle
     if (digitalRead(BOOT_PIN) == LOW) {
         Serial.println("[sys] BOOT held, entering config mode");
+
+        initEPaper();
+        epaper->sendErrorScreen();
+        epaper->displayImage();
+        epaper->enterSleep();
+        
         wifiManager.startSoftAPWithWebServer();
         return;
     }
 
-    Serial.printf("Free heap before new: %d\n", ESP.getFreeHeap());
-
-    Serial.println("[EPD] Creating display...");
-    epaper = EPaperFactory::create();
-    Serial.println("[EPD] Initializing...");
-    epaper->initialize();
-    Serial.println("[EPD] Initialized.");
 
     String ssid, password;
     if (!wifiManager.loadCredentials(ssid, password) ||
         !wifiManager.connectToWiFi(ssid.c_str(), password.c_str(), 15000)) {
         Serial.println("[WiFi] Connection failed, showing error and entering SoftAP mode...");
+
+        initEPaper();
+
         epaper->sendErrorScreen();
         epaper->displayImage();
         epaper->enterSleep();
@@ -160,17 +139,10 @@ void setup() {
         return;
     }
 
+    initEPaper();
+
     String serverBaseURL;
     bool hasServerURL = wifiManager.loadServerURL(serverBaseURL);
-    // URL 未設定でも SoftAP には入らず、フォールバックに進む
-
-    Serial.printf("Free heap before new: %d\n", ESP.getFreeHeap());
-
-    Serial.println("[EPD] Creating display...");
-    epaper = EPaperFactory::create();
-    Serial.println("[EPD] Initializing...");
-    epaper->initialize();
-    Serial.println("[EPD] Initialized.");
 
     int sleepSeconds = -1;
 
@@ -183,30 +155,25 @@ void setup() {
                  serverBaseURL.c_str(),
                  macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
         sleepSeconds = fetchImage(imageURL, epaper);
+        //TODO: fetch errorが検知できないのを修正する
+
+        // NOTE: sleepSeconds == 0 (server returned X-Sleep-Seconds: 0) falls through to error path.
+        // If 0-second sleep becomes a valid server response, change this to >= 0.
+        if (sleepSeconds > 0) {
+            // 転送が正常終了したとみなす
+            epaper->displayImage();
+            epaper->enterSleep();
+            deepSleep(sleepSeconds);
+            return;
+        }
     }
 
-    if (sleepSeconds < 180) {
-        Serial.println("[fallback] Trying GitHub Pages default...");
-        sleepSeconds = fetchImageFallback(epaper);
-    }
-
-    if (sleepSeconds >= 180) {
-        epaper->enterSleep();
-        deepSleep(sleepSeconds);
-        return;
-    }
-
-    Serial.println("[Epaper] All sources failed, entering SoftAP mode...");
+    // ここに来ているということはなんか問題があった
+    Serial.println("[fallback] Default error page");
     epaper->sendErrorScreen();
     epaper->displayImage();
     epaper->enterSleep();
-
-    // Keep SoftAP active instead of sleeping for 1 hour:
-    // - User sees error screen and immediately understands action needed
-    // - User can access Web UI at http://192.168.254.1 to reconfigure WiFi/Server without manual reset
-    // - Tradeoff: Higher battery consumption, but better UX (no need to press RST+BOOT again)
-    // - Alternative considered: 1-hour sleep + Welcome screen (would require unnecessary reset)
-    wifiManager.startSoftAPWithWebServer();
+    deepSleep(86400);
 }
 
 void loop() {

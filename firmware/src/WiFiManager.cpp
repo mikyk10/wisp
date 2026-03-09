@@ -1,33 +1,25 @@
 #include "WiFiManager.h"
 
-String WiFiManager::generateHostname()
+String WiFiManager::getMacSuffix()
 {
     uint8_t mac[6];
     WiFi.macAddress(mac);
+    char suffix[6 + 1];
+    sprintf(suffix, "%02X%02X%02X", mac[3], mac[4], mac[5]);
+    return String(suffix);
+}
 
-    // MACアドレスの末尾6桁を取得
-    char macSuffix[6 + 1];
-    sprintf(macSuffix, "%02X%02X%02X", mac[3], mac[4], mac[5]);
-
-    // SSIDのテンプレートを書き換え
+String WiFiManager::generateHostname()
+{
     String hostname = hostname_template;
-    hostname.replace("******", macSuffix);
-
+    hostname.replace("******", getMacSuffix());
     return hostname;
 }
 
 String WiFiManager::generateSSID()
 {
-    uint8_t mac[6];
-    WiFi.macAddress(mac);
-
-    // MACアドレスの末尾6桁を取得
-    char macSuffix[6 + 1];
-    sprintf(macSuffix, "%02X%02X%02X", mac[3], mac[4], mac[5]);
-
-    // SSIDのテンプレートを書き換え
     String apSSID = ssid_template;
-    apSSID.replace("******", macSuffix);
+    apSSID.replace("******", getMacSuffix());
     return apSSID;
 }
 
@@ -210,6 +202,9 @@ void WiFiManager::handleScan()
         String ssid = WiFi.SSID(i);
         ssid.replace("\\", "\\\\");
         ssid.replace("\"", "\\\"");
+        ssid.replace("\n", "\\n");
+        ssid.replace("\r", "\\r");
+        ssid.replace("\t", "\\t");
         json += "\"";
         json += ssid;
         json += "\"";
@@ -288,6 +283,7 @@ bool WiFiManager::loadCredentials(String &ssid, String &password)
     preferences.end();
 
     Serial.println("[WiFi] Validating saved credentials");
+    // NOTE: password is required, so open networks (no password) cannot be configured.
     if (ssid.length() > 0 && password.length() > 0)
     {
         Serial.println("[WiFi] Loaded saved credentials");

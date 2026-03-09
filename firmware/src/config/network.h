@@ -17,6 +17,8 @@ const char hostname_template[] = "WISP-******";  // Dynamically replaced by hard
   #define FALLBACK_IMAGE_URL "https://raw.githubusercontent.com/<user>/<repo>/main/docs/defaults/epd4in0e.bin"
 #elif defined(EPD_WAVESHARE_EPD13IN3E)
   #define FALLBACK_IMAGE_URL "https://raw.githubusercontent.com/<user>/<repo>/main/docs/defaults/epd13in3e.bin"
+#elif defined(EPD_WAVESHARE_EPD13IN3K)
+  #define FALLBACK_IMAGE_URL "https://raw.githubusercontent.com/<user>/<repo>/main/docs/defaults/epd13in3k.bin"
 #else
   #define FALLBACK_IMAGE_URL ""
 #endif

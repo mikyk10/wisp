@@ -15,6 +15,7 @@
 class WiFiManager
 {
 private:
+    String getMacSuffix();
     String generateSSID();
     String generateHostname();
 

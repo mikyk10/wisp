@@ -132,6 +132,13 @@ displays:
     #
     #   blur        — Gaussian blur. value = sigma radius in pixels; 0 = no blur.
     #
+    #   selective_color — Keep pixels within a hue range in color; convert the rest
+    #                     to grayscale. Useful for dramatic single-color emphasis.
+    #                     hue_center: center hue in degrees (0–360).
+    #                       0=red, 30=orange, 60=yellow, 120=green, 180=cyan,
+    #                       240=blue, 270=violet, 300=magenta
+    #                     hue_range: tolerance in degrees from center (e.g. 30).
+    #
     # filters:
     #   - type: gamma
     #     properties:
@@ -151,3 +158,7 @@ displays:
     #   - type: blur
     #     properties:
     #       value: 0.0
+    #   - type: selective_color
+    #     properties:
+    #       hue_center: 0    # red
+    #       hue_range: 30

@@ -121,7 +121,8 @@ const (
 	ImageProcessorTypeContrast   ImageProcessorType = "contrast"
 	ImageProcessorTypeGamma      ImageProcessorType = "gamma"
 	ImageProcessorTypeHue        ImageProcessorType = "hue"
-	ImageProcessorTypeSaturation ImageProcessorType = "saturation"
+	ImageProcessorTypeSaturation     ImageProcessorType = "saturation"
+	ImageProcessorTypeSelectiveColor ImageProcessorType = "selective_color"
 )
 
 // ImageProcessorConfig holds configuration for a filter applied to images.

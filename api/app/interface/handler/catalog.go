@@ -69,35 +69,42 @@ func (uc *catalogHandler) Img(c *echo.Context) error {
 
 	id, err := strconv.ParseUint(idstr, 10, 64)
 	if err != nil {
-		// Invalid image ID format (400 Bad Request, not a DB error)
-		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusBadRequest, nil)
+		return uc.renderErrorImage(c, ext, display, errMsgPhotoNotFound, http.StatusBadRequest, nil)
 	}
-	_, _, displayErr := uc.imguc.GetSequencerGroupForDisplay(displayKey)
+	imsecgrp, _, displayErr := uc.imguc.GetSequencerGroupForDisplay(displayKey)
 	if displayErr != nil {
-		return uc.renderErrorImage(c, ext, display,errMsgDisplayNotFound, http.StatusNotFound, displayErr)
+		return uc.renderErrorImage(c, ext, display, errMsgDisplayNotFound, http.StatusNotFound, displayErr)
 	}
 
-	img, err := uc.imguc.FindLocalImageById("", model.PrimaryKey(id))
+	// Load original source image (not thumbnail) and apply the display's processing pipeline
+	srcImg, meta, loadErr := uc.imguc.LoadSourceImageById(model.PrimaryKey(id))
+	if loadErr != nil {
+		return uc.renderErrorImage(c, ext, display, errMsgPhotoNotFound, http.StatusNotFound, loadErr)
+	}
+
+	ctx := context.Background()
+	processedImg, _ := imsecgrp.Apply(ctx, srcImg, meta)
+
+	buf := &bytes.Buffer{}
+	mime := ""
+	switch ext {
+	case ".jpg", ".jpeg":
+		mime = "image/jpeg"
+		err = jpeg.Encode(buf, processedImg, nil)
+	case ".png":
+		mime = "image/png"
+		err = png.Encode(buf, processedImg)
+	default:
+		mime = "application/octet-stream"
+		ecdr := encoder.NewWaveshareEPEncoder(display)
+		buf, err = ecdr.Encode(processedImg)
+	}
+
 	if err != nil {
-		// Record not found is a 404, not a DB error
-		if err == gorm.ErrRecordNotFound {
-			err = nil
-		}
-		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusNotFound, err)
+		return uc.renderErrorImage(c, ext, display, errMsgPhotoNotFound, http.StatusInternalServerError, err)
 	}
 
-	// If ThumbJPG is empty (e.g. catalog-excluded images), returning 0 bytes
-	// would cause NS_BINDING_ABORTED in the browser, so return a dummy image instead.
-	if len(img.ThumbJPG) == 0 {
-		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusNotFound, nil)
-	}
-
-	rdr, mime, err := uc.img(ext, img)
-	if err != nil {
-		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusNotFound, err)
-	}
-
-	return c.Stream(http.StatusOK, mime, rdr)
+	return c.Stream(http.StatusOK, mime, buf)
 }
 
 // ImgManagement serves images for Management API (/api/catalog/:catalogKey/image/:imgid).

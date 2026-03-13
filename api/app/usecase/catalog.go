@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"image"
 	"image/jpeg"
 	"log/slog"
 	"maps"
@@ -34,6 +35,7 @@ import (
 	"github.com/mikyk10/wisp/app/domain/improc/hue"
 	"github.com/mikyk10/wisp/app/domain/improc/rotation"
 	"github.com/mikyk10/wisp/app/domain/improc/saturation"
+	"github.com/mikyk10/wisp/app/domain/improc/selective_color"
 	"github.com/mikyk10/wisp/app/domain/improc/timestamp"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
@@ -54,6 +56,9 @@ type CatalogUsecase interface {
 
 	// FindLocalImageById returns an image from the ImageLocalFileProvider by ID.
 	FindLocalImageById(catalogKey string, id model.PrimaryKey) (*model.Image, error)
+
+	// LoadSourceImageById loads the original source image and metadata for a given image ID.
+	LoadSourceImageById(id model.PrimaryKey) (image.Image, *model.ImgMeta, error)
 
 	// ListImages retrieves the list of indexed images under the catalog using a callback.
 	// tags filters results to images possessing all of the specified tag names (AND semantics).
@@ -324,6 +329,14 @@ func (uc *catalogUseCase) FindLocalImageById(catalogKey string, id model.Primary
 	return uc.imgr.FindById(id)
 }
 
+func (uc *catalogUseCase) LoadSourceImageById(id model.PrimaryKey) (image.Image, *model.ImgMeta, error) {
+	rec, err := uc.imgr.FindById(id)
+	if err != nil {
+		return nil, nil, err
+	}
+	return catalog.LoadImageFromPath(rec.Src)
+}
+
 func (uc *catalogUseCase) ListImages(catalogKey string, tags []string, cb func(*model.Image) error) error {
 	return uc.imgr.ListByCatalog(catalogKey, tags, cb)
 }
@@ -369,6 +382,8 @@ func (uc *catalogUseCase) GetSequencerGroupForDisplay(displayKey string) (improc
 			impDispCatalogSeq.Push(hue.NewImageHue(proc.Data))
 		case config.ImageProcessorTypeSaturation:
 			impDispCatalogSeq.Push(saturation.NewImageSaturation(proc.Data))
+		case config.ImageProcessorTypeSelectiveColor:
+			impDispCatalogSeq.Push(selective_color.NewSelectiveColor(proc.Data))
 		default:
 			// do nothing
 		}

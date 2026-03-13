@@ -13,6 +13,11 @@ import (
 	"github.com/rwcarlsen/goexif/exif"
 )
 
+// LoadImageFromPath loads an image and its metadata from a file path.
+func LoadImageFromPath(path string) (image.Image, *model.ImgMeta, error) {
+	return load(path)
+}
+
 func load(path string) (image.Image, *model.ImgMeta, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, nil, err

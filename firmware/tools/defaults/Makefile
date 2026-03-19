@@ -5,12 +5,14 @@ TMPDIR = /tmp/wisp-defaults
 DISPLAY_epd7in3e  = ws7in3e
 DISPLAY_epd4in0e  = ws4in0e
 DISPLAY_epd13in3e = ws13in3e
+DISPLAY_epd13in3k = ws13in3k
 
 SIZE_epd7in3e  = 800 480
 SIZE_epd4in0e  = 600 400
 SIZE_epd13in3e = 1200 1600
+SIZE_epd13in3k = 960 680
 
-DEVICES = epd7in3e epd4in0e epd13in3e
+DEVICES = epd7in3e epd4in0e epd13in3e epd13in3k
 
 .PRECIOUS: $(TMPDIR)/%.png
 

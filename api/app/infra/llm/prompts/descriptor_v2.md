@@ -1,10 +1,10 @@
 ---
 version: v2
 stage: descriptor
-#provider: ollama_local
-#model: qwen2.5vl:7b
-provider: openai
-model: gpt-5-nano
+provider: ollama_local
+model: qwen3.5:9b
+#provider: openai
+#model: gpt-5-nano
 #max_tokens: 1024
 ---
 Describe this photo in detail. Focus on subjects, setting, mood, colors, and objects.

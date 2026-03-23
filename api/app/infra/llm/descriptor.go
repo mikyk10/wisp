@@ -10,7 +10,6 @@ import (
 	"time"
 
 	anyllm "github.com/mozilla-ai/any-llm-go"
-	openaicompat "github.com/mozilla-ai/any-llm-go/providers/openai"
 
 	"github.com/mikyk10/wisp/app/domain/ai"
 	"github.com/mikyk10/wisp/app/domain/model/config"
@@ -65,26 +64,18 @@ func (c *descriptorClient) Describe(ctx context.Context, thumbJPEG []byte) (stri
 		return "", fmt.Errorf("descriptor: provider %q not found in config", c.prompt.Config.Provider)
 	}
 
-	provider, err := openaicompat.NewCompatible(
-		openaicompat.CompatibleConfig{
-			Name:           c.prompt.Config.Provider,
-			DefaultBaseURL: provCfg.Endpoint,
-			RequireAPIKey:  false,
-			DefaultAPIKey:  "none",
-		},
-		anyllm.WithBaseURL(provCfg.Endpoint),
-		anyllm.WithAPIKey(providerAPIKey(provCfg.APIKey)),
-		anyllm.WithTimeout(time.Duration(c.cfg.AI.RequestTimeoutSec)*time.Second),
-	)
+	provider, err := newProvider(c.prompt.Config, provCfg, c.cfg.AI.RequestTimeoutSec)
 	if err != nil {
 		return "", fmt.Errorf("descriptor: create provider: %w", err)
 	}
 
-	imageDataURL := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(thumbJPEG)
+	imageB64 := base64.StdEncoding.EncodeToString(thumbJPEG)
+	imageDataURL := "data:image/jpeg;base64," + imageB64
 
 	params := anyllm.CompletionParams{
-		Model:     c.prompt.Config.Model,
-		MaxTokens: c.prompt.Config.MaxTokens,
+		Model:           c.prompt.Config.Model,
+		MaxTokens:       c.prompt.Config.MaxTokens,
+		ReasoningEffort: anyllm.ReasoningEffortNone,
 		Messages: []anyllm.Message{
 			{
 				Role: anyllm.RoleUser,
@@ -95,6 +86,19 @@ func (c *descriptorClient) Describe(ctx context.Context, thumbJPEG []byte) (stri
 			},
 		},
 	}
+
+	slog.Info("descriptor: request",
+		"provider", c.prompt.Config.Provider,
+		"model", c.prompt.Config.Model,
+		"endpoint", provCfg.Endpoint,
+		"max_tokens", c.prompt.Config.MaxTokens,
+		"reasoning_effort", string(params.ReasoningEffort),
+		"prompt_length", len(c.prompt.Body),
+		"image_size_bytes", len(thumbJPEG),
+		"image_b64_length", len(imageB64),
+		"max_retries", c.cfg.AI.MaxRetries,
+		"timeout_sec", c.cfg.AI.RequestTimeoutSec,
+	)
 
 	var result string
 	var lastErr error
@@ -110,20 +114,29 @@ func (c *descriptorClient) Describe(ctx context.Context, thumbJPEG []byte) (stri
 			}
 		}
 
-		resp, err := provider.Completion(ctx, params)
+		callCtx, callCancel := context.WithTimeout(ctx, time.Duration(c.cfg.AI.RequestTimeoutSec)*time.Second)
+		start := time.Now()
+		resp, err := provider.Completion(callCtx, params)
+		elapsed := time.Since(start)
+		callCancel()
 		if err != nil {
 			if ctx.Err() != nil {
 				return "", ctx.Err()
 			}
 			lastErr = err
-			slog.Warn("descriptor: completion failed", "attempt", attempt, "err", err)
+			logCompletionError("descriptor", attempt, elapsed, callCtx.Err() != nil, c.cfg.AI.RequestTimeoutSec, err)
 			continue
 		}
 		if len(resp.Choices) == 0 {
 			lastErr = fmt.Errorf("descriptor: empty response choices")
+			slog.Warn("descriptor: empty choices", "attempt", attempt, "elapsed", elapsed)
 			continue
 		}
+
 		result = strings.TrimSpace(resp.Choices[0].Message.ContentString())
+		attrs := logResponseAttrs(attempt, elapsed, resp.Choices[0], resp.Usage)
+		attrs = append(attrs, "result_length", len(result))
+		slog.Info("descriptor: response", attrs...)
 		return result, nil
 	}
 

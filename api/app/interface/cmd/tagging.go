@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"log"
+	"log/slog"
+	"os"
 
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/usecase"
@@ -33,6 +35,12 @@ func NewCatalogTaggingRunCommand(c *dig.Container) *cobra.Command {
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			descriptorPromptPath, _ := cmd.Flags().GetString("descriptor-prompt-path")
 			taggerPromptPath, _ := cmd.Flags().GetString("tagger-prompt-path")
+
+			if verbose {
+				slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+					Level: slog.LevelDebug,
+				})))
+			}
 
 			return pipelineUc.Run(context.Background(), usecase.TaggingRunOptions{
 				CatalogKey:           catalog,

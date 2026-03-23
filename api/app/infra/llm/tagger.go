@@ -12,7 +12,6 @@ import (
 	"unicode"
 
 	anyllm "github.com/mozilla-ai/any-llm-go"
-	openaicompat "github.com/mozilla-ai/any-llm-go/providers/openai"
 
 	"github.com/mikyk10/wisp/app/domain/ai"
 	"github.com/mikyk10/wisp/app/domain/model/config"
@@ -99,28 +98,32 @@ func (c *taggerClient) Tag(ctx context.Context, description string) ([]string, e
 	}
 	promptText := buf.String()
 
-	provider, err := openaicompat.NewCompatible(
-		openaicompat.CompatibleConfig{
-			Name:           c.prompt.Config.Provider,
-			DefaultBaseURL: provCfg.Endpoint,
-			RequireAPIKey:  false,
-			DefaultAPIKey:  "none",
-		},
-		anyllm.WithBaseURL(provCfg.Endpoint),
-		anyllm.WithAPIKey(providerAPIKey(provCfg.APIKey)),
-		anyllm.WithTimeout(time.Duration(c.cfg.AI.RequestTimeoutSec)*time.Second),
-	)
+	provider, err := newProvider(c.prompt.Config, provCfg, c.cfg.AI.RequestTimeoutSec)
 	if err != nil {
 		return nil, fmt.Errorf("tagger: create provider: %w", err)
 	}
 
 	params := anyllm.CompletionParams{
-		Model:     c.prompt.Config.Model,
-		MaxTokens: c.prompt.Config.MaxTokens,
+		Model:           c.prompt.Config.Model,
+		MaxTokens:       c.prompt.Config.MaxTokens,
+		ReasoningEffort: anyllm.ReasoningEffortNone,
 		Messages: []anyllm.Message{
 			{Role: anyllm.RoleUser, Content: promptText},
 		},
 	}
+
+	slog.Info("tagger: request",
+		"provider", c.prompt.Config.Provider,
+		"model", c.prompt.Config.Model,
+		"endpoint", provCfg.Endpoint,
+		"max_tokens", c.prompt.Config.MaxTokens,
+		"reasoning_effort", string(params.ReasoningEffort),
+		"prompt_length", len(promptText),
+		"description_length", len(description),
+		"max_tags", c.cfg.AI.MaxTags,
+		"max_retries", c.cfg.AI.MaxRetries,
+		"timeout_sec", c.cfg.AI.RequestTimeoutSec,
+	)
 
 	maxRetries := c.cfg.AI.MaxRetries
 	var lastErr error
@@ -135,27 +138,37 @@ func (c *taggerClient) Tag(ctx context.Context, description string) ([]string, e
 			}
 		}
 
-		resp, err := provider.Completion(ctx, params)
+		callCtx, callCancel := context.WithTimeout(ctx, time.Duration(c.cfg.AI.RequestTimeoutSec)*time.Second)
+		start := time.Now()
+		resp, err := provider.Completion(callCtx, params)
+		elapsed := time.Since(start)
+		callCancel()
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
 			lastErr = err
-			slog.Warn("tagger: completion failed", "attempt", attempt, "err", err)
+			logCompletionError("tagger", attempt, elapsed, callCtx.Err() != nil, c.cfg.AI.RequestTimeoutSec, err)
 			continue
 		}
 		if len(resp.Choices) == 0 {
 			lastErr = fmt.Errorf("tagger: empty response choices")
+			slog.Warn("tagger: empty choices", "attempt", attempt, "elapsed", elapsed)
 			continue
 		}
 
 		raw := strings.TrimSpace(resp.Choices[0].Message.ContentString())
+		attrs := logResponseAttrs(attempt, elapsed, resp.Choices[0], resp.Usage)
+		attrs = append(attrs, "raw_length", len(raw))
+
 		tags, err := normalizeTags(raw, c.cfg.AI.MaxTags)
 		if err != nil {
 			lastErr = fmt.Errorf("tagger: format invalid on attempt %d: %w", attempt, err)
-			slog.Warn("tagger: invalid tag format, retrying", "attempt", attempt, "raw", raw)
+			slog.Warn("tagger: invalid tag format, retrying", append(attrs, "raw", raw)...)
 			continue
 		}
+
+		slog.Info("tagger: response", append(attrs, "tags", tags)...)
 		return tags, nil
 	}
 

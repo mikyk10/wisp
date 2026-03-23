@@ -118,7 +118,7 @@ func TestRandomImg_UnknownDisplay(t *testing.T) {
 	})
 
 	if assert.NoError(t, h.RandomImg(c)) {
-		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, http.StatusNotFound, rec.Code)
 		assert.Equal(t, "image/jpeg", rec.Header().Get(echo.HeaderContentType))
 		assert.NotEmpty(t, rec.Body.Bytes())
 	}

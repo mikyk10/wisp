@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image"
 	"image/jpeg"
 	"image/png"
 	"io"
@@ -30,6 +31,10 @@ import (
 const (
 	errMsgPhotoNotFound   = "Sorry, the photo you're looking for isn't here.\nCheck catalog settings or rescan for updates."
 	errMsgDisplayNotFound = "Specified display-key is not found.\nAdd to 'displays' section in server config."
+
+	// errorSleepSeconds is the retry interval sent to the device when an error image is returned.
+	// Keeps retry frequency low without requiring config-level overrides per error type.
+	errorSleepSeconds = 3600
 )
 
 type CatalogHandler interface {
@@ -85,21 +90,7 @@ func (uc *catalogHandler) Img(c *echo.Context) error {
 	ctx := context.Background()
 	processedImg, _ := imsecgrp.Apply(ctx, srcImg, meta)
 
-	buf := &bytes.Buffer{}
-	mime := ""
-	switch ext {
-	case ".jpg", ".jpeg":
-		mime = "image/jpeg"
-		err = jpeg.Encode(buf, processedImg, nil)
-	case ".png":
-		mime = "image/png"
-		err = png.Encode(buf, processedImg)
-	default:
-		mime = "application/octet-stream"
-		ecdr := encoder.NewWaveshareEPEncoder(display)
-		buf, err = ecdr.Encode(processedImg)
-	}
-
+	buf, mime, err := uc.encodeImage(ext, processedImg, display)
 	if err != nil {
 		return uc.renderErrorImage(c, ext, display, errMsgPhotoNotFound, http.StatusInternalServerError, err)
 	}
@@ -165,6 +156,22 @@ func (uc *catalogHandler) ToggleVisibility(c *echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
+// encodeImage encodes img into the format indicated by ext.
+// Returns the encoded buffer, MIME type, and any encoding error.
+func (uc *catalogHandler) encodeImage(ext string, img image.Image, display epaper.DisplayMetadata) (*bytes.Buffer, string, error) {
+	buf := &bytes.Buffer{}
+	switch strings.ToLower(ext) {
+	case ".jpg", ".jpeg":
+		return buf, "image/jpeg", jpeg.Encode(buf, img, nil)
+	case ".png":
+		return buf, "image/png", png.Encode(buf, img)
+	default:
+		ecdr := encoder.NewWaveshareEPEncoder(display)
+		b, err := ecdr.Encode(img)
+		return b, "application/octet-stream", err
+	}
+}
+
 // resolveDisplay resolves the display configuration from the displayKey parameter.
 // If displayKey is not found or not provided, returns default display.
 func (uc *catalogHandler) resolveDisplay(c *echo.Context) epaper.DisplayMetadata {
@@ -195,28 +202,12 @@ func (uc *catalogHandler) renderErrorImage(
 	})
 	img, _ = simpleColorReduction.Apply(ctx, img, meta)
 
-	mime := ""
-	var buf *bytes.Buffer
-
-	switch ext {
-	case ".png":
-		mime = "image/png"
-		buf = &bytes.Buffer{}
-		_ = png.Encode(buf, img)
-	case ".jpg", ".jpeg":
-		mime = "image/jpeg"
-		buf = &bytes.Buffer{}
-		_ = jpeg.Encode(buf, img, nil)
-	default:
-		// e-Paper binary format
-		mime = "application/octet-stream"
-		ecdr := encoder.NewWaveshareEPEncoder(display)
-		buf, err = ecdr.Encode(img)
-		if err != nil {
-			return c.String(http.StatusInternalServerError, "Internal Error")
-		}
+	buf, mime, encErr := uc.encodeImage(ext, img, display)
+	if encErr != nil {
+		return c.String(http.StatusInternalServerError, "Internal Error")
 	}
 
+	c.Response().Header().Set("X-Sleep-Seconds", strconv.Itoa(errorSleepSeconds))
 	return c.Stream(statusCode, mime, buf)
 }
 
@@ -287,10 +278,12 @@ func (uc *catalogHandler) RandomImg(c *echo.Context) error {
 		// Check if the error is a display-not-found error
 		// TODO: verify type assertion works correctly; if not, move logic to provider_errmsg.go
 		msg := errMsgPhotoNotFound
+		statusCode := http.StatusInternalServerError
 		if _, ok := pickErr.(*catalog.DisplayNotFoundError); ok {
 			msg = errMsgDisplayNotFound
+			statusCode = http.StatusNotFound
 		}
-		return uc.renderErrorImage(c, ext, display,msg, http.StatusOK, pickErr)
+		return uc.renderErrorImage(c, ext, display, msg, statusCode, pickErr)
 	}
 
 	sleepSecs := uc.svc.Displays[displayKey].SleepDurationSeconds
@@ -300,7 +293,7 @@ func (uc *catalogHandler) RandomImg(c *echo.Context) error {
 	img, meta, err := imgPtr.Load()
 	if err != nil {
 		ext := filepath.Ext(strings.ToLower(c.Request().URL.Path))
-		return uc.renderErrorImage(c, ext, display,errMsgPhotoNotFound, http.StatusOK, err)
+		return uc.renderErrorImage(c, ext, display, errMsgPhotoNotFound, http.StatusInternalServerError, err)
 	}
 
 	img, _ = imsecgrp.Apply(ctx, img, meta)
@@ -308,25 +301,9 @@ func (uc *catalogHandler) RandomImg(c *echo.Context) error {
 	//TODO: output destination
 	c.Response().Header().Set("X-Sleep-Seconds", strconv.Itoa(sleepSecs))
 
-	buf := &bytes.Buffer{}
 	ext := filepath.Ext(strings.ToLower(c.Request().URL.Path))
 
-	mime := ""
-	switch ext {
-	case ".jpg":
-		fallthrough
-	case ".jpeg":
-		mime = "image/jpeg"
-		err = jpeg.Encode(buf, img, nil)
-	case ".png":
-		mime = "image/png"
-		err = png.Encode(buf, img)
-	default:
-		mime = "application/octet-stream"
-		ecdr := encoder.NewWaveshareEPEncoder(display)
-		buf, err = ecdr.Encode(img)
-	}
-
+	buf, mime, err := uc.encodeImage(ext, img, display)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, "Internal Error")
 	}

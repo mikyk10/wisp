@@ -272,8 +272,8 @@ func (cu *catalogUseCase) processIncludedFile(ctx context.Context, catalogKey st
 	// Release the full-size image cached inside the loader before the DB write.
 	// Without this, info holds the decoded image until the goroutine exits — which may be
 	// delayed significantly when all goroutines pile up waiting for the SQLite single connection.
-	if ptr, ok := info.(interface{ ClearImage() }); ok {
-		ptr.ClearImage()
+	if clearable, ok := info.(catalog.ClearableImageLoader); ok {
+		clearable.ClearImage()
 	}
 
 	rec := &model.Image{

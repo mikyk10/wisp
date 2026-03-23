@@ -55,7 +55,7 @@ func (p *imageRepositoryImpl) FindById(id model.PrimaryKey) (*model.Image, error
 func (p *imageRepositoryImpl) CountByCatalog(catalogKey string, ori model.CanonicalOrientation) (int64, error) {
 	var count int64
 	err := p.conn.Model(&model.Image{}).
-		Where("catalog_key = ? AND image_orientation = ? AND deleted_at IS NULL AND excluded = false", catalogKey, ori).
+		Where("catalog_key = ? AND image_orientation = ? AND excluded = false", catalogKey, ori).
 		Count(&count).Error
 	return count, err
 }
@@ -133,12 +133,12 @@ func (p *imageRepositoryImpl) FindByRandom(catalogKey string, ori model.Canonica
 	rnd := rand.Float64()
 
 	img := &model.Image{}
-	err := p.conn.Model(img).Where("catalog_key = ? AND image_orientation = ? AND deleted_at is null AND excluded = false AND rnd >= ?", catalogKey, ori, rnd).Order("rnd ASC").First(img).Error
+	err := p.conn.Model(img).Where("catalog_key = ? AND image_orientation = ? AND excluded = false AND rnd >= ?", catalogKey, ori, rnd).Order("rnd ASC").First(img).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 	if img.ID == 0 {
-		err = p.conn.Model(img).Where("catalog_key = ? AND image_orientation = ? AND deleted_at is null AND excluded = false AND rnd < ?", catalogKey, ori, rnd).Order("rnd ASC").First(img).Error
+		err = p.conn.Model(img).Where("catalog_key = ? AND image_orientation = ? AND excluded = false AND rnd < ?", catalogKey, ori, rnd).Order("rnd ASC").First(img).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}

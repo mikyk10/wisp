@@ -46,11 +46,17 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
 
     int httpCode = httpClient.GET();
     Serial.printf("[http] HTTP status: %d\n", httpCode);
-    if (httpCode != HTTP_CODE_OK) {
-        Serial.printf("[http] Response: %s\n", httpClient.getString().c_str());
+    if (httpCode < 0) {
+        // Network-level error (connection refused, DNS failure, timeout, etc.)
+        Serial.printf("[http] Network error: %s\n", HTTPClient::errorToString(httpCode).c_str());
         httpClient.end();
         delete secureClient;
         return -1;
+    }
+    if (httpCode != HTTP_CODE_OK) {
+        // HTTP error (4xx/5xx): the server may have sent an error image as the body.
+        // Fall through to display it instead of silently falling back to the built-in error screen.
+        Serial.printf("[http] HTTP error %d — attempting to render server error image\n", httpCode);
     }
 
     int contentLength = httpClient.getSize();
@@ -155,12 +161,11 @@ void setup() {
                  serverBaseURL.c_str(),
                  macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
         sleepSeconds = fetchImage(imageURL, epaper);
-        //TODO: fetch errorが検知できないのを修正する
 
         // NOTE: sleepSeconds == 0 (server returned X-Sleep-Seconds: 0) falls through to error path.
         // If 0-second sleep becomes a valid server response, change this to >= 0.
         if (sleepSeconds > 0) {
-            // 転送が正常終了したとみなす
+            // Display whatever the server sent (normal image or error image) and sleep.
             epaper->displayImage();
             epaper->enterSleep();
             deepSleep(sleepSeconds);

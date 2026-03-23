@@ -15,6 +15,14 @@ type ImageLoader interface {
 	GetSourcePath() string
 }
 
+// ClearableImageLoader extends ImageLoader for loaders that cache decoded images internally.
+// Implement ClearImage() to release the cached image early (before blocking I/O such as DB writes)
+// to prevent large image data from being held in goroutine memory unnecessarily.
+type ClearableImageLoader interface {
+	ImageLoader
+	ClearImage()
+}
+
 type imageLoader struct {
 	img  image.Image
 	meta *model.ImgMeta

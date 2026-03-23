@@ -60,7 +60,7 @@ func (d *digBuilder) WithDatabase(globalConfig *config.GlobalConfig) *digBuilder
 			return nil, fmt.Errorf("failed to open database: %w", err)
 		}
 
-		conn.AutoMigrate(&model.Image{}) //nolint:errcheck
+		conn.AutoMigrate(model.AllModels()...) //nolint:errcheck
 
 		return conn, nil
 	})
@@ -72,7 +72,7 @@ func (d *digBuilder) WithSQLiteMock() *digBuilder {
 		if err != nil {
 			return nil, err
 		}
-		conn.AutoMigrate(&model.Image{}) //nolint:errcheck
+		conn.AutoMigrate(model.AllModels()...) //nolint:errcheck
 		return conn, nil
 	})
 }

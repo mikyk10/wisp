@@ -63,7 +63,7 @@ func (f *fsImageFileFinder) Find(ctx context.Context, resultChan chan<- string) 
 			})
 
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("walk: failed to traverse path", "path", path, "err", err)
 		}
 	}
 }

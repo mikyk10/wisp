@@ -73,7 +73,7 @@ func loadMeta(path string) (*model.ImgMeta, error) {
 
 	exifInfo, err := exifDecoder.DecodeExif()
 	if err != nil {
-		slog.Warn("no EXIF data", "path", path)
+		slog.Debug("no EXIF data (meta-only)", "path", path)
 	}
 
 	putExif(meta, exifInfo)

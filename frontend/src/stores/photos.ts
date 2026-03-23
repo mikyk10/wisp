@@ -11,7 +11,6 @@ export const usePhotosStore = defineStore('photos', () => {
   const timeline = ref<Record<string, Omit<TimelineEntry, 'key' | 'label'>>>({})
   const streamCompleted = ref(false)
   const error = ref<string | null>(null)
-  const filterTags = ref<string[]>([])
 
   // ── Getters ──────────────────────────────────────────────────────────────
   const totalPhotos = computed(() => items.value.length)
@@ -59,7 +58,7 @@ export const usePhotosStore = defineStore('photos', () => {
   }
 
   // ── Actions ──────────────────────────────────────────────────────────────
-  async function loadPhotosStream(catalogKey: string, tags: string[] = []) {
+  async function loadPhotosStream(catalogKey: string) {
     loading.value = true
     error.value = null
 
@@ -70,7 +69,7 @@ export const usePhotosStore = defineStore('photos', () => {
       let batch: Photo[] = []
       const batchSize = 50
 
-      const resource = isApiMode() ? API_PATHS.catalogImages(catalogKey, tags) : 'photos.ndjson'
+      const resource = isApiMode() ? API_PATHS.catalogImages(catalogKey) : 'photos.ndjson'
 
       for await (const rec of reader.readStream(resource)) {
         const url = buildImageUrl(catalogKey, rec.id)
@@ -129,7 +128,6 @@ export const usePhotosStore = defineStore('photos', () => {
     timeline,
     streamCompleted,
     error,
-    filterTags,
     // getters
     totalPhotos,
     timelineEntries,

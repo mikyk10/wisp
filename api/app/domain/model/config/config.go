@@ -33,12 +33,6 @@ type ConfigLoader interface {
 	LoadConfig() (*GlobalConfig, *ServiceConfig, error)
 }
 
-// AIProviderConfig holds connection details for a single LLM provider.
-type AIProviderConfig struct {
-	Endpoint string `yaml:"endpoint"`
-	APIKey   string `yaml:"api_key"` //nolint:gosec // G117: struct field name, not an actual secret
-}
-
 // GlobalConfig holds application-wide configuration.
 type GlobalConfig struct {
 	LogLevel slog.Level `yaml:"log_level"`
@@ -52,15 +46,6 @@ type GlobalConfig struct {
 			}
 		}
 	}
-	AI struct {
-		Providers            map[string]AIProviderConfig `yaml:"providers"`
-		DescriptorPromptPath string                      `yaml:"descriptor_prompt_path" env:"WISP_AI_DESCRIPTOR_PROMPT_PATH"`
-		TaggerPromptPath     string                      `yaml:"tagger_prompt_path"     env:"WISP_AI_TAGGER_PROMPT_PATH"`
-		Workers              int                         `yaml:"workers"                env:"WISP_AI_WORKERS"`
-		RequestTimeoutSec    int                         `yaml:"request_timeout_sec"    env:"WISP_AI_REQUEST_TIMEOUT_SEC"`
-		MaxTags              int                         `yaml:"max_tags"               env:"WISP_AI_MAX_TAGS"`
-		MaxRetries           int                         `yaml:"max_retries"            env:"WISP_AI_MAX_RETRIES"`
-	} `yaml:"ai"`
 }
 
 // ServiceConfig holds catalog and display configuration.

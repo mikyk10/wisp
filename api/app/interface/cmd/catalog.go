@@ -111,7 +111,7 @@ func NewCatalogListImagesCommand(c *dig.Container) *cobra.Command {
 				return errors.New("error: Only file catalog type can list images")
 			}
 
-			return catUc.ListImages(catlName, nil, func(img *model.Image) error {
+			return catUc.ListImages(catlName, func(img *model.Image) error {
 				takenAt := "-"
 				if img.TakenAt.Valid {
 					takenAt = img.TakenAt.Time.Format("2006-01-02")

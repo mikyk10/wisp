@@ -216,19 +216,5 @@ func (ldr *defaultConfigLoader) loadRawConfig() (*config.GlobalConfig, *raw.Serv
 		return nil, nil, err
 	}
 
-	// Set AI defaults for zero values.
-	if conf.AI.Workers == 0 {
-		conf.AI.Workers = 2
-	}
-	if conf.AI.RequestTimeoutSec == 0 {
-		conf.AI.RequestTimeoutSec = 90
-	}
-	if conf.AI.MaxTags == 0 {
-		conf.AI.MaxTags = 15
-	}
-	if conf.AI.MaxRetries == 0 {
-		conf.AI.MaxRetries = 3
-	}
-
 	return &conf, &rawServiceConfig, nil
 }

@@ -19,7 +19,7 @@ linters:
 
   settings:
     cyclop:
-      max-complexity: 40
+      max-complexity: 15
       #package-average: 0.5
     gosec:
       excludes:

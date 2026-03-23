@@ -105,23 +105,14 @@ func (p *imageRepositoryImpl) UpsertInactiveImage(catalogKey, srcHash, src strin
 	}).Error
 }
 
-func (p *imageRepositoryImpl) ListByCatalog(catalogKey string, tags []string, cb func(*model.Image) error) error {
-	q := p.conn.Unscoped().Model(&model.Image{}).
+func (p *imageRepositoryImpl) ListByCatalog(catalogKey string, cb func(*model.Image) error) error {
+	rows, err := p.conn.Unscoped().Model(&model.Image{}).
 		Select("id", "catalog_key", "src", "taken_at", "created_at", "deleted_at").
 		// excluded = false: completely hide catalog-excluded entries (negative index).
 		// Use Unscoped so that user-hidden images (deleted_at IS NOT NULL) are still included.
 		Where("catalog_key = ? AND excluded = false", catalogKey).
-		Order("taken_at desc")
-
-	if len(tags) > 0 {
-		// AND semantics: image must have ALL specified tags.
-		q = q.Where(
-			"id IN (SELECT image_id FROM image_tags it JOIN tags t ON it.tag_id = t.id WHERE t.name_normalized IN ? GROUP BY image_id HAVING COUNT(DISTINCT it.tag_id) = ?)",
-			tags, len(tags),
-		)
-	}
-
-	rows, err := q.Rows()
+		Order("taken_at desc").
+		Rows()
 	if err != nil {
 		return err
 	}

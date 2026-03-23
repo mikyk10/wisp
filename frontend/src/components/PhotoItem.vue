@@ -33,7 +33,7 @@
           </div>
         </template>
       </v-img>
-      
+
       <!-- Hidden state overlay -->
       <div
         v-if="!photo.enabled"
@@ -64,26 +64,13 @@
           color="white"
         />
       </div>
-
-      <!-- Tag overlay (bottom, on hover) -->
-      <div
-        v-if="isHovered && tags.length > 0"
-        class="tag-overlay"
-      >
-        <span
-          v-for="tag in tags"
-          :key="tag"
-          class="tag-chip"
-        >{{ tag }}</span>
-      </div>
     </div>
   </v-card>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useSelectionStore } from '@/stores/selection'
-import { photosApi } from '@/api/photos'
 
 interface Photo {
   id: number
@@ -99,24 +86,8 @@ interface Props {
 const props = defineProps<Props>()
 const selectionStore = useSelectionStore()
 const isHovered = ref(false)
-const tags = ref<string[]>([])
-const tagsLoaded = ref(false)
 
 const isSelected = computed(() => selectionStore.isPhotoSelected(props.photo.id))
-
-// Reset when RecycleScroller reuses this component for a different photo
-watch(() => props.photo.id, () => {
-  tags.value = []
-  tagsLoaded.value = false
-})
-
-// Fetch tags once on first hover
-watch(isHovered, async (hovered) => {
-  if (hovered && !tagsLoaded.value) {
-    tagsLoaded.value = true
-    tags.value = await photosApi.getTags(props.photo.id)
-  }
-})
 
 const handleClick = () => {
   selectionStore.togglePhotoSelection(props.photo.id)
@@ -202,28 +173,5 @@ const handleClick = () => {
     0 0 20px rgba(0, 210, 168, 0.2),
     0 0 6px rgba(0, 210, 168, 0.1);
   z-index: 1;
-}
-
-.tag-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 20px 6px 6px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-  z-index: 3;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  pointer-events: none;
-}
-
-.tag-chip {
-  font-size: 0.6rem;
-  line-height: 1.4;
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
-  padding: 1px 5px;
 }
 </style>

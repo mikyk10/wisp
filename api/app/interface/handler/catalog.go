@@ -249,11 +249,6 @@ func (uc *catalogHandler) List(c *echo.Context) error {
 
 	catalogKey := c.Param("catalogKey")
 
-	var tags []string
-	if q := c.QueryParam("tags"); q != "" {
-		tags = strings.Split(q, ",")
-	}
-
 	pr, pw := io.Pipe()
 
 	fetcher := func() {
@@ -261,7 +256,7 @@ func (uc *catalogHandler) List(c *echo.Context) error {
 		var ferr error
 		defer func() { pw.CloseWithError(ferr) }()
 
-		ferr = uc.imguc.ListImages(catalogKey, tags, func(rec *model.Image) error {
+		ferr = uc.imguc.ListImages(catalogKey, func(rec *model.Image) error {
 			// EXIF DateTime has no timezone info, so goexif interprets it as UTC.
 			// Return it with a "Z" suffix as UTC time to prevent misinterpretation on the frontend.
 			// Photos without EXIF data (Valid=false) return an empty string.

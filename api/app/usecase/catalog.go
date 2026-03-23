@@ -61,8 +61,7 @@ type CatalogUsecase interface {
 	LoadSourceImageById(id model.PrimaryKey) (image.Image, *model.ImgMeta, error)
 
 	// ListImages retrieves the list of indexed images under the catalog using a callback.
-	// tags filters results to images possessing all of the specified tag names (AND semantics).
-	ListImages(catalogKey string, tags []string, cb func(*model.Image) error) error
+	ListImages(catalogKey string, cb func(*model.Image) error) error
 
 	// ToggleLocalImageFileVisibility toggles the visibility state of images by ID.
 	ToggleLocalImageFileVisibility(catalogKey string, ids []model.PrimaryKey) error
@@ -337,8 +336,8 @@ func (uc *catalogUseCase) LoadSourceImageById(id model.PrimaryKey) (image.Image,
 	return catalog.LoadImageFromPath(rec.Src)
 }
 
-func (uc *catalogUseCase) ListImages(catalogKey string, tags []string, cb func(*model.Image) error) error {
-	return uc.imgr.ListByCatalog(catalogKey, tags, cb)
+func (uc *catalogUseCase) ListImages(catalogKey string, cb func(*model.Image) error) error {
+	return uc.imgr.ListByCatalog(catalogKey, cb)
 }
 
 func (uc *catalogUseCase) ToggleLocalImageFileVisibility(catalogKey string, ids []model.PrimaryKey) error {

@@ -25,11 +25,7 @@ export function buildApiUrl(path: string): string {
 /** Canonical API path segments. */
 export const API_PATHS = {
   catalogs: (): string => 'api/catalogs',
-  catalogImages: (catalogKey: string, tags: string[] = []): string => {
-    const base = `api/catalog/${catalogKey}/images`
-    return tags.length > 0 ? `${base}?tags=${tags.join(',')}` : base
-  },
-  catalogTags: (catalogKey: string): string => `api/catalog/${catalogKey}/tags`,
+  catalogImages: (catalogKey: string): string => `api/catalog/${catalogKey}/images`,
 }
 
 /**

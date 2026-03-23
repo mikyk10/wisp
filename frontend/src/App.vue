@@ -30,43 +30,6 @@
           color="primary"
           item-color="primary"
         />
-        <!-- Wrapper div is the flex item with fixed width.
-             v-autocomplete fills it with width:100% (Vuetify default).
-             menu-props caps the dropdown so long tag names never force a resize. -->
-        <div
-          class="mr-3"
-          style="width: 240px; flex: 0 0 240px; overflow: visible"
-        >
-          <v-autocomplete
-            v-model="selectedTags"
-            :items="availableTags"
-            multiple
-            density="compact"
-            hide-details
-            variant="outlined"
-            placeholder="Filter by tags"
-            color="primary"
-            :disabled="!currentCatalog || availableTags.length === 0"
-            :menu-props="{ maxWidth: 240 }"
-          >
-            <template #selection="{ item, index }">
-              <v-chip
-                v-if="index === 0"
-                size="small"
-                closable
-                @click:close.stop="removeTag(item.value)"
-              >
-                {{ item.title }}
-              </v-chip>
-              <span
-                v-else-if="index === 1"
-                class="text-caption ml-1 text-medium-emphasis align-self-center"
-              >
-                +{{ selectedTags.length - 1 }}
-              </span>
-            </template>
-          </v-autocomplete>
-        </div>
         <v-chip
           v-if="totalPhotos > 0"
           variant="outlined"
@@ -105,11 +68,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useCatalogsStore } from '@/stores/catalogs'
 import { usePhotosStore } from '@/stores/photos'
 import { useSelectionStore } from '@/stores/selection'
-import { photosApi } from '@/api/photos'
 import PhotoGrid from './components/PhotoGrid.vue'
 import TimelineScrollbar from './components/TimelineScrollbar.vue'
 import SelectionToolbar from './components/SelectionToolbar.vue'
@@ -128,32 +90,6 @@ const currentCatalog = computed({
 })
 const totalPhotos = computed(() => photosStore.totalPhotos)
 const selectedCount = computed(() => selectionStore.selectedCount)
-
-const availableTags = ref<string[]>([])
-
-watch(
-  () => catalogsStore.currentCatalog,
-  async (catalog) => {
-    availableTags.value = []
-    if (catalog) {
-      availableTags.value = await photosApi.getCatalogTags(catalog)
-    }
-  },
-  { immediate: true },
-)
-
-const selectedTags = computed({
-  get: () => photosStore.filterTags,
-  set: async (val: string[]) => {
-    photosStore.filterTags = val
-    photosStore.resetPhotos()
-    await photosStore.loadPhotosStream(catalogsStore.currentCatalog, val)
-  },
-})
-
-function removeTag(tag: string) {
-  selectedTags.value = selectedTags.value.filter((t) => t !== tag)
-}
 
 onMounted(() => {
   catalogsStore.initCatalogs()

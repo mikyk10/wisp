@@ -58,11 +58,6 @@ const vuetifyStubs = {
     props: ['modelValue', 'items', 'density', 'hideDetails', 'variant', 'color', 'itemColor'],
     emits: ['update:modelValue'],
   },
-  VAutocomplete: {
-    template: '<input />',
-    props: ['modelValue', 'items', 'multiple', 'density', 'hideDetails', 'variant', 'placeholder', 'color', 'disabled', 'menuProps'],
-    emits: ['update:modelValue'],
-  },
   VIcon: { template: '<i />', props: ['icon', 'start'] },
   VSpacer: { template: '<div />' },
   VOverlay: { template: '<div />' },

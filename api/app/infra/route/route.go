@@ -14,7 +14,7 @@ import (
 // Associates each URL to a controller action
 func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 
-	if err := ctn.Invoke(func(h handler.CatalogHandler) { //nolint:contextcheck
+	if err := ctn.Invoke(func(h handler.CatalogHandler, th *handler.ImageTagsHandler) { //nolint:contextcheck
 		// Management API — requires authentication
 		api := e.Group("/api")
 		{
@@ -26,6 +26,12 @@ func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 
 			// /api/catalog/{catalog key}/image/{ID Number}.{Extension}
 			api.GET("/catalog/:catalogKey/image/:imgid", h.ImgManagement)
+
+			// /api/catalog/{catalog key}/tags
+			api.GET("/catalog/:catalogKey/tags", th.GetCatalogTags)
+
+			// /api/images/{id}/tags
+			api.GET("/images/:id/tags", th.GetTags)
 
 			// /api/devices
 			api.GET("/devices", h.List)

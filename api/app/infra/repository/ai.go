@@ -127,6 +127,38 @@ func (r *aiRepositoryImpl) HasImageTags(imageID model.PrimaryKey) (bool, error) 
 	return count > 0, err
 }
 
+func (r *aiRepositoryImpl) FindTagNamesByImageID(imageID model.PrimaryKey) ([]string, error) {
+	var names []string
+	err := r.db.Model(&model.Tag{}).
+		Joins("JOIN image_tags ON image_tags.tag_id = tags.id").
+		Where("image_tags.image_id = ?", imageID).
+		Pluck("tags.display_name", &names).Error
+	return names, err
+}
+
+func (r *aiRepositoryImpl) FindTagsByCatalog(catalogKey string) ([]string, error) {
+	var names []string
+	err := r.db.Model(&model.Tag{}).
+		Joins("JOIN image_tags ON image_tags.tag_id = tags.id").
+		Joins("JOIN images ON images.id = image_tags.image_id").
+		Where("images.catalog_key = ? AND images.deleted_at IS NULL", catalogKey).
+		Distinct().
+		Order("tags.display_name").
+		Pluck("tags.display_name", &names).Error
+	return names, err
+}
+
+func (r *aiRepositoryImpl) FindImageIDsByTags(catalogKey string, tags []string) ([]model.PrimaryKey, error) {
+	var ids []model.PrimaryKey
+	err := r.db.Model(&model.ImageTag{}).
+		Joins("JOIN tags ON tags.id = image_tags.tag_id").
+		Joins("JOIN images ON images.id = image_tags.image_id").
+		Where("images.catalog_key = ? AND images.deleted_at IS NULL AND tags.display_name IN ?", catalogKey, tags).
+		Distinct().
+		Pluck("image_tags.image_id", &ids).Error
+	return ids, err
+}
+
 // --- Generation cache ---
 
 func (r *aiRepositoryImpl) CreateCacheEntry(entry *model.GenerationCacheEntry) error {

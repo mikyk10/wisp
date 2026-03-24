@@ -22,6 +22,9 @@ type AIRepository interface {
 	FindOrCreateTag(name string) (*model.Tag, error)
 	ReplaceImageTags(imageID model.PrimaryKey, sourceStepID model.PrimaryKey, tagIDs []model.PrimaryKey) error
 	HasImageTags(imageID model.PrimaryKey) (bool, error)
+	FindTagNamesByImageID(imageID model.PrimaryKey) ([]string, error)
+	FindTagsByCatalog(catalogKey string) ([]string, error)
+	FindImageIDsByTags(catalogKey string, tags []string) ([]model.PrimaryKey, error)
 
 	// Generation cache
 	CreateCacheEntry(entry *model.GenerationCacheEntry) error

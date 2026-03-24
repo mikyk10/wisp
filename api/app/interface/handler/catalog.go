@@ -20,6 +20,7 @@ import (
 	"github.com/mikyk10/wisp/app/domain/improc/color_reduction"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/mikyk10/wisp/app/domain/repository"
 	"github.com/mikyk10/wisp/app/interface/handler/response"
 	"github.com/mikyk10/wisp/app/usecase"
 
@@ -47,14 +48,16 @@ type CatalogHandler interface {
 }
 
 type catalogHandler struct {
-	imguc usecase.CatalogUsecase
-	svc   *config.ServiceConfig
+	imguc  usecase.CatalogUsecase
+	svc    *config.ServiceConfig
+	aiRepo repository.AIRepository
 }
 
-func NewCatalogHandler(svc *config.ServiceConfig, catr usecase.CatalogUsecase) CatalogHandler {
+func NewCatalogHandler(svc *config.ServiceConfig, catr usecase.CatalogUsecase, aiRepo repository.AIRepository) CatalogHandler {
 	return &catalogHandler{
-		imguc: catr,
-		svc:   svc,
+		imguc:  catr,
+		svc:    svc,
+		aiRepo: aiRepo,
 	}
 }
 
@@ -240,6 +243,20 @@ func (uc *catalogHandler) List(c *echo.Context) error {
 
 	catalogKey := c.Param("catalogKey")
 
+	// Parse optional tag filter: ?tags=sunset,beach
+	var tagFilter map[model.PrimaryKey]bool
+	if tagsParam := c.QueryParam("tags"); tagsParam != "" {
+		tags := strings.Split(tagsParam, ",")
+		ids, err := uc.aiRepo.FindImageIDsByTags(catalogKey, tags)
+		if err != nil {
+			return c.String(http.StatusInternalServerError, "tag filter error")
+		}
+		tagFilter = make(map[model.PrimaryKey]bool, len(ids))
+		for _, id := range ids {
+			tagFilter[id] = true
+		}
+	}
+
 	pr, pw := io.Pipe()
 
 	fetcher := func() {
@@ -248,6 +265,9 @@ func (uc *catalogHandler) List(c *echo.Context) error {
 		defer func() { pw.CloseWithError(ferr) }()
 
 		ferr = uc.imguc.ListImages(catalogKey, func(rec *model.Image) error {
+			if tagFilter != nil && !tagFilter[rec.ID] {
+				return nil // skip images not matching tag filter
+			}
 			// EXIF DateTime has no timezone info, so goexif interprets it as UTC.
 			// Return it with a "Z" suffix as UTC time to prevent misinterpretation on the frontend.
 			// Photos without EXIF data (Valid=false) return an empty string.

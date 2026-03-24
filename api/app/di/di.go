@@ -100,6 +100,7 @@ func setupDefaultDependency(d *digBuilder) {
 	d.mustProvide(usecase.NewTaggingUsecase)
 	d.mustProvide(usecase.NewGenerateUsecase)
 	d.mustProvide(handler.NewCatalogHandler)
+	d.mustProvide(handler.NewImageTagsHandler)
 }
 
 //nolint:unparam

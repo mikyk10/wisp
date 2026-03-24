@@ -32,7 +32,7 @@ func TestListCatalogs(t *testing.T) {
 		},
 	}
 
-	h := handler.NewCatalogHandler(svc, nil)
+	h := handler.NewCatalogHandler(svc, nil, nil)
 
 	if assert.NoError(t, h.ListCatalogs(c)) {
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -61,7 +61,7 @@ func setupHandler() (*echo.Echo, handler.CatalogHandler, *gorm.DB) {
 
 	uc := usecase.NewCatalogUseCase(svc, repo, nil)
 
-	h := handler.NewCatalogHandler(svc, uc)
+	h := handler.NewCatalogHandler(svc, uc, nil)
 	return echo.New(), h, conn
 }
 

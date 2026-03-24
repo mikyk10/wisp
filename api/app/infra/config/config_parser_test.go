@@ -56,7 +56,10 @@ func TestLoadConfig_ParsesFileHooks(t *testing.T) {
 	if !ok {
 		t.Fatal("expected catalog entry 'album-with-hook'")
 	}
-	fpc := withHook.Config.(domainConfig.ImageFileProviderConfig)
+	fpc, ok := withHook.Config.(domainConfig.ImageFileProviderConfig)
+	if !ok {
+		t.Fatal("expected ImageFileProviderConfig for album-with-hook")
+	}
 	if fpc.Hooks.OnNewFile != "echo tagged {file}" {
 		t.Errorf("expected on_new_file = %q, got %q", "echo tagged {file}", fpc.Hooks.OnNewFile)
 	}
@@ -65,7 +68,10 @@ func TestLoadConfig_ParsesFileHooks(t *testing.T) {
 	if !ok {
 		t.Fatal("expected catalog entry 'album-no-hook'")
 	}
-	fpcNo := noHook.Config.(domainConfig.ImageFileProviderConfig)
+	fpcNo, ok := noHook.Config.(domainConfig.ImageFileProviderConfig)
+	if !ok {
+		t.Fatal("expected ImageFileProviderConfig for album-no-hook")
+	}
 	if fpcNo.Hooks.OnNewFile != "" {
 		t.Errorf("expected empty on_new_file for album-no-hook, got %q", fpcNo.Hooks.OnNewFile)
 	}

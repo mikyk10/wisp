@@ -182,7 +182,7 @@ func putExif(meta *model.ImgMeta, exif *exif.Exif) {
 			if y, ey := tag.Int(1); ey == nil {
 				meta.ExifSubjectArea = image.Point{X: x, Y: y}
 				meta.HasExifSubjectArea = true
-				slog.Debug("exif: SubjectArea found", "x", x, "y", y, "count", tag.Count)
+				slog.Debug("exif: SubjectArea found", "x", x, "y", y, "count", tag.Count) //nolint:gosec // G706: values are parsed ints, not user input
 			}
 		}
 	} else if tag, err := exif.Get("SubjectLocation"); err == nil {
@@ -190,7 +190,7 @@ func putExif(meta *model.ImgMeta, exif *exif.Exif) {
 			if y, ey := tag.Int(1); ey == nil {
 				meta.ExifSubjectArea = image.Point{X: x, Y: y}
 				meta.HasExifSubjectArea = true
-				slog.Debug("exif: SubjectLocation found", "x", x, "y", y)
+				slog.Debug("exif: SubjectLocation found", "x", x, "y", y) //nolint:gosec // G706: values are parsed ints, not user input
 			}
 		}
 	}

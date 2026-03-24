@@ -49,7 +49,11 @@ func (ldr *defaultConfigLoader) LoadConfig() (*config.GlobalConfig, *config.Serv
 	svcConfig.Catalog = make(map[string]*config.ImageProviderConfig)
 
 	for _, v := range rawSvcConfig.Catalog {
-		svcConfig.Catalog[v.Key] = parseCatalogEntry(v)
+		entry := parseCatalogEntry(v)
+		if entry == nil {
+			return nil, nil, fmt.Errorf("catalog[%s]: unsupported provider type %q", v.Key, v.Type)
+		}
+		svcConfig.Catalog[v.Key] = entry
 	}
 
 	svcConfig.Displays = make(map[string]*config.DisplayConfig)

@@ -5,5 +5,11 @@ package model
 func AllModels() []any {
 	return []any{
 		&Image{},
+		&PipelineExecution{},
+		&StepExecution{},
+		&StepOutput{},
+		&GenerationCacheEntry{},
+		&Tag{},
+		&ImageTag{},
 	}
 }

@@ -59,7 +59,7 @@ func setupHandler() (*echo.Echo, handler.CatalogHandler, *gorm.DB) {
 		},
 	}
 
-	uc := usecase.NewCatalogUseCase(svc, repo)
+	uc := usecase.NewCatalogUseCase(svc, repo, nil)
 
 	h := handler.NewCatalogHandler(svc, uc)
 	return echo.New(), h, conn

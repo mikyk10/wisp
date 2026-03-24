@@ -4,12 +4,13 @@ package raw
 
 // Catalog Entry (Image Provider)
 type CatalogEntry struct {
-	FileConfig       FileConfig       `json:"file,omitempty" yaml:"file,omitempty"`
-	HTTPConfig       HTTPConfig       `json:"http,omitempty" yaml:"http,omitempty"`
-	Key              string           `json:"key" yaml:"key"`
-	LuaConfig        LuaConfig        `json:"lua,omitempty" yaml:"lua,omitempty"`
+	FileConfig       FileConfig       `json:"file,omitempty"       yaml:"file,omitempty"`
+	HTTPConfig       HTTPConfig       `json:"http,omitempty"       yaml:"http,omitempty"`
+	Key              string           `json:"key"                  yaml:"key"`
+	LuaConfig        LuaConfig        `json:"lua,omitempty"        yaml:"lua,omitempty"`
 	PlaywrightConfig PlaywrightConfig `json:"playwright,omitempty" yaml:"playwright,omitempty"`
-	Type             string           `json:"type" yaml:"type"`
+	GenerateConfig   GenerateConfig   `json:"generate,omitempty"   yaml:"generate,omitempty"`
+	Type             string           `json:"type"                 yaml:"type"`
 }
 
 // Associated Catalog Entry
@@ -105,7 +106,26 @@ type PlaywrightConfig struct {
 	URL    string `json:"url" yaml:"url"`
 }
 
-type ColorbarConfig struct {}
+type ColorbarConfig struct{}
+
+type GenerateConfig struct {
+	CacheDepth    int             `json:"cache_depth"     yaml:"cache_depth"`
+	EvictCount    int             `json:"evict_count"     yaml:"evict_count"`
+	SourceCatalog string          `json:"source_catalog"  yaml:"source_catalog"`
+	Pipeline      PipelineConfig  `json:"pipeline"        yaml:"pipeline"`
+}
+
+type PipelineConfig struct {
+	Variables map[string]string `json:"variables,omitempty" yaml:"variables,omitempty"`
+	Stages    []StageConfig     `json:"stages"              yaml:"stages"`
+}
+
+type StageConfig struct {
+	Name       string `json:"name"        yaml:"name"`
+	Output     string `json:"output"      yaml:"output"`
+	Prompt     string `json:"prompt"      yaml:"prompt"`
+	ImageInput string `json:"image_input" yaml:"image_input"`
+}
 
 // WiSP Service Configuration
 type ServiceConfig struct {

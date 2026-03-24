@@ -22,7 +22,16 @@ func (e *DisplayNotFoundError) Error() string {
 	return fmt.Sprintf("display not found: %s", e.Key)
 }
 
+// PickImageProviderOpts provides optional dependencies for PickImageProvider.
+type PickImageProviderOpts struct {
+	AIRepo repository.AIRepository
+}
+
 func PickImageProvider(now time.Time, epd epaper.DisplayMetadata, repo repository.ImageRepository, imageProviderConfigs ...*config.AssociatedImageProviders) ImageLocator {
+	return PickImageProviderWithOpts(now, epd, repo, nil, imageProviderConfigs...)
+}
+
+func PickImageProviderWithOpts(now time.Time, epd epaper.DisplayMetadata, repo repository.ImageRepository, opts *PickImageProviderOpts, imageProviderConfigs ...*config.AssociatedImageProviders) ImageLocator {
 	errProvider := func(msg string) ImageLocator {
 		return &imageErrorMessageProvider{epd, &config.ImageErrorMessageProviderConfig{Message: msg}, nil}
 	}
@@ -85,11 +94,11 @@ func PickImageProvider(now time.Time, epd epaper.DisplayMetadata, repo repositor
 		}
 	}
 
-	return newLocatorFromConfig(now, epd, repo, imgProviderConfig)
+	return newLocatorFromConfig(now, epd, repo, opts, imgProviderConfig)
 }
 
 // newLocatorFromConfig is a factory that creates an ImageLocator based on the type of ImageProviderConfig.
-func newLocatorFromConfig(now time.Time, epd epaper.DisplayMetadata, repo repository.ImageRepository, cfg *config.ImageProviderConfig) ImageLocator {
+func newLocatorFromConfig(now time.Time, epd epaper.DisplayMetadata, repo repository.ImageRepository, opts *PickImageProviderOpts, cfg *config.ImageProviderConfig) ImageLocator {
 	errProvider := func(msg string) ImageLocator {
 		return &imageErrorMessageProvider{epd, &config.ImageErrorMessageProviderConfig{Message: msg}, nil}
 	}
@@ -104,6 +113,11 @@ func newLocatorFromConfig(now time.Time, epd epaper.DisplayMetadata, repo reposi
 		return NewLuaScriptProvider(now, epd, repo, cfg.Key, provConf)
 	case config.ImageColorbarProviderConfig:
 		return NewColorbarProvider(epd)
+	case config.ImageGenerateProviderConfig:
+		if opts != nil && opts.AIRepo != nil {
+			return NewImageGenerateProvider(cfg.Key, opts.AIRepo)
+		}
+		return errProvider("Generate provider requires AI repository")
 	}
 	return errProvider("Image Provider not found")
 }

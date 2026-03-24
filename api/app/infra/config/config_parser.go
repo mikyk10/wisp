@@ -185,6 +185,29 @@ func parseCatalogEntry(v raw.CatalogEntry) *config.ImageProviderConfig {
 			Key:    v.Key,
 			Config: config.ImageColorbarProviderConfig{},
 		}
+
+	case config.ImageGenerateProviderType:
+		stages := make([]config.StageConfig, len(v.GenerateConfig.Pipeline.Stages))
+		for i, s := range v.GenerateConfig.Pipeline.Stages {
+			stages[i] = config.StageConfig{
+				Name:       s.Name,
+				Output:     s.Output,
+				Prompt:     s.Prompt,
+				ImageInput: s.ImageInput,
+			}
+		}
+		return &config.ImageProviderConfig{
+			Key: v.Key,
+			Config: config.ImageGenerateProviderConfig{
+				CacheDepth:    v.GenerateConfig.CacheDepth,
+				EvictCount:    v.GenerateConfig.EvictCount,
+				SourceCatalog: v.GenerateConfig.SourceCatalog,
+				Pipeline: config.PipelineConfig{
+					Variables: v.GenerateConfig.Pipeline.Variables,
+					Stages:    stages,
+				},
+			},
+		}
 	}
 
 	return nil
@@ -210,7 +233,7 @@ func (ldr *defaultConfigLoader) loadRawConfig() (*config.GlobalConfig, *raw.Serv
 	}
 	var conf config.GlobalConfig
 
-	if err := yaml.Unmarshal(b, &conf); err != nil {
+	if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(b))), &conf); err != nil {
 		return nil, nil, err
 	}
 
@@ -220,7 +243,7 @@ func (ldr *defaultConfigLoader) loadRawConfig() (*config.GlobalConfig, *raw.Serv
 	}
 
 	var rawServiceConfig raw.ServiceConfig
-	if err := yaml.Unmarshal(c, &rawServiceConfig); err != nil {
+	if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(c))), &rawServiceConfig); err != nil {
 		return nil, nil, err
 	}
 

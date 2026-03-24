@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"strings"
 	"time"
 
@@ -445,13 +446,19 @@ func (e *imageEditExecutor) Execute(ctx context.Context, prompt string, images [
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 
-	// Add image(s)
+	// Add image(s) with correct MIME type
 	for i, img := range images {
-		partName := "image[]"
-		fileName := fmt.Sprintf("image_%d.png", i)
-		part, err := writer.CreateFormFile(partName, fileName)
+		ct := detectImageContentType(img)
+		ext := ".png"
+		if ct == "image/jpeg" {
+			ext = ".jpg"
+		}
+		partHeader := make(textproto.MIMEHeader)
+		partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="image[]"; filename="image_%d%s"`, i, ext))
+		partHeader.Set("Content-Type", ct)
+		part, err := writer.CreatePart(partHeader)
 		if err != nil {
-			return nil, fmt.Errorf("create form file: %w", err)
+			return nil, fmt.Errorf("create form part: %w", err)
 		}
 		if _, err := part.Write(img); err != nil {
 			return nil, fmt.Errorf("write image data: %w", err)
@@ -538,6 +545,19 @@ func providerAPIKey(key string) string {
 		return "none"
 	}
 	return key
+}
+
+func detectImageContentType(data []byte) string {
+	if len(data) >= 2 && data[0] == 0xFF && data[1] == 0xD8 {
+		return "image/jpeg"
+	}
+	if len(data) >= 8 && string(data[:8]) == "\x89PNG\r\n\x1a\n" {
+		return "image/png"
+	}
+	if len(data) >= 4 && string(data[:4]) == "RIFF" {
+		return "image/webp"
+	}
+	return "image/png" // fallback
 }
 
 func truncate(s string, n int) string {

@@ -221,6 +221,24 @@ func (r *aiRepositoryImpl) FindLatestSuccessfulStep(imageID model.PrimaryKey, st
 	return &step, err
 }
 
+func (r *aiRepositoryImpl) FindRandomImage(catalogKey string) (*model.Image, error) {
+	pivot := rand.Float64()
+	var img model.Image
+	err := r.db.Where("catalog_key = ? AND excluded = false AND deleted_at IS NULL AND rnd >= ?", catalogKey, pivot).
+		Order("rnd").First(&img).Error
+	if err == gorm.ErrRecordNotFound {
+		err = r.db.Where("catalog_key = ? AND excluded = false AND deleted_at IS NULL", catalogKey).
+			Order("rnd").First(&img).Error
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &img, nil
+}
+
 // --- Cleanup ---
 
 func (r *aiRepositoryImpl) ResetImageTagging(imageID model.PrimaryKey) error {

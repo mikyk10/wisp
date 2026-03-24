@@ -176,10 +176,11 @@ func (u *generateUsecase) generateOne(ctx context.Context, opts GenerateRunOptio
 		if err != nil {
 			return fmt.Errorf("resolve source image: %w", err)
 		}
-		if img != nil {
-			sourceImage = img.ThumbJPG
-			sourceImageID = &img.ID
+		if img == nil {
+			return fmt.Errorf("no images found in source catalog %q (run 'catalog scan' first)", catConfig.SourceCatalog)
 		}
+		sourceImage = img.ThumbJPG
+		sourceImageID = &img.ID
 	}
 
 	exec := &model.PipelineExecution{
@@ -247,8 +248,7 @@ func (u *generateUsecase) resolveSourceImage(opts GenerateRunOptions, sourceCata
 	if opts.SourceID > 0 {
 		return u.imageRepo.FindById(opts.SourceID)
 	}
-	// Random from source catalog (any orientation)
-	return u.imageRepo.FindByRandom(sourceCatalog, 0)
+	return u.repo.FindRandomImage(sourceCatalog)
 }
 
 func (u *generateUsecase) List(catalogKey string) ([]*model.GenerationCacheEntry, error) {

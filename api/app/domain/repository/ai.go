@@ -35,6 +35,7 @@ type AIRepository interface {
 	FindImagesForTagging(catalogKey string, limit int) ([]*model.Image, error)
 	FindAllImages(catalogKey string, limit int) ([]*model.Image, error)
 	FindLatestSuccessfulStep(imageID model.PrimaryKey, stageName string) (*model.StepExecution, error)
+	FindRandomImage(catalogKey string) (*model.Image, error)
 
 	// Cleanup
 	ResetImageTagging(imageID model.PrimaryKey) error

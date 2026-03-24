@@ -63,7 +63,18 @@ catalog:
   #   type: colorbar
 
   # Example: AI-generated image catalog (text-to-image via gpt-image-1)
-  # Omit prompt: to use built-in defaults (default_gen_meta.md / default_gen_image.md).
+  #
+  # The default pipeline uses two built-in prompts:
+  #   1. meta-prompt — LLM invents an image concept (text output)
+  #   2. generate    — gpt-image-1 creates the image  (image output)
+  # Omit prompt: to use built-in defaults; set prompt: to override with
+  # an external file path or another embedded prompt name.
+  #
+  # Variables are available in prompt templates as {{.config.KEY}}.
+  #
+  # Run:  wisp catalog generate run --catalog=ai-generated [--verbose]
+  # List: wisp catalog generate list --catalog=ai-generated
+  #
   # - key: ai-generated
   #   type: generate
   #   generate:
@@ -79,20 +90,31 @@ catalog:
   #           output: image
 
   # Example: AI style transfer (img2img from another catalog)
-  # - key: ai-ghibli
+  #
+  # Picks a random photo from source_catalog and transforms it using
+  # the /v1/images/edits API. Use --source-id=ID to target a specific photo.
+  # The built-in stylize.md prompt applies a surrealist painting style.
+  #
+  # Run:  wisp catalog generate run --catalog=ai-stylized [--source-id=42] [--verbose]
+  #
+  # - key: ai-stylized
   #   type: generate
   #   generate:
   #     cache_depth: 5
   #     evict_count: 2
-  #     source_catalog: photos
+  #     source_catalog: photos     # Pick random photo from this catalog
   #     pipeline:
   #       stages:
   #         - name: stylize
   #           output: image
-  #           prompt: prompts/ghibli_style.md
-  #           image_input: $source
+  #           prompt: stylize.md   # Built-in Dalí-style prompt (or your own)
+  #           image_input: $source # Feed the source photo to the API
 
   # Example: destination catalog for favorited AI-generated images
+  #
+  # Use `wisp catalog generate favorite` to export a cached image here.
+  # The next `catalog scan` will index it for frame delivery.
+  #
   # - key: ai-favorites
   #   type: file
   #   file:
@@ -151,6 +173,9 @@ displays:
     # Add a cron field to restrict a catalog to specific times (standard 5-field cron):
     #   - key: holiday-photos
     #     cron: "0 0 * 12 *"   # only in December
+    # AI-generated catalogs (type: generate) work the same way:
+    #   - key: ai-generated
+    #   - key: ai-stylized
     catalog:
       - key: photos
 

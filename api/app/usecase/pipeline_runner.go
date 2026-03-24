@@ -199,7 +199,13 @@ func (r *PipelineRunner) RunPipeline(ctx context.Context, input RunPipelineInput
 		}
 
 		if r.verbose {
-			slog.Info("pipeline: stage completed", "stage", stage.Name, "output_type", sr.OutputType, "latency_ms", step.LatencyMs)
+			attrs := []any{"stage", stage.Name, "output_type", sr.OutputType, "latency_ms", step.LatencyMs}
+			if sr.OutputType == "text" {
+				attrs = append(attrs, "output", sr.Text)
+			} else {
+				attrs = append(attrs, "output_bytes", len(sr.ImageData))
+			}
+			slog.Info("pipeline: stage completed", attrs...)
 		}
 	}
 

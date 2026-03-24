@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1" //nolint:gosec // sha1 used for prompt versioning, not cryptography
 	"embed"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -78,13 +79,39 @@ func DefaultTaggerPrompt() *Prompt {
 	return p
 }
 
-// ResolvePrompt loads a prompt from an external path if provided, otherwise from embedded.
-// If path is empty, falls back to the embedded prompt with the given name.
+// ResolvePrompt loads a prompt by trying, in order:
+//  1. External file at path (if path is non-empty)
+//  2. Embedded prompt at "prompts/{path}" (if file not found on disk)
+//  3. Embedded prompt at embeddedName (if path is empty)
 func ResolvePrompt(path, embeddedName string) (*Prompt, error) {
 	if path != "" {
-		return LoadPrompt(path)
+		p, err := LoadPrompt(path)
+		if err == nil {
+			return p, nil
+		}
+		// File not found on disk → try embedded
+		if os.IsNotExist(unwrapPathError(err)) {
+			if ep, eerr := LoadEmbeddedPrompt("prompts/" + path); eerr == nil {
+				return ep, nil
+			}
+		}
+		return nil, err
 	}
-	return LoadEmbeddedPrompt(embeddedName)
+	if embeddedName != "" {
+		return LoadEmbeddedPrompt(embeddedName)
+	}
+	return nil, fmt.Errorf("no prompt path or embedded name provided")
+}
+
+// unwrapPathError extracts the underlying error from wrapped path errors.
+func unwrapPathError(err error) error {
+	for err != nil {
+		if pe, ok := err.(*os.PathError); ok {
+			return pe.Err
+		}
+		err = errors.Unwrap(err)
+	}
+	return nil
 }
 
 // ParsePrompt parses a prompt string with YAML front-matter.

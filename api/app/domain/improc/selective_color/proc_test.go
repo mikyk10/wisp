@@ -102,7 +102,10 @@ func TestSelectiveColor_HueWrapAround(t *testing.T) {
 }
 
 func TestSelectiveColor_DefaultValues(t *testing.T) {
-	p := NewSelectiveColor(map[string]string{}).(*processor)
+	p, ok := NewSelectiveColor(map[string]string{}).(*processor)
+	if !ok {
+		t.Fatal("NewSelectiveColor did not return *processor")
+	}
 	if p.hueCenter != 0 {
 		t.Errorf("default hue_center should be 0, got %f", p.hueCenter)
 	}

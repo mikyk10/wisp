@@ -47,10 +47,10 @@ func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgM
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r, g, b, a := src.At(x, y).RGBA()
-			r8 := uint8(r >> 8)
-			g8 := uint8(g >> 8)
-			b8 := uint8(b >> 8)
-			a8 := uint8(a >> 8)
+			r8 := uint8((r >> 8) & 0xff)
+			g8 := uint8((g >> 8) & 0xff)
+			b8 := uint8((b >> 8) & 0xff)
+			a8 := uint8((a >> 8) & 0xff)
 
 			h, s, _ := rgbToHSL(r8, g8, b8)
 
@@ -82,22 +82,22 @@ func rgbToHSL(r, g, b uint8) (h, s, l float64) {
 	gf := float64(g) / 255.0
 	bf := float64(b) / 255.0
 
-	max := math.Max(rf, math.Max(gf, bf))
-	min := math.Min(rf, math.Min(gf, bf))
-	l = (max + min) / 2.0
+	cmax := math.Max(rf, math.Max(gf, bf))
+	cmin := math.Min(rf, math.Min(gf, bf))
+	l = (cmax + cmin) / 2.0
 
-	if max == min {
+	if cmax == cmin {
 		return 0, 0, l
 	}
 
-	d := max - min
+	d := cmax - cmin
 	if l > 0.5 {
-		s = d / (2.0 - max - min)
+		s = d / (2.0 - cmax - cmin)
 	} else {
-		s = d / (max + min)
+		s = d / (cmax + cmin)
 	}
 
-	switch max {
+	switch cmax {
 	case rf:
 		h = (gf - bf) / d
 		if gf < bf {

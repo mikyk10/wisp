@@ -43,6 +43,7 @@ type AIProviderConfig struct {
 // AITaggingConfig holds tagging-specific AI settings.
 type AITaggingConfig struct {
 	MaxTags  int            `yaml:"max_tags"  env:"WISP_AI_MAX_TAGS"`
+	Workers  int            `yaml:"workers"   env:"WISP_AI_TAGGING_WORKERS"`
 	Pipeline PipelineConfig `yaml:"pipeline"`
 }
 

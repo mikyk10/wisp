@@ -62,7 +62,14 @@ func newChatTextExecutor(providers map[string]appconfig.AIProviderConfig, meta P
 		},
 		anyllm.WithBaseURL(prov.Endpoint),
 		anyllm.WithAPIKey(providerAPIKey(prov.APIKey)),
-		anyllm.WithHTTPClient(&http.Client{Timeout: timeout}),
+		// Workaround: AnyLLM omits reasoning_effort when set to "none", but Ollama's
+		// Qwen3.5 defaults to thinking mode unless "reasoning_effort":"none" is explicitly
+		// present in the request body. Inject it via transport for all providers — models
+		// that don't support it (e.g. GPT-4o) simply ignore the field.
+		anyllm.WithHTTPClient(&http.Client{
+			Timeout:   timeout,
+			Transport: newReasoningTransport(http.DefaultTransport, map[string]any{"reasoning_effort": "none"}),
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create AnyLLM provider: %w", err)
@@ -93,6 +100,7 @@ func (e *chatTextExecutor) Execute(ctx context.Context, prompt string, images []
 		Messages: []anyllm.Message{
 			{Role: anyllm.RoleUser, Content: parts},
 		},
+		ReasoningEffort: anyllm.ReasoningEffortNone,
 	}
 	if e.meta.MaxTokens > 0 {
 		params.MaxTokens = &e.meta.MaxTokens

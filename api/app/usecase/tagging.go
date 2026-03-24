@@ -73,7 +73,7 @@ func (u *taggingUsecase) Run(ctx context.Context, opts TaggingRunOptions) error 
 
 	workers := opts.Workers
 	if workers <= 0 {
-		workers = u.cfg.AI.Workers
+		workers = u.cfg.AI.Tagging.Workers
 	}
 	if workers <= 0 {
 		workers = 2

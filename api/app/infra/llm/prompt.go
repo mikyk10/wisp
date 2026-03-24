@@ -2,7 +2,8 @@ package llm
 
 import (
 	"bytes"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // sha1 used for prompt versioning, not cryptography
+	"embed"
 	"fmt"
 	"os"
 	"strings"
@@ -11,11 +12,15 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+//go:embed prompts/descriptor_v1.md prompts/tagger_v1.md
+var embeddedPrompts embed.FS
+
 // API type constants for prompt frontmatter.
 const (
 	ApiTypeChat            = "chat"             // chat completion (default)
-	ApiTypeImageGeneration = "image_generation"  // /v1/images/generations (DALL-E)
-	ApiTypeComfyUI         = "comfyui"           // ComfyUI (future)
+	ApiTypeImageGeneration = "image_generation" // /v1/images/generations
+	ApiTypeImageEdit       = "image_edit"       // /v1/images/edits (img2img)
+	ApiTypeComfyUI         = "comfyui"          // ComfyUI (future)
 )
 
 // PromptMeta holds the YAML front-matter of a prompt file.
@@ -27,8 +32,8 @@ type PromptMeta struct {
 	ApiType     string  `yaml:"api_type"`    // "chat" (default), "image_generation", "comfyui"
 	Temperature float64 `yaml:"temperature"`
 	MaxTokens   int     `yaml:"max_tokens"`
-	Size        string  `yaml:"size"`        // image_generation only
-	Quality     string  `yaml:"quality"`     // image_generation only
+	Size        string  `yaml:"size"`    // image_generation only
+	Quality     string  `yaml:"quality"` // image_generation only
 }
 
 // Prompt represents a parsed prompt file.
@@ -38,13 +43,49 @@ type Prompt struct {
 	Hash string // first 12 chars of SHA1 of body
 }
 
-// LoadPrompt reads and parses a prompt file with YAML front-matter.
+// LoadPrompt reads and parses a prompt from an external file path.
 func LoadPrompt(path string) (*Prompt, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("read prompt file %s: %w", path, err)
+		return nil, fmt.Errorf("load prompt %s: %w", path, err)
 	}
 	return ParsePrompt(string(data))
+}
+
+// LoadEmbeddedPrompt reads a prompt from the embedded filesystem.
+func LoadEmbeddedPrompt(name string) (*Prompt, error) {
+	data, err := embeddedPrompts.ReadFile(name)
+	if err != nil {
+		return nil, fmt.Errorf("load embedded prompt %s: %w", name, err)
+	}
+	return ParsePrompt(string(data))
+}
+
+// DefaultDescriptorPrompt returns the embedded default descriptor prompt.
+func DefaultDescriptorPrompt() *Prompt {
+	p, err := LoadEmbeddedPrompt("prompts/descriptor_v1.md")
+	if err != nil {
+		panic(fmt.Sprintf("missing embedded descriptor prompt: %v", err))
+	}
+	return p
+}
+
+// DefaultTaggerPrompt returns the embedded default tagger prompt.
+func DefaultTaggerPrompt() *Prompt {
+	p, err := LoadEmbeddedPrompt("prompts/tagger_v1.md")
+	if err != nil {
+		panic(fmt.Sprintf("missing embedded tagger prompt: %v", err))
+	}
+	return p
+}
+
+// ResolvePrompt loads a prompt from an external path if provided, otherwise from embedded.
+// If path is empty, falls back to the embedded prompt with the given name.
+func ResolvePrompt(path, embeddedName string) (*Prompt, error) {
+	if path != "" {
+		return LoadPrompt(path)
+	}
+	return LoadEmbeddedPrompt(embeddedName)
 }
 
 // ParsePrompt parses a prompt string with YAML front-matter.
@@ -92,7 +133,6 @@ func RenderPrompt(body string, data TemplateData) (string, error) {
 		return "", fmt.Errorf("parse prompt template: %w", err)
 	}
 
-	// Build template context
 	ctx := map[string]any{
 		"prev": map[string]any{
 			"output": data.Prev.Text,

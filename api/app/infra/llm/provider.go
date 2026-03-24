@@ -1,12 +1,14 @@
 package llm
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -24,9 +26,11 @@ import (
 func NewStageExecutor(providers map[string]appconfig.AIProviderConfig, meta PromptMeta, outputType string, timeout time.Duration) (ai.StageExecutor, error) {
 	if outputType == "image" {
 		switch meta.ApiType {
-		case ApiTypeImageGeneration:
+		case ApiTypeImageGeneration, "":
 			return newImageGenExecutor(providers, meta, timeout)
-		case ApiTypeChat, "":
+		case ApiTypeImageEdit:
+			return newImageEditExecutor(providers, meta, timeout)
+		case ApiTypeChat:
 			return newChatImageExecutor(providers, meta, timeout)
 		case ApiTypeComfyUI:
 			return nil, fmt.Errorf("api_type %q is not yet implemented", ApiTypeComfyUI)
@@ -142,6 +146,7 @@ type chatImageExecutor struct {
 // chatCompletionRequest is the raw request body for /v1/chat/completions.
 type chatCompletionRequest struct {
 	Model       string           `json:"model"`
+	Modalities  []string         `json:"modalities,omitempty"`
 	Messages    []rawMessage     `json:"messages"`
 	MaxTokens   int              `json:"max_tokens,omitempty"`
 	Temperature *float64         `json:"temperature,omitempty"`
@@ -183,8 +188,9 @@ func (e *chatImageExecutor) Execute(ctx context.Context, prompt string, images [
 	}
 
 	reqBody := chatCompletionRequest{
-		Model:    e.meta.Model,
-		Messages: []rawMessage{{Role: "user", Content: parts}},
+		Model:      e.meta.Model,
+		Modalities: []string{"text", "image"},
+		Messages:   []rawMessage{{Role: "user", Content: parts}},
 	}
 	if e.meta.MaxTokens > 0 {
 		reqBody.MaxTokens = e.meta.MaxTokens
@@ -398,6 +404,129 @@ func (e *imageGenExecutor) Execute(ctx context.Context, prompt string, _ [][]byt
 	}
 
 	return nil, fmt.Errorf("image generation returned neither URL nor base64 data")
+}
+
+// ---------------------------------------------------------------------------
+// Image edit executor — raw HTTP multipart (output: image, api_type: image_edit)
+// /v1/images/edits — sends image + prompt, receives edited image (img2img)
+// ---------------------------------------------------------------------------
+
+func newImageEditExecutor(providers map[string]appconfig.AIProviderConfig, meta PromptMeta, timeout time.Duration) (ai.StageExecutor, error) {
+	prov, ok := providers[meta.Provider]
+	if !ok {
+		return nil, fmt.Errorf("unknown AI provider %q", meta.Provider)
+	}
+	return &imageEditExecutor{
+		endpoint: strings.TrimSuffix(prov.Endpoint, "/") + "/images/edits",
+		apiKey:   providerAPIKey(prov.APIKey),
+		meta:     meta,
+		timeout:  timeout,
+	}, nil
+}
+
+type imageEditExecutor struct {
+	endpoint string
+	apiKey   string
+	meta     PromptMeta
+	timeout  time.Duration
+}
+
+func (e *imageEditExecutor) Execute(ctx context.Context, prompt string, images [][]byte) (*ai.StageResult, error) {
+	if len(images) == 0 {
+		return nil, fmt.Errorf("image_edit requires at least one input image")
+	}
+
+	slog.Debug("llm: image edit", "model", e.meta.Model, "endpoint", e.endpoint, "images", len(images))
+
+	callCtx, cancel := context.WithTimeout(ctx, e.timeout)
+	defer cancel()
+
+	// Build multipart request
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	// Add image(s)
+	for i, img := range images {
+		partName := "image[]"
+		fileName := fmt.Sprintf("image_%d.png", i)
+		part, err := writer.CreateFormFile(partName, fileName)
+		if err != nil {
+			return nil, fmt.Errorf("create form file: %w", err)
+		}
+		if _, err := part.Write(img); err != nil {
+			return nil, fmt.Errorf("write image data: %w", err)
+		}
+	}
+
+	_ = writer.WriteField("prompt", prompt)
+	_ = writer.WriteField("model", e.meta.Model)
+	if e.meta.Size != "" {
+		_ = writer.WriteField("size", e.meta.Size)
+	}
+	if e.meta.Quality != "" {
+		_ = writer.WriteField("quality", e.meta.Quality)
+	}
+	_ = writer.WriteField("n", "1")
+
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(callCtx, http.MethodPost, e.endpoint, &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	if e.apiKey != "" && e.apiKey != "none" {
+		req.Header.Set("Authorization", "Bearer "+e.apiKey)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("image edit request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("image edit returned %d: %s", resp.StatusCode, truncate(string(respBody), 300))
+	}
+
+	// Parse response — same format as /v1/images/generations
+	var result struct {
+		Data []struct {
+			B64JSON string `json:"b64_json"`
+			URL     string `json:"url"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+	if len(result.Data) == 0 {
+		return nil, fmt.Errorf("image edit returned no data")
+	}
+
+	item := result.Data[0]
+	if item.B64JSON != "" {
+		data, err := base64.StdEncoding.DecodeString(item.B64JSON)
+		if err != nil {
+			return nil, fmt.Errorf("decode base64 image: %w", err)
+		}
+		return &ai.StageResult{OutputType: "image", ImageData: data, ContentType: "image/png"}, nil
+	}
+	if item.URL != "" {
+		data, ct, err := downloadImage(callCtx, item.URL)
+		if err != nil {
+			return nil, err
+		}
+		return &ai.StageResult{OutputType: "image", ImageData: data, ContentType: ct}, nil
+	}
+
+	return nil, fmt.Errorf("image edit returned neither b64_json nor url")
 }
 
 // ---------------------------------------------------------------------------

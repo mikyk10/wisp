@@ -62,6 +62,41 @@ catalog:
   # - key: colorbar
   #   type: colorbar
 
+  # Example: AI-generated image catalog (text-to-image via GPT-4o)
+  # - key: ai-landscapes
+  #   type: generate
+  #   generate:
+  #     cache_depth: 10        # Max images kept in cache
+  #     evict_count: 3         # FIFO evict per batch run
+  #     pipeline:
+  #       stages:
+  #         - name: meta-prompt
+  #           output: text
+  #           prompt: prompts/landscape_meta.md
+  #         - name: generate
+  #           output: image
+  #           prompt: prompts/landscape_gen.md
+
+  # Example: AI style transfer (img2img from another catalog)
+  # - key: ai-ghibli
+  #   type: generate
+  #   generate:
+  #     cache_depth: 5
+  #     evict_count: 2
+  #     source_catalog: photos
+  #     pipeline:
+  #       stages:
+  #         - name: stylize
+  #           output: image
+  #           prompt: prompts/ghibli_style.md
+  #           image_input: $source
+
+  # Example: destination catalog for favorited AI-generated images
+  # - key: ai-favorites
+  #   type: file
+  #   file:
+  #     src_path: /mnt/wspf/ai-favorites
+
 displays:
   - name: my-display
     # mac_address is the :displayKey path parameter in the API.

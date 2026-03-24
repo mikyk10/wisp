@@ -77,12 +77,14 @@ type CatalogUsecase interface {
 type catalogUseCase struct {
 	serviceConfig *config.ServiceConfig
 	imgr          repository.ImageRepository
+	aiRepo        repository.AIRepository
 }
 
-func NewCatalogUseCase(serviceConfig *config.ServiceConfig, imgr repository.ImageRepository) CatalogUsecase {
+func NewCatalogUseCase(serviceConfig *config.ServiceConfig, imgr repository.ImageRepository, aiRepo repository.AIRepository) CatalogUsecase {
 	return &catalogUseCase{
 		serviceConfig: serviceConfig,
 		imgr:          imgr,
+		aiRepo:        aiRepo,
 	}
 }
 
@@ -441,7 +443,7 @@ func (uc *catalogUseCase) Pick(displayKey string) (catalog.ImageLoader, epaper.D
 			return nil, nil, nil, fmt.Errorf("failed to resolve image provider for display %s: %w", displayKey, err)
 		}
 	} else {
-		imgProvider := catalog.PickImageProvider(time.Now(), display, uc.imgr, displayConfigInUse.Catalog...)
+		imgProvider := catalog.PickImageProviderWithOpts(time.Now(), display, uc.imgr, &catalog.PickImageProviderOpts{AIRepo: uc.aiRepo}, displayConfigInUse.Catalog...)
 		var err error
 		imgPtr, err = imgProvider.Resolve()
 		if err != nil {

@@ -30,11 +30,12 @@ func (r *PipelineRunner) SetVerbose(v bool) { r.verbose = v }
 
 // RunPipelineInput holds the inputs for a pipeline execution.
 type RunPipelineInput struct {
-	PipelineExecID model.PrimaryKey
-	Stages         []config.StageConfig
-	SourceImage    []byte         // $source image data (may be nil)
-	ConfigVars     map[string]any // template config variables
-	SkipStages     map[string]string // stage name → cached text output (skip execution, use cached)
+	PipelineExecID   model.PrimaryKey
+	Stages           []config.StageConfig
+	SourceImage      []byte            // $source image data (may be nil)
+	ConfigVars       map[string]any    // template config variables
+	SkipStages       map[string]string // stage name → cached text output (skip execution, use cached)
+	EmbeddedPrompts  map[string]string // stage name → embedded prompt path (fallback when stage.Prompt is empty)
 }
 
 // RunPipeline executes all stages of a pipeline sequentially.
@@ -71,8 +72,12 @@ func (r *PipelineRunner) RunPipeline(ctx context.Context, input RunPipelineInput
 			continue
 		}
 
-		// Load prompt
-		prompt, err := llm.LoadPrompt(stage.Prompt)
+		// Load prompt: external file path, or fall back to embedded
+		embeddedName := ""
+		if input.EmbeddedPrompts != nil {
+			embeddedName = input.EmbeddedPrompts[stage.Name]
+		}
+		prompt, err := llm.ResolvePrompt(stage.Prompt, embeddedName)
 		if err != nil {
 			return nil, r.recordStepFailure(input.PipelineExecID, stage, i, "prompt_load_failed", err)
 		}

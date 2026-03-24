@@ -1,0 +1,21 @@
+catalog:
+  - key: album-with-hook
+    type: file
+    file:
+      src_path: /home/pi/Pictures
+      hooks:
+        on_new_file: "echo tagged {file}"
+
+  - key: album-no-hook
+    type: file
+    file:
+      src_path: /home/pi/Other
+
+displays:
+  - name: test-display
+    mac_address: dev
+    api_version: 2025-03-01
+    model: ws7in3e
+    orientation: landscape
+    catalog:
+      - key: album-with-hook

@@ -35,6 +35,16 @@
               "src_path": {
                 "type": "string"
               },
+              "hooks": {
+                "type": "object",
+                "description": "Optional shell commands invoked during catalog scan events.",
+                "properties": {
+                  "on_new_file": {
+                    "type": "string",
+                    "description": "Shell command executed asynchronously for each newly registered file. {file} is replaced with the absolute path."
+                  }
+                }
+              },
               "criteria": {
                 "type": "object",
                 "properties": {

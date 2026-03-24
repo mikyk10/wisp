@@ -38,6 +38,13 @@ catalog:
     file:
       src_path: /mnt/wspf    # Mounted from PHOTO_DIR via compose.yaml.
 
+      # hooks:
+      #   # Shell command executed asynchronously for each newly registered file
+      #   # during `catalog scan`. Fires only for files not yet in the database.
+      #   # {file} is replaced with the absolute path of the new file.
+      #   # Errors are logged but never block the scan.
+      #   on_new_file: "python3 /path/to/tag_subject_area.py {file}"
+
   # Example: capture a web page as an image
   # - key: dashboard
   #   type: playwright-go

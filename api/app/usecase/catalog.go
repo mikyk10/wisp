@@ -13,6 +13,7 @@ import (
 	"maps"
 	"math/rand/v2"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"slices"
@@ -158,7 +159,12 @@ func (cu *catalogUseCase) scanCatalog(ctx context.Context, provConf *config.Imag
 	concurrency := scanConcurrency(workers)
 	slog.Debug("scan: concurrency", "workers", concurrency)
 	wg := &sync.WaitGroup{}
+	hookWg := &sync.WaitGroup{}
 	sem := make(chan struct{}, concurrency)
+
+	if pconf.Hooks.OnNewFile != "" {
+		slog.Info("scan: on_new_file hook configured", "catalog", provConf.Key, "cmd", pconf.Hooks.OnNewFile)
+	}
 
 	includedFileCh := make(chan catalog.ImageLoader, concurrency)
 	excludedFileCh := make(chan catalog.ImageLoader, concurrency)
@@ -188,7 +194,7 @@ loop:
 			sem <- struct{}{}
 			go func(h [20]byte, ldr catalog.ImageLoader) {
 				defer func() { wg.Done(); <-sem }()
-				cu.processIncludedFile(ctx, provConf.Key, h, ldr)
+				cu.processIncludedFile(ctx, provConf.Key, h, ldr, pconf.Hooks.OnNewFile, hookWg)
 			}(srcHash, info)
 			dispatched++
 			if dispatched%logInterval == 0 {
@@ -216,12 +222,13 @@ loop:
 	}
 
 	wg.Wait()
+	hookWg.Wait()
 	slog.Info("scan completed", "catalog", provConf.Key, "total", dispatched)
 }
 
 // processIncludedFile processes a file received from includedFileCh and registers it in the DB.
 // imseq is created per goroutine, so it is thread-safe.
-func (cu *catalogUseCase) processIncludedFile(ctx context.Context, catalogKey string, srcHash [20]byte, info catalog.ImageLoader) {
+func (cu *catalogUseCase) processIncludedFile(ctx context.Context, catalogKey string, srcHash [20]byte, info catalog.ImageLoader, onNewFileCmd string, hookWg *sync.WaitGroup) {
 	// Set a timeout in case image processing takes too long.
 	ctx2, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -297,7 +304,16 @@ func (cu *catalogUseCase) processIncludedFile(ctx context.Context, catalogKey st
 		return
 	}
 
-	slog.Debug("scan: included", "path", meta.ImageSourcePath)
+	isNewFile := existing == nil
+	if isNewFile && onNewFileCmd != "" {
+		hookWg.Add(1)
+		go func(cmd, filePath string) {
+			defer hookWg.Done()
+			runOnNewFileHook(cmd, filePath)
+		}(onNewFileCmd, meta.ImageSourcePath)
+	}
+
+	slog.Debug("scan: included", "path", meta.ImageSourcePath, "new", isNewFile)
 }
 
 // processExcludedFile registers a file received from excludedFileCh as logically deleted in the DB.
@@ -434,4 +450,23 @@ func (uc *catalogUseCase) Pick(displayKey string) (catalog.ImageLoader, epaper.D
 	}
 
 	return imgPtr, display, imseqGroup, nil
+}
+
+// runOnNewFileHook executes the on_new_file hook command for a newly registered file.
+// The placeholder {file} in cmd is replaced with filePath.
+// Errors are logged but never propagated — a failing hook must not affect the scan.
+func runOnNewFileHook(cmd, filePath string) {
+	expanded := strings.ReplaceAll(cmd, "{file}", filePath)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	//nolint:gosec // cmd is from trusted config, not user input
+	c := exec.CommandContext(ctx, "sh", "-c", expanded)
+	out, err := c.CombinedOutput()
+	if err != nil {
+		slog.Error("hook: on_new_file failed", "cmd", cmd, "file", filePath, "err", err, "output", string(out))
+		return
+	}
+	slog.Info("hook: on_new_file completed", "file", filePath)
 }

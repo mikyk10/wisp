@@ -1,10 +1,12 @@
 package usecase_test
 
 import (
+	"fmt"
 	"image"
 	"image/jpeg"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 	"github.com/mikyk10/wisp/app/domain/model"
@@ -402,3 +404,121 @@ func TestPick_KnownDisplayKey_ReturnsLoader(t *testing.T) {
 		t.Error("Pick() sequencer group should not be nil")
 	}
 }
+
+// --- on_new_file hook tests ---
+
+// setupScanUseCaseWithHook creates a single-catalog test environment with a configured hook.
+func setupScanUseCaseWithHook(t *testing.T, srcDir string, hookCmd string) (usecase.CatalogUsecase, repository.ImageRepository) {
+	t.Helper()
+	return setupScanUseCaseWithConfig(t, &config.ServiceConfig{
+		Catalog: map[string]*config.ImageProviderConfig{
+			"cat1": {
+				Key: "cat1",
+				Config: config.ImageFileProviderConfig{
+					SrcPath: srcDir,
+					Hooks:   config.FileHooks{OnNewFile: hookCmd},
+				},
+			},
+		},
+		Displays: map[string]*config.DisplayConfig{},
+	})
+}
+
+// TestScan_OnNewFileHook_FiresForNewFile verifies that the on_new_file hook
+// is executed when a previously unseen file is registered during scan.
+func TestScan_OnNewFileHook_FiresForNewFile(t *testing.T) {
+	srcDir := t.TempDir()
+	logDir := t.TempDir()
+	logFile := filepath.Join(logDir, "hook.log")
+
+	createTestJPEG(t, filepath.Join(srcDir, "photo.jpg"))
+
+	hookCmd := fmt.Sprintf("echo {file} >> %s", logFile)
+	uc, _ := setupScanUseCaseWithHook(t, srcDir, hookCmd)
+
+	if err := uc.Scan(0); err != nil {
+		t.Fatalf("Scan() error: %v", err)
+	}
+
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("hook log not created: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 hook invocation, got %d", len(lines))
+	}
+	if !strings.HasSuffix(lines[0], "photo.jpg") {
+		t.Errorf("hook log should contain file path, got %q", lines[0])
+	}
+}
+
+// TestScan_OnNewFileHook_DoesNotFireForExistingFile verifies that the hook
+// is NOT executed on the second scan when no new files are added.
+func TestScan_OnNewFileHook_DoesNotFireForExistingFile(t *testing.T) {
+	srcDir := t.TempDir()
+	logDir := t.TempDir()
+	logFile := filepath.Join(logDir, "hook.log")
+
+	createTestJPEG(t, filepath.Join(srcDir, "photo.jpg"))
+
+	hookCmd := fmt.Sprintf("echo {file} >> %s", logFile)
+	uc, _ := setupScanUseCaseWithHook(t, srcDir, hookCmd)
+
+	if err := uc.Scan(0); err != nil {
+		t.Fatalf("first Scan() error: %v", err)
+	}
+	if err := uc.Scan(0); err != nil {
+		t.Fatalf("second Scan() error: %v", err)
+	}
+
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("hook log not created: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected exactly 1 hook invocation after 2 scans, got %d", len(lines))
+	}
+}
+
+// TestScan_OnNewFileHook_NoHookConfigured verifies that scan works normally
+// when no hook is configured (empty string).
+func TestScan_OnNewFileHook_NoHookConfigured(t *testing.T) {
+	srcDir := t.TempDir()
+	createTestJPEG(t, filepath.Join(srcDir, "photo.jpg"))
+
+	uc, _ := setupScanUseCaseWithHook(t, srcDir, "")
+
+	if err := uc.Scan(0); err != nil {
+		t.Fatalf("Scan() error: %v", err)
+	}
+
+	count := 0
+	_ = uc.ListImages("cat1", func(*model.Image) error { count++; return nil })
+	if count != 1 {
+		t.Errorf("expected 1 indexed image, got %d", count)
+	}
+}
+
+// TestScan_OnNewFileHook_FailureDoesNotBlockScan verifies that a failing hook
+// does not prevent the file from being registered or the scan from completing.
+func TestScan_OnNewFileHook_FailureDoesNotBlockScan(t *testing.T) {
+	srcDir := t.TempDir()
+	createTestJPEG(t, filepath.Join(srcDir, "photo.jpg"))
+
+	uc, _ := setupScanUseCaseWithHook(t, srcDir, "exit 1")
+
+	if err := uc.Scan(0); err != nil {
+		t.Fatalf("Scan() error: %v", err)
+	}
+
+	count := 0
+	_ = uc.ListImages("cat1", func(*model.Image) error { count++; return nil })
+	if count != 1 {
+		t.Errorf("expected 1 indexed image despite hook failure, got %d", count)
+	}
+}
+

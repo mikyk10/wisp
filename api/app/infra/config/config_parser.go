@@ -143,6 +143,9 @@ func parseCatalogEntry(v raw.CatalogEntry) *config.ImageProviderConfig {
 			Config: config.ImageFileProviderConfig{
 				Criteria: cr,
 				SrcPath:  v.FileConfig.SrcPath,
+				Hooks: config.FileHooks{
+					OnNewFile: v.FileConfig.Hooks.OnNewFile,
+				},
 			},
 		}
 

@@ -59,8 +59,13 @@ type ExcludeTimeRangeItem struct {
 }
 
 type FileConfig struct {
-	Criteria Criteria `json:"criteria" yaml:"criteria"`
-	SrcPath  string   `json:"src_path" yaml:"src_path"`
+	Criteria   Criteria `json:"criteria" yaml:"criteria"`
+	SrcPath    string   `json:"src_path" yaml:"src_path"`
+	Hooks      FileHooks `json:"hooks,omitempty" yaml:"hooks,omitempty"`
+}
+
+type FileHooks struct {
+	OnNewFile string `json:"on_new_file,omitempty" yaml:"on_new_file,omitempty"`
 }
 
 type Filter struct {

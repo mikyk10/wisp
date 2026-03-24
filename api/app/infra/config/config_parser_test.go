@@ -46,6 +46,31 @@ func TestLoadConfig_InvalidCronExpression(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_ParsesFileHooks(t *testing.T) {
+	_, svc, err := newLoaderFromDir("testdata_hooks").LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig() unexpected error: %v", err)
+	}
+
+	withHook, ok := svc.Catalog["album-with-hook"]
+	if !ok {
+		t.Fatal("expected catalog entry 'album-with-hook'")
+	}
+	fpc := withHook.Config.(domainConfig.ImageFileProviderConfig)
+	if fpc.Hooks.OnNewFile != "echo tagged {file}" {
+		t.Errorf("expected on_new_file = %q, got %q", "echo tagged {file}", fpc.Hooks.OnNewFile)
+	}
+
+	noHook, ok := svc.Catalog["album-no-hook"]
+	if !ok {
+		t.Fatal("expected catalog entry 'album-no-hook'")
+	}
+	fpcNo := noHook.Config.(domainConfig.ImageFileProviderConfig)
+	if fpcNo.Hooks.OnNewFile != "" {
+		t.Errorf("expected empty on_new_file for album-no-hook, got %q", fpcNo.Hooks.OnNewFile)
+	}
+}
+
 func TestValidateGlobalConfig(t *testing.T) {
 	tests := []struct {
 		name    string

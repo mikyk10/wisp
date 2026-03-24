@@ -160,13 +160,18 @@ func (r *aiRepositoryImpl) FindRandomCacheEntry(catalogKey string) (*model.Gener
 	var entry model.GenerationCacheEntry
 	err := r.db.Where("catalog_key = ? AND rnd >= ?", catalogKey, pivot).Order("rnd").First(&entry).Error
 	if err == gorm.ErrRecordNotFound {
-		// Wrap around
 		err = r.db.Where("catalog_key = ?", catalogKey).Order("rnd").First(&entry).Error
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
 	}
-	return &entry, err
+	if err != nil {
+		return nil, err
+	}
+	// Re-randomize to improve distribution over time (same as Image.FindByRandom)
+	entry.Rnd = rand.Float64()
+	r.db.Model(&entry).Update("rnd", entry.Rnd)
+	return &entry, nil
 }
 
 func (r *aiRepositoryImpl) EvictOldestCacheEntries(catalogKey string, count int) error {
@@ -236,6 +241,9 @@ func (r *aiRepositoryImpl) FindRandomImage(catalogKey string) (*model.Image, err
 	if err != nil {
 		return nil, err
 	}
+	// Re-randomize to improve distribution over time
+	img.Rnd = rand.Float64()
+	r.db.Model(&img).Update("rnd", img.Rnd)
 	return &img, nil
 }
 

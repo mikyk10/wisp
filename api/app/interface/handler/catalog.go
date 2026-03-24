@@ -8,7 +8,6 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
-	"maps"
 	"net/http"
 	"path/filepath"
 	"slices"
@@ -62,7 +61,14 @@ func NewCatalogHandler(svc *config.ServiceConfig, catr usecase.CatalogUsecase, a
 }
 
 func (uc *catalogHandler) ListCatalogs(c *echo.Context) error {
-	catalogs := slices.Sorted(maps.Keys(uc.svc.Catalog))
+	var catalogs []string
+	for key, cfg := range uc.svc.Catalog {
+		if _, isGenerate := cfg.Config.(config.ImageGenerateProviderConfig); isGenerate {
+			continue
+		}
+		catalogs = append(catalogs, key)
+	}
+	slices.Sort(catalogs)
 	return c.JSON(http.StatusOK, map[string]any{"catalogs": catalogs})
 }
 

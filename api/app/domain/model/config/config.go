@@ -8,6 +8,7 @@ const (
 	ImagePlaywrightProviderType string = "playwright-go"
 	ImageLuaProviderType        string = "lua"
 	ImageColorbarProviderType   string = "colorbar"
+	ImageGenerateProviderType   string = "generate"
 )
 
 type DisplayOrientation int
@@ -33,6 +34,18 @@ type ConfigLoader interface {
 	LoadConfig() (*GlobalConfig, *ServiceConfig, error)
 }
 
+// AIProviderConfig holds connection details for a single LLM provider.
+type AIProviderConfig struct {
+	Endpoint string `yaml:"endpoint"`
+	APIKey   string `yaml:"api_key"` //nolint:gosec // struct field name, not a secret
+}
+
+// AITaggingConfig holds tagging-specific AI settings.
+type AITaggingConfig struct {
+	MaxTags  int            `yaml:"max_tags"  env:"WISP_AI_MAX_TAGS"`
+	Pipeline PipelineConfig `yaml:"pipeline"`
+}
+
 // GlobalConfig holds application-wide configuration.
 type GlobalConfig struct {
 	LogLevel slog.Level `yaml:"log_level"`
@@ -46,6 +59,13 @@ type GlobalConfig struct {
 			}
 		}
 	}
+	AI struct {
+		Providers         map[string]AIProviderConfig `yaml:"providers"`
+		Workers           int                         `yaml:"workers"             env:"WISP_AI_WORKERS"`
+		RequestTimeoutSec int                         `yaml:"request_timeout_sec" env:"WISP_AI_REQUEST_TIMEOUT_SEC"`
+		MaxRetries        int                         `yaml:"max_retries"         env:"WISP_AI_MAX_RETRIES"`
+		Tagging           AITaggingConfig             `yaml:"tagging"`
+	} `yaml:"ai"`
 }
 
 // ServiceConfig holds catalog and display configuration.

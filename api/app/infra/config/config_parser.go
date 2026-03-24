@@ -181,6 +181,28 @@ func parseCatalogEntry(v raw.CatalogEntry) *config.ImageProviderConfig {
 			Key:    v.Key,
 			Config: config.ImageColorbarProviderConfig{},
 		}
+
+	case config.ImageGenerateProviderType:
+		stages := make([]config.StageConfig, len(v.GenerateConfig.Pipeline.Stages))
+		for i, s := range v.GenerateConfig.Pipeline.Stages {
+			stages[i] = config.StageConfig{
+				Name:       s.Name,
+				Output:     s.Output,
+				Prompt:     s.Prompt,
+				ImageInput: s.ImageInput,
+			}
+		}
+		return &config.ImageProviderConfig{
+			Key: v.Key,
+			Config: config.ImageGenerateProviderConfig{
+				CacheDepth:    v.GenerateConfig.CacheDepth,
+				EvictCount:    v.GenerateConfig.EvictCount,
+				SourceCatalog: v.GenerateConfig.SourceCatalog,
+				Pipeline: config.PipelineConfig{
+					Stages: stages,
+				},
+			},
+		}
 	}
 
 	return nil

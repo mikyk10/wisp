@@ -1,0 +1,419 @@
+package llm
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/mikyk10/wisp/app/domain/ai"
+	appconfig "github.com/mikyk10/wisp/app/domain/model/config"
+
+	anyllm "github.com/mozilla-ai/any-llm-go"
+	openaicompat "github.com/mozilla-ai/any-llm-go/providers/openai"
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
+)
+
+// NewStageExecutor creates the appropriate StageExecutor based on output type and api_type.
+func NewStageExecutor(providers map[string]appconfig.AIProviderConfig, meta PromptMeta, outputType string, timeout time.Duration) (ai.StageExecutor, error) {
+	if outputType == "image" {
+		switch meta.ApiType {
+		case ApiTypeImageGeneration:
+			return newImageGenExecutor(providers, meta, timeout)
+		case ApiTypeChat, "":
+			return newChatImageExecutor(providers, meta, timeout)
+		case ApiTypeComfyUI:
+			return nil, fmt.Errorf("api_type %q is not yet implemented", ApiTypeComfyUI)
+		default:
+			return nil, fmt.Errorf("unknown api_type %q", meta.ApiType)
+		}
+	}
+	// output: text → always chat completion via AnyLLM
+	return newChatTextExecutor(providers, meta, timeout)
+}
+
+// ---------------------------------------------------------------------------
+// Chat text executor — AnyLLM (output: text)
+// ---------------------------------------------------------------------------
+
+func newChatTextExecutor(providers map[string]appconfig.AIProviderConfig, meta PromptMeta, timeout time.Duration) (ai.StageExecutor, error) {
+	prov, ok := providers[meta.Provider]
+	if !ok {
+		return nil, fmt.Errorf("unknown AI provider %q", meta.Provider)
+	}
+
+	provider, err := openaicompat.NewCompatible(
+		openaicompat.CompatibleConfig{
+			Name:           meta.Provider,
+			DefaultBaseURL: prov.Endpoint,
+			RequireAPIKey:  false,
+			DefaultAPIKey:  "none",
+		},
+		anyllm.WithBaseURL(prov.Endpoint),
+		anyllm.WithAPIKey(providerAPIKey(prov.APIKey)),
+		anyllm.WithHTTPClient(&http.Client{Timeout: timeout}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create AnyLLM provider: %w", err)
+	}
+
+	return &chatTextExecutor{provider: provider, meta: meta, timeout: timeout}, nil
+}
+
+type chatTextExecutor struct {
+	provider *openaicompat.CompatibleProvider
+	meta     PromptMeta
+	timeout  time.Duration
+}
+
+func (e *chatTextExecutor) Execute(ctx context.Context, prompt string, images [][]byte) (*ai.StageResult, error) {
+	var parts []anyllm.ContentPart
+	parts = append(parts, anyllm.ContentPart{Type: "text", Text: prompt})
+	for _, img := range images {
+		b64 := base64.StdEncoding.EncodeToString(img)
+		parts = append(parts, anyllm.ContentPart{
+			Type:     "image_url",
+			ImageURL: &anyllm.ImageURL{URL: "data:image/jpeg;base64," + b64},
+		})
+	}
+
+	params := anyllm.CompletionParams{
+		Model: e.meta.Model,
+		Messages: []anyllm.Message{
+			{Role: anyllm.RoleUser, Content: parts},
+		},
+	}
+	if e.meta.MaxTokens > 0 {
+		params.MaxTokens = &e.meta.MaxTokens
+	}
+	if e.meta.Temperature > 0 {
+		params.Temperature = &e.meta.Temperature
+	}
+
+	slog.Debug("llm: chat text", "model", e.meta.Model, "provider", e.meta.Provider)
+	callCtx, cancel := context.WithTimeout(ctx, e.timeout)
+	defer cancel()
+
+	resp, err := e.provider.Completion(callCtx, params)
+	if err != nil {
+		return nil, fmt.Errorf("chat completion failed: %w", err)
+	}
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("chat completion returned no choices")
+	}
+
+	return &ai.StageResult{
+		OutputType: "text",
+		Text:       strings.TrimSpace(resp.Choices[0].Message.ContentString()),
+	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Chat image executor — Raw HTTP (output: image, api_type: chat)
+// AnyLLM/openai-go cannot parse image content parts from chat completion responses.
+// ---------------------------------------------------------------------------
+
+func newChatImageExecutor(providers map[string]appconfig.AIProviderConfig, meta PromptMeta, timeout time.Duration) (ai.StageExecutor, error) {
+	prov, ok := providers[meta.Provider]
+	if !ok {
+		return nil, fmt.Errorf("unknown AI provider %q", meta.Provider)
+	}
+	return &chatImageExecutor{
+		endpoint: strings.TrimSuffix(prov.Endpoint, "/") + "/chat/completions",
+		apiKey:   providerAPIKey(prov.APIKey),
+		meta:     meta,
+		timeout:  timeout,
+	}, nil
+}
+
+type chatImageExecutor struct {
+	endpoint string
+	apiKey   string
+	meta     PromptMeta
+	timeout  time.Duration
+}
+
+// chatCompletionRequest is the raw request body for /v1/chat/completions.
+type chatCompletionRequest struct {
+	Model       string           `json:"model"`
+	Messages    []rawMessage     `json:"messages"`
+	MaxTokens   int              `json:"max_tokens,omitempty"`
+	Temperature *float64         `json:"temperature,omitempty"`
+}
+
+type rawMessage struct {
+	Role    string        `json:"role"`
+	Content []contentPart `json:"content"`
+}
+
+type contentPart struct {
+	Type     string    `json:"type"`
+	Text     string    `json:"text,omitempty"`
+	ImageURL *imageURL `json:"image_url,omitempty"`
+}
+
+type imageURL struct {
+	URL string `json:"url"`
+}
+
+// chatCompletionResponse is the raw response from /v1/chat/completions.
+type chatCompletionResponse struct {
+	Choices []struct {
+		Message struct {
+			Content json.RawMessage `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+}
+
+func (e *chatImageExecutor) Execute(ctx context.Context, prompt string, images [][]byte) (*ai.StageResult, error) {
+	var parts []contentPart
+	parts = append(parts, contentPart{Type: "text", Text: prompt})
+	for _, img := range images {
+		b64 := base64.StdEncoding.EncodeToString(img)
+		parts = append(parts, contentPart{
+			Type:     "image_url",
+			ImageURL: &imageURL{URL: "data:image/jpeg;base64," + b64},
+		})
+	}
+
+	reqBody := chatCompletionRequest{
+		Model:    e.meta.Model,
+		Messages: []rawMessage{{Role: "user", Content: parts}},
+	}
+	if e.meta.MaxTokens > 0 {
+		reqBody.MaxTokens = e.meta.MaxTokens
+	}
+	if e.meta.Temperature > 0 {
+		reqBody.Temperature = &e.meta.Temperature
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, e.timeout)
+	defer cancel()
+
+	slog.Debug("llm: chat image (raw HTTP)", "model", e.meta.Model, "endpoint", e.endpoint)
+
+	req, err := http.NewRequestWithContext(callCtx, http.MethodPost, e.endpoint, strings.NewReader(string(body)))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if e.apiKey != "" && e.apiKey != "none" {
+		req.Header.Set("Authorization", "Bearer "+e.apiKey)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("chat completion request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("chat completion returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return extractImageFromChatResponse(respBody)
+}
+
+// extractImageFromChatResponse parses the chat completion response JSON
+// and extracts image data from content parts.
+func extractImageFromChatResponse(respBody []byte) (*ai.StageResult, error) {
+	var resp chatCompletionResponse
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("no choices in response")
+	}
+
+	content := resp.Choices[0].Message.Content
+
+	// Content may be a string (text only) or array (multi-part with images)
+	// Try array first
+	var parts []contentPart
+	if err := json.Unmarshal(content, &parts); err == nil {
+		// Multi-part response — look for image parts
+		var text string
+		for _, part := range parts {
+			switch part.Type {
+			case "image_url":
+				if part.ImageURL != nil {
+					imgData, ct, err := resolveImageURL(part.ImageURL.URL)
+					if err != nil {
+						return nil, fmt.Errorf("resolve image from response: %w", err)
+					}
+					return &ai.StageResult{
+						OutputType:  "image",
+						Text:        text,
+						ImageData:   imgData,
+						ContentType: ct,
+					}, nil
+				}
+			case "text":
+				text = part.Text
+			}
+		}
+		return nil, fmt.Errorf("no image_url part found in chat response content parts")
+	}
+
+	// Content is a string — no image
+	var textContent string
+	if err := json.Unmarshal(content, &textContent); err == nil {
+		return nil, fmt.Errorf("chat response contained only text, no image: %s", truncate(textContent, 100))
+	}
+
+	return nil, fmt.Errorf("unable to parse chat response content: %s", truncate(string(content), 200))
+}
+
+// resolveImageURL extracts image bytes from a data URL or fetches from HTTP URL.
+func resolveImageURL(url string) ([]byte, string, error) {
+	if strings.HasPrefix(url, "data:") {
+		// data:image/png;base64,iVBOR...
+		parts := strings.SplitN(url, ",", 2)
+		if len(parts) != 2 {
+			return nil, "", fmt.Errorf("invalid data URL")
+		}
+		meta := parts[0] // "data:image/png;base64"
+		ct := "image/png"
+		if idx := strings.Index(meta, ":"); idx >= 0 {
+			rest := meta[idx+1:]
+			if semi := strings.Index(rest, ";"); semi >= 0 {
+				ct = rest[:semi]
+			}
+		}
+		data, err := base64.StdEncoding.DecodeString(parts[1])
+		if err != nil {
+			return nil, "", fmt.Errorf("decode base64 image: %w", err)
+		}
+		return data, ct, nil
+	}
+
+	// HTTP(S) URL — download
+	return downloadImage(context.Background(), url)
+}
+
+func downloadImage(ctx context.Context, url string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "image/png"
+	}
+	return data, ct, nil
+}
+
+// ---------------------------------------------------------------------------
+// Image generation executor — openai-go (output: image, api_type: image_generation)
+// ---------------------------------------------------------------------------
+
+func newImageGenExecutor(providers map[string]appconfig.AIProviderConfig, meta PromptMeta, timeout time.Duration) (ai.StageExecutor, error) {
+	prov, ok := providers[meta.Provider]
+	if !ok {
+		return nil, fmt.Errorf("unknown AI provider %q", meta.Provider)
+	}
+
+	opts := []option.RequestOption{
+		option.WithBaseURL(prov.Endpoint),
+	}
+	if prov.APIKey != "" {
+		opts = append(opts, option.WithAPIKey(prov.APIKey))
+	} else {
+		opts = append(opts, option.WithAPIKey("unused"))
+	}
+	if timeout > 0 {
+		opts = append(opts, option.WithHTTPClient(&http.Client{Timeout: timeout}))
+	}
+	client := openai.NewClient(opts...)
+	return &imageGenExecutor{client: &client, meta: meta}, nil
+}
+
+type imageGenExecutor struct {
+	client *openai.Client
+	meta   PromptMeta
+}
+
+func (e *imageGenExecutor) Execute(ctx context.Context, prompt string, _ [][]byte) (*ai.StageResult, error) {
+	slog.Debug("llm: image generation", "model", e.meta.Model, "provider", e.meta.Provider)
+
+	params := openai.ImageGenerateParams{
+		Prompt: prompt,
+		Model:  e.meta.Model,
+	}
+	if e.meta.Size != "" {
+		params.Size = openai.ImageGenerateParamsSize(e.meta.Size)
+	}
+	if e.meta.Quality != "" {
+		params.Quality = openai.ImageGenerateParamsQuality(e.meta.Quality)
+	}
+
+	resp, err := e.client.Images.Generate(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("image generation failed: %w", err)
+	}
+	if len(resp.Data) == 0 {
+		return nil, fmt.Errorf("image generation returned no data")
+	}
+
+	item := resp.Data[0]
+	if item.URL != "" {
+		data, ct, err := downloadImage(ctx, item.URL)
+		if err != nil {
+			return nil, err
+		}
+		return &ai.StageResult{OutputType: "image", ImageData: data, ContentType: ct}, nil
+	}
+	if item.B64JSON != "" {
+		data, err := base64.StdEncoding.DecodeString(item.B64JSON)
+		if err != nil {
+			return nil, fmt.Errorf("decode base64 image: %w", err)
+		}
+		return &ai.StageResult{OutputType: "image", ImageData: data, ContentType: "image/png"}, nil
+	}
+
+	return nil, fmt.Errorf("image generation returned neither URL nor base64 data")
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+func providerAPIKey(key string) string {
+	if key == "" {
+		return "none"
+	}
+	return key
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
+}

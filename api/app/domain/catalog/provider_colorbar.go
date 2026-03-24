@@ -28,15 +28,15 @@ func (i *imageColorbarProvider) Resolve() (ImageLoader, error) {
 	width := i.epd.Width()
 	height := i.epd.Height()
 
-	// SMPTE color bars (top to bottom: white, yellow, cyan, green, magenta, red, blue, black)
+	// EBU 75% color bars (left to right)
 	colors := []color.RGBA{
-		{255, 255, 255, 255}, // White
-		{255, 255, 0, 255},   // Yellow
-		{0, 255, 255, 255},   // Cyan
-		{0, 255, 0, 255},     // Green
-		{255, 0, 255, 255},   // Magenta
-		{255, 0, 0, 255},     // Red
-		{0, 0, 255, 255},     // Blue
+		{191, 191, 191, 255}, // White (75%)
+		{191, 191, 0, 255},   // Yellow
+		{0, 191, 191, 255},   // Cyan
+		{0, 191, 0, 255},     // Green
+		{191, 0, 191, 255},   // Magenta
+		{191, 0, 0, 255},     // Red
+		{0, 0, 191, 255},     // Blue
 		{0, 0, 0, 255},       // Black
 	}
 

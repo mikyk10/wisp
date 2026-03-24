@@ -229,7 +229,7 @@ func (ldr *defaultConfigLoader) loadRawConfig() (*config.GlobalConfig, *raw.Serv
 	}
 	var conf config.GlobalConfig
 
-	if err := yaml.Unmarshal(b, &conf); err != nil {
+	if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(b))), &conf); err != nil {
 		return nil, nil, err
 	}
 
@@ -239,7 +239,7 @@ func (ldr *defaultConfigLoader) loadRawConfig() (*config.GlobalConfig, *raw.Serv
 	}
 
 	var rawServiceConfig raw.ServiceConfig
-	if err := yaml.Unmarshal(c, &rawServiceConfig); err != nil {
+	if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(c))), &rawServiceConfig); err != nil {
 		return nil, nil, err
 	}
 

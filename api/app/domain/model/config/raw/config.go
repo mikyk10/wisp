@@ -116,7 +116,8 @@ type GenerateConfig struct {
 }
 
 type PipelineConfig struct {
-	Stages []StageConfig `json:"stages" yaml:"stages"`
+	Variables map[string]string `json:"variables,omitempty" yaml:"variables,omitempty"`
+	Stages    []StageConfig     `json:"stages"              yaml:"stages"`
 }
 
 type StageConfig struct {

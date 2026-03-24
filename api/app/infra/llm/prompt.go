@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-//go:embed prompts/descriptor_v1.md prompts/tagger_v1.md
+//go:embed prompts/descriptor_v1.md prompts/tagger_v1.md prompts/default_gen_meta.md prompts/default_gen_image.md
 var embeddedPrompts embed.FS
 
 // API type constants for prompt frontmatter.

@@ -62,20 +62,21 @@ catalog:
   # - key: colorbar
   #   type: colorbar
 
-  # Example: AI-generated image catalog (text-to-image via GPT-4o)
-  # - key: ai-landscapes
+  # Example: AI-generated image catalog (text-to-image via gpt-image-1)
+  # Omit prompt: to use built-in defaults (default_gen_meta.md / default_gen_image.md).
+  # - key: ai-generated
   #   type: generate
   #   generate:
   #     cache_depth: 10        # Max images kept in cache
   #     evict_count: 3         # FIFO evict per batch run
   #     pipeline:
+  #       variables:
+  #         orientation: landscape
   #       stages:
   #         - name: meta-prompt
   #           output: text
-  #           prompt: prompts/landscape_meta.md
   #         - name: generate
   #           output: image
-  #           prompt: prompts/landscape_gen.md
 
   # Example: AI style transfer (img2img from another catalog)
   # - key: ai-ghibli

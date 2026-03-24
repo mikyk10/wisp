@@ -12,7 +12,8 @@ func (ImageGenerateProviderConfig) providerConfigTag() {}
 
 // PipelineConfig defines a sequence of stages.
 type PipelineConfig struct {
-	Stages []StageConfig `yaml:"stages"`
+	Variables map[string]string `yaml:"variables"`
+	Stages    []StageConfig     `yaml:"stages"`
 }
 
 // StageConfig defines a single pipeline stage.

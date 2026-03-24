@@ -222,8 +222,8 @@ func (u *taggingUsecase) processImage(ctx context.Context, img *model.Image, sta
 
 	// Embedded prompt fallbacks for tagging stages
 	embeddedPrompts := map[string]string{
-		"descriptor": "prompts/descriptor_v1.md",
-		"tagger":     "prompts/tagger_v1.md",
+		"descriptor": "prompts/descriptor.md",
+		"tagger":     "prompts/tagger.md",
 	}
 
 	result, err := u.runner.RunPipeline(ctx, RunPipelineInput{

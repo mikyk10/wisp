@@ -124,7 +124,6 @@ func (r *PipelineRunner) RunPipeline(ctx context.Context, input RunPipelineInput
 			StageIndex:          i,
 			ProviderName:        prompt.Meta.Provider,
 			ModelName:           prompt.Meta.Model,
-			PromptVersion:       prompt.Meta.Version,
 			PromptHash:          prompt.Hash,
 			Status:              model.StatusRunning,
 			StartedAt:           time.Now(),

@@ -36,7 +36,6 @@ type StepExecution struct {
 	StageIndex          int             `gorm:"not null"`
 	ProviderName        string          `gorm:"type:varchar(64)"`
 	ModelName           string          `gorm:"type:varchar(128)"`
-	PromptVersion       string          `gorm:"type:varchar(32)"`
 	PromptHash          string          `gorm:"type:char(12)"`
 	Status              ExecutionStatus `gorm:"type:varchar(32);not null"`
 	StartedAt           time.Time       `gorm:"not null"`

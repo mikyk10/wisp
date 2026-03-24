@@ -1,5 +1,4 @@
 ---
-version: v1
 stage: generate
 provider: openai
 model: gpt-image-1

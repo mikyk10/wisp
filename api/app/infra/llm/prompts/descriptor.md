@@ -1,5 +1,4 @@
 ---
-version: v1
 stage: descriptor
 provider: ollama_local
 model: qwen3.5:9b

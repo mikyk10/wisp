@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-//go:embed prompts/descriptor_v1.md prompts/tagger_v1.md prompts/default_gen_meta.md prompts/default_gen_image.md
+//go:embed prompts/descriptor.md prompts/tagger.md prompts/default_gen_meta.md prompts/default_gen_image.md
 var embeddedPrompts embed.FS
 
 // API type constants for prompt frontmatter.
@@ -25,7 +25,6 @@ const (
 
 // PromptMeta holds the YAML front-matter of a prompt file.
 type PromptMeta struct {
-	Version     string  `yaml:"version"`
 	Stage       string  `yaml:"stage"`
 	Provider    string  `yaml:"provider"`
 	Model       string  `yaml:"model"`
@@ -63,7 +62,7 @@ func LoadEmbeddedPrompt(name string) (*Prompt, error) {
 
 // DefaultDescriptorPrompt returns the embedded default descriptor prompt.
 func DefaultDescriptorPrompt() *Prompt {
-	p, err := LoadEmbeddedPrompt("prompts/descriptor_v1.md")
+	p, err := LoadEmbeddedPrompt("prompts/descriptor.md")
 	if err != nil {
 		panic(fmt.Sprintf("missing embedded descriptor prompt: %v", err))
 	}
@@ -72,7 +71,7 @@ func DefaultDescriptorPrompt() *Prompt {
 
 // DefaultTaggerPrompt returns the embedded default tagger prompt.
 func DefaultTaggerPrompt() *Prompt {
-	p, err := LoadEmbeddedPrompt("prompts/tagger_v1.md")
+	p, err := LoadEmbeddedPrompt("prompts/tagger.md")
 	if err != nil {
 		panic(fmt.Sprintf("missing embedded tagger prompt: %v", err))
 	}

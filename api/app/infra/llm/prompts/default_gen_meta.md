@@ -1,5 +1,4 @@
 ---
-version: v1
 stage: meta-prompt
 provider: openai
 model: gpt-4o

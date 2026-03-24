@@ -29,11 +29,16 @@ type Criteria struct {
 	Include Include `json:"include,omitempty" yaml:"include,omitempty"`
 }
 
+type Crop struct {
+	Strategy string `json:"strategy,omitempty" yaml:"strategy,omitempty"`
+}
+
 // Displays to configure
 type Display struct {
 	APIVersion             string         `json:"api_version" yaml:"api_version"`
 	AssociatedCatalogEntry []CatalogItem  `json:"catalog" yaml:"catalog"`
 	ColorReduction         ColorReduction `json:"color_reduction,omitempty" yaml:"color_reduction,omitempty"`
+	Crop                   Crop           `json:"crop,omitempty" yaml:"crop,omitempty"`
 	DisplayModel           string         `json:"model" yaml:"model"`
 	DisplayOrientation     string         `json:"orientation" yaml:"orientation"`
 	Flip                   bool           `json:"flip,omitempty" yaml:"flip,omitempty"`

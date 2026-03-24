@@ -13,6 +13,7 @@ import (
 	"github.com/mikyk10/wisp/app/domain/improc"
 	"github.com/mikyk10/wisp/app/domain/improc/crop"
 	"github.com/mikyk10/wisp/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +26,7 @@ type procs struct {
 
 func buildImageProcs(epm epaper.DisplayMetadata) procs {
 	imseq := improc.NewSequencer()
-	imseq.Push(crop.NewImageCropper(epm))
+	imseq.Push(crop.NewImageCropper(epm, config.CropStrategyCenter))
 	enc := encoder.NewWaveshareEPEncoder(epm)
 	return procs{epm, imseq, enc}
 }

@@ -46,7 +46,7 @@ func TestConfigLoad(t *testing.T) {
 
 		// Process according to provider and display settings.
 		imseq := improc.NewSequencer()
-		imseq.Push(crop.NewImageCropper(epDisplayMeta))
+		imseq.Push(crop.NewImageCropper(epDisplayMeta, config.CropStrategyCenter))
 		//	imseq.Push(saturation.NewSaturationFactory()())
 		//	imseq.Push(hue.NewImageHueFactory()())
 		//	imseq.Push(color_reduction.NewImageColorReductionFactory(epDisplayMeta)())

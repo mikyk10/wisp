@@ -2,21 +2,25 @@ package crop
 
 import (
 	"context"
+	"fmt"
+	"image"
+	"log/slog"
+
+	"github.com/anthonynsimon/bild/transform"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"github.com/mikyk10/wisp/app/domain/improc"
 	"github.com/mikyk10/wisp/app/domain/model"
-	"image"
-
-	"github.com/anthonynsimon/bild/transform"
+	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/sunshineplan/imgconv"
 )
 
 type processor struct {
-	epd epaper.DisplayMetadata
+	epd      epaper.DisplayMetadata
+	strategy config.CropStrategy
 }
 
-func NewImageCropper(epd epaper.DisplayMetadata) improc.ImageProcessor {
-	return &processor{epd: epd}
+func NewImageCropper(epd epaper.DisplayMetadata, strategy config.CropStrategy) improc.ImageProcessor {
+	return &processor{epd: epd, strategy: strategy}
 }
 
 func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgMeta) (image.Image, *model.ImgMeta) {
@@ -37,8 +41,14 @@ func (p *processor) crop(img image.Image, meta *model.ImgMeta) image.Image {
 
 	meta.RequiredCorrectionAngle = angle
 
+	preBounds := img.Bounds()
 	img = transform.Rotate(img, angle, &transform.RotationOptions{ResizeBounds: true})
 	bounds := img.Bounds()
+
+	// apply display-orientation correction to subject area coordinates
+	if meta.HasExifSubjectArea {
+		meta.ExifSubjectArea = rotatePointByAngle(meta.ExifSubjectArea, angle, preBounds.Max.X, preBounds.Max.Y)
+	}
 
 	hwAspectRatioX := float64(p.epd.Width()) / float64(p.epd.Height())
 	hwAspectRatioY := float64(p.epd.Height()) / float64(p.epd.Width())
@@ -55,14 +65,59 @@ func (p *processor) crop(img image.Image, meta *model.ImgMeta) image.Image {
 		calculatedY1 = float64(bounds.Max.Y)
 	}
 
-	// number of pixels to shorten
-	diffX := float64(bounds.Max.X) - calculatedX1
-	diffY := float64(bounds.Max.Y) - calculatedY1
+	cropW := int(calculatedX1)
+	cropH := int(calculatedY1)
 
-	// crop remainder should be equally distributed to left and right edges; calculate the image center point
-	cropped := transform.Crop(img, image.Rect(int(diffX/2), int(diffY/2), int(calculatedX1+(diffX/2)), int(calculatedY1+(diffY/2))))
+	offsetX, offsetY := p.cropOffset(bounds, cropW, cropH, meta)
 
-	return cropped
+	return transform.Crop(img, image.Rect(offsetX, offsetY, cropW+offsetX, cropH+offsetY))
+}
+
+// cropOffset returns the top-left corner of the crop rectangle based on the active strategy.
+func (p *processor) cropOffset(bounds image.Rectangle, cropW, cropH int, meta *model.ImgMeta) (int, int) {
+	centerX := (bounds.Max.X - cropW) / 2
+	centerY := (bounds.Max.Y - cropH) / 2
+
+	if p.strategy != config.CropStrategyExifSubject || !meta.HasExifSubjectArea {
+		return centerX, centerY
+	}
+
+	sx, sy := meta.ExifSubjectArea.X, meta.ExifSubjectArea.Y
+	offsetX := clamp(sx-cropW/2, 0, bounds.Max.X-cropW)
+	offsetY := clamp(sy-cropH/2, 0, bounds.Max.Y-cropH)
+	slog.Debug("crop: exif_subject offset",
+		"subject", meta.ExifSubjectArea,
+		"cropSize", fmt.Sprintf("%dx%d", cropW, cropH),
+		"imageSize", fmt.Sprintf("%dx%d", bounds.Max.X, bounds.Max.Y),
+		"offset", fmt.Sprintf("(%d,%d)", offsetX, offsetY),
+		"center", fmt.Sprintf("(%d,%d)", centerX, centerY),
+	)
+	return offsetX, offsetY
+}
+
+// rotatePointByAngle applies the same rotation used in crop() to a point.
+// preW and preH are the image dimensions before rotation.
+func rotatePointByAngle(p image.Point, angle float64, preW, preH int) image.Point {
+	x, y := p.X, p.Y
+	W, H := preW-1, preH-1
+	switch angle {
+	case 90:
+		return image.Point{X: H - y, Y: x}
+	case -90:
+		return image.Point{X: y, Y: W - x}
+	default: // 0°
+		return p
+	}
+}
+
+func clamp(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
 
 func (p *processor) resize(img image.Image) image.Image {

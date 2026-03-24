@@ -1,6 +1,7 @@
 package model
 
 import (
+	"image"
 	"time"
 )
 
@@ -28,6 +29,9 @@ type ImgMeta struct {
 
 	//TODO: should be better naming
 	RequiredCorrectionAngle float64
+
+	ExifSubjectArea    image.Point // SubjectArea center point in original image coordinates
+	HasExifSubjectArea bool        // true if SubjectArea/SubjectLocation was found in Exif
 
 	//TODO: implement these
 	//GPSLatitude     string

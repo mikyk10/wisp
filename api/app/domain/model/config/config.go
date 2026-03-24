@@ -76,9 +76,21 @@ type DisplayConfig struct {
 	Flip                 bool
 	ShowTimestamp        bool
 	ColorReduction       ColorReduction
+	Crop                 CropConfig
 	Catalog              []*AssociatedImageProviders
 	ImageProcessors      []*ImageProcessorConfig
 	SleepDurationSeconds int
+}
+
+type CropStrategy string
+
+const (
+	CropStrategyCenter      CropStrategy = "center"
+	CropStrategyExifSubject CropStrategy = "exif_subject"
+)
+
+type CropConfig struct {
+	Strategy CropStrategy
 }
 
 type ColorReductionType = string

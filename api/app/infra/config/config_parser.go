@@ -81,6 +81,12 @@ func (ldr *defaultConfigLoader) LoadConfig() (*config.GlobalConfig, *config.Serv
 			disp.SleepDurationSeconds = 86400
 		}
 
+		cropStrategy := config.CropStrategyCenter
+		if v.Crop.Strategy == string(config.CropStrategyExifSubject) {
+			cropStrategy = config.CropStrategyExifSubject
+		}
+		disp.Crop = config.CropConfig{Strategy: cropStrategy}
+
 		gron := gronx.New()
 		for i, cat := range v.AssociatedCatalogEntry {
 			provConfig, ok := svcConfig.Catalog[cat.Key]

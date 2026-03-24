@@ -35,6 +35,7 @@ func NewImageConvertCommand(c *dig.Container) *cobra.Command {
 			format, _ := cmd.Flags().GetString("format")
 			outPath, _ := cmd.Flags().GetString("output")
 			colorReductionType, _ := cmd.Flags().GetString("color-reduction")
+			cropStrategyStr, _ := cmd.Flags().GetString("crop-strategy")
 
 			if !epaper.IsValidModel(epaper.EPaperDisplayModel(displayModel)) {
 				return fmt.Errorf("unknown display model %q — valid models: %s", displayModel, strings.Join(epaper.ValidModels(), ", "))
@@ -67,7 +68,11 @@ func NewImageConvertCommand(c *dig.Container) *cobra.Command {
 			preSeq := improc.NewSequencer()
 			imseqGroup.Push(preSeq)
 			preSeq.Push(exif_rotation.NewExifRotation())
-			preSeq.Push(crop.NewImageCropper(display))
+			cropStrategy := config.CropStrategyCenter
+			if cropStrategyStr == string(config.CropStrategyExifSubject) {
+				cropStrategy = config.CropStrategyExifSubject
+			}
+			preSeq.Push(crop.NewImageCropper(display, cropStrategy))
 
 			// Post-processing: color reduction, optional 180° flip.
 			postSeq := improc.NewSequencer()
@@ -127,6 +132,7 @@ func NewImageConvertCommand(c *dig.Container) *cobra.Command {
 	cmd.Flags().StringP("format", "f", "bin", "Output format: jpg, png, bin")
 	cmd.Flags().StringP("output", "o", "", "Output file path (default: out.<format>)")
 	cmd.Flags().StringP("color-reduction", "c", config.ColorReductionTypeFloydSteinberg, "Color reduction algorithm: simple, bayer, floysteinberg, sierra3")
+	cmd.Flags().String("crop-strategy", string(config.CropStrategyCenter), "Crop strategy: center, exif_subject")
 
 	return cmd
 }

@@ -58,7 +58,39 @@ func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgM
 		meta.ImageOrientation = model.ImgCanonicalOrientationLandscape
 	}
 
+	if meta.HasExifSubjectArea {
+		origW := src.Bounds().Max.X
+		origH := src.Bounds().Max.Y
+		meta.ExifSubjectArea = transformSubjectPointByOrientation(meta.ExifSubjectArea, meta.ExifOrientation, origW, origH)
+	}
+
 	return img, meta
+}
+
+// transformSubjectPointByOrientation transforms a point from the original image coordinate
+// system to the post-ExifOrientation coordinate system. origW and origH are the dimensions
+// of the image before any rotation.
+func transformSubjectPointByOrientation(p image.Point, o model.ExifOrientation, origW, origH int) image.Point {
+	x, y := p.X, p.Y
+	W, H := origW-1, origH-1
+	switch o {
+	case 2:
+		return image.Point{X: W - x, Y: y}
+	case 3:
+		return image.Point{X: W - x, Y: H - y}
+	case 4:
+		return image.Point{X: x, Y: H - y}
+	case 5: // rotate 90° CW then FlipH = transpose
+		return image.Point{X: y, Y: x}
+	case 6: // rotate 90° CW
+		return image.Point{X: H - y, Y: x}
+	case 7: // rotate -90° then FlipH = transverse
+		return image.Point{X: H - y, Y: W - x}
+	case 8: // rotate -90° (CCW)
+		return image.Point{X: y, Y: W - x}
+	default: // case 1 (normal) and unknown
+		return p
+	}
 }
 
 func xyPropotion(img image.Image) int {

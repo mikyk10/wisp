@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"github.com/mikyk10/wisp/app/domain/model"
 
 	"github.com/adrium/goheif"
+	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/rwcarlsen/goexif/exif"
 )
 
@@ -173,6 +173,24 @@ func putExif(meta *model.ImgMeta, exif *exif.Exif) {
 				slog.Warn("exif: failed to parse orientation value", "err", err)
 			} else {
 				meta.ExifOrientation = model.ExifOrientation(val)
+			}
+		}
+	}
+
+	if tag, err := exif.Get("SubjectArea"); err == nil {
+		if x, ex := tag.Int(0); ex == nil {
+			if y, ey := tag.Int(1); ey == nil {
+				meta.ExifSubjectArea = image.Point{X: x, Y: y}
+				meta.HasExifSubjectArea = true
+				slog.Debug("exif: SubjectArea found", "x", x, "y", y, "count", tag.Count)
+			}
+		}
+	} else if tag, err := exif.Get("SubjectLocation"); err == nil {
+		if x, ex := tag.Int(0); ex == nil {
+			if y, ey := tag.Int(1); ey == nil {
+				meta.ExifSubjectArea = image.Point{X: x, Y: y}
+				meta.HasExifSubjectArea = true
+				slog.Debug("exif: SubjectLocation found", "x", x, "y", y)
 			}
 		}
 	}

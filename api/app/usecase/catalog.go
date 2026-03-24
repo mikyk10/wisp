@@ -377,7 +377,7 @@ func (uc *catalogUseCase) GetSequencerGroupForDisplay(displayKey string) (improc
 	imPreProcessingSeq := improc.NewSequencer()
 	imseqGroup.Push(imPreProcessingSeq)
 	imPreProcessingSeq.Push(exif_rotation.NewExifRotation())
-	imPreProcessingSeq.Push(crop.NewImageCropper(display))
+	imPreProcessingSeq.Push(crop.NewImageCropper(display, displayConfigInUse.Crop.Strategy))
 
 	// Image processors configured for the display.
 	impDispCatalogSeq := improc.NewSequencer()

@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/png"
 
@@ -26,7 +27,7 @@ func (p *imageGenerateProvider) Resolve() (ImageLoader, error) {
 		return nil, err
 	}
 	if entry == nil {
-		return nil, nil
+		return nil, fmt.Errorf("no cached images available for catalog %q", p.catalogKey)
 	}
 	return &generatedImageLoader{entry: entry}, nil
 }

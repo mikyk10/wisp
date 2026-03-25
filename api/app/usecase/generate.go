@@ -5,14 +5,19 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"bytes"
+	"image"
+	"image/jpeg"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/adrium/goheif"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/mikyk10/wisp/app/domain/repository"
@@ -180,11 +185,11 @@ func (u *generateUsecase) generateOne(ctx context.Context, opts GenerateRunOptio
 			return fmt.Errorf("no images found in source catalog %q (run 'catalog scan' first)", catConfig.SourceCatalog)
 		}
 		sourceImageID = &img.ID
-		sourceImage, err = os.ReadFile(img.Src)
+		sourceImage, err = loadSourceImageAsJPEG(img.Src)
 		if err != nil {
 			return fmt.Errorf("read source image %s: %w", img.Src, err)
 		}
-		slog.Debug("generate: source image resolved", "id", img.ID, "thumb_size", len(sourceImage))
+		slog.Debug("generate: source image resolved", "id", img.ID, "size", len(sourceImage))
 	}
 
 	exec := &model.PipelineExecution{
@@ -291,6 +296,43 @@ func (u *generateUsecase) Favorite(catalogKey string, cacheID model.PrimaryKey, 
 
 	slog.Info("generate: favorited image", "cache_id", cacheID, "dest", destPath)
 	return nil
+}
+
+// loadSourceImageAsJPEG reads an image file and returns JPEG bytes.
+// HEIC files are decoded and re-encoded as JPEG; JPEG/PNG files are returned as-is.
+func loadSourceImageAsJPEG(path string) ([]byte, error) {
+	ext := strings.ToLower(filepath.Ext(path))
+
+	if ext == ".heic" || ext == ".heif" {
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		img, err := goheif.Decode(f)
+		if err != nil {
+			return nil, fmt.Errorf("decode HEIC: %w", err)
+		}
+		var buf bytes.Buffer
+		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
+			return nil, fmt.Errorf("encode JPEG: %w", err)
+		}
+		return buf.Bytes(), nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify it's a valid image format
+	_, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("unsupported image format: %w", err)
+	}
+	_ = format
+	return data, nil
 }
 
 func (u *generateUsecase) getGenerateConfig(catalogKey string) (config.ImageGenerateProviderConfig, error) {

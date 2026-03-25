@@ -26,7 +26,6 @@ const (
 
 // PromptMeta holds the YAML front-matter of a prompt file.
 type PromptMeta struct {
-	Stage       string  `yaml:"stage"`
 	Provider    string  `yaml:"provider"`
 	Model       string  `yaml:"model"`
 	ApiType     string  `yaml:"api_type"`    // "chat" (default), "image_generation", "comfyui"

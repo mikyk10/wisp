@@ -1,5 +1,4 @@
 ---
-stage: meta-prompt
 provider: openai
 model: gpt-4o
 api_type: chat

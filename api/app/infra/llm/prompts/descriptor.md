@@ -1,5 +1,4 @@
 ---
-stage: descriptor
 provider: ollama_local
 model: qwen3.5:9b
 temperature: 0.3

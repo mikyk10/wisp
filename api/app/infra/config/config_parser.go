@@ -203,8 +203,7 @@ func parseCatalogEntry(v raw.CatalogEntry) *config.ImageProviderConfig {
 				EvictCount:    v.GenerateConfig.EvictCount,
 				SourceCatalog: v.GenerateConfig.SourceCatalog,
 				Pipeline: config.PipelineConfig{
-					Variables: v.GenerateConfig.Pipeline.Variables,
-					Stages:    stages,
+					Stages: stages,
 				},
 			},
 		}

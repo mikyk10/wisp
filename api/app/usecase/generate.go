@@ -194,12 +194,6 @@ func (u *generateUsecase) generateOne(ctx context.Context, opts GenerateRunOptio
 		return err
 	}
 
-	// Build config vars from pipeline variables
-	configVars := make(map[string]any)
-	for k, v := range catConfig.Pipeline.Variables {
-		configVars[k] = v
-	}
-
 	// Embedded prompt fallbacks for default generation pipeline
 	embeddedPrompts := map[string]string{
 		"meta-prompt": "prompts/default_gen_meta.md",
@@ -210,7 +204,7 @@ func (u *generateUsecase) generateOne(ctx context.Context, opts GenerateRunOptio
 		PipelineExecID:  exec.ID,
 		Stages:          catConfig.Pipeline.Stages,
 		SourceImage:     sourceImage,
-		ConfigVars:      configVars,
+		ConfigVars:      nil,
 		EmbeddedPrompts: embeddedPrompts,
 	})
 

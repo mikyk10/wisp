@@ -25,9 +25,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	migrate := os.Getenv("WISP_AUTO_MIGRATE") == "1"
+
 	container := di.NewBuilder().
 		WithConfig(globalConfig, serviceConfig).
-		WithDatabase(globalConfig).
+		WithDatabase(globalConfig, migrate).
 		WithRWI(rwi).
 		Build()
 

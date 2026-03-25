@@ -5,11 +5,19 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // reasoningTransport injects extra JSON fields into POST request bodies.
 // Used to force reasoning_effort=none for models like Qwen3.5 that default
 // to thinking mode when the field is absent.
+//
+// TODO: This is a blunt workaround — it intercepts all outgoing requests and
+// mutates the body at the HTTP transport layer because AnyLLM does not expose
+// a per-request option for reasoning_effort. If AnyLLM (or a replacement SDK)
+// gains native support for this parameter, or if we move to per-provider
+// client construction, this transport hack and its host-based skip list
+// should be removed in favour of that cleaner approach.
 type reasoningTransport struct {
 	base        http.RoundTripper
 	extraFields map[string]any
@@ -24,6 +32,11 @@ func newReasoningTransport(base http.RoundTripper, fields map[string]any) *reaso
 
 func (t *reasoningTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.Method != http.MethodPost || req.Body == nil || len(t.extraFields) == 0 {
+		return t.base.RoundTrip(req)
+	}
+
+	// Skip injection for OpenAI — it rejects unknown fields like reasoning_effort.
+	if req.URL != nil && strings.Contains(req.URL.Host, "openai.com") {
 		return t.base.RoundTrip(req)
 	}
 

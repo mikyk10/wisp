@@ -32,7 +32,7 @@ func (r *PipelineRunner) SetVerbose(v bool) { r.verbose = v }
 type RunPipelineInput struct {
 	PipelineExecID model.PrimaryKey
 	Stages         []config.StageConfig
-	SourceImage    []byte            // $source image data (may be nil)
+	SourceImage    []byte            // _source image data (may be nil)
 	ConfigVars     map[string]any    // template config variables
 	SkipStages     map[string]string // stage name → cached text output (skip execution, use cached)
 }
@@ -100,7 +100,9 @@ func (r *PipelineRunner) RunPipeline(ctx context.Context, input RunPipelineInput
 
 		// Resolve image input
 		var imageInputs [][]byte
+		slog.Debug("pipeline: stage config", "stage", stage.Name, "image_input", stage.ImageInput, "output", stage.Output, "source_len", len(input.SourceImage))
 		if stage.ImageInput != "" {
+			slog.Debug("pipeline: resolving image input", "stage", stage.Name, "image_input", stage.ImageInput, "source_len", len(input.SourceImage))
 			imgData, err := r.resolveImageInput(stage.ImageInput, input.SourceImage, stageOutputs)
 			if err != nil {
 				return nil, r.recordStepFailure(input.PipelineExecID, stage, i, "image_input_failed", err)
@@ -108,6 +110,7 @@ func (r *PipelineRunner) RunPipeline(ctx context.Context, input RunPipelineInput
 			if imgData != nil {
 				imageInputs = append(imageInputs, imgData)
 			}
+			slog.Debug("pipeline: image inputs resolved", "stage", stage.Name, "count", len(imageInputs))
 		}
 
 		// Create StageExecutor based on output type + api_type
@@ -212,9 +215,9 @@ func (r *PipelineRunner) RunPipeline(ctx context.Context, input RunPipelineInput
 }
 
 func (r *PipelineRunner) resolveImageInput(ref string, sourceImage []byte, stageOutputs map[string]llm.StageOutput) ([]byte, error) {
-	if ref == "$source" {
+	if ref == "_source" {
 		if sourceImage == nil {
-			return nil, fmt.Errorf("$source referenced but no source image provided")
+			return nil, fmt.Errorf("_source referenced but no source image provided")
 		}
 		return sourceImage, nil
 	}

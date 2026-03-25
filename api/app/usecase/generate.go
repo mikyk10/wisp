@@ -179,8 +179,12 @@ func (u *generateUsecase) generateOne(ctx context.Context, opts GenerateRunOptio
 		if img == nil {
 			return fmt.Errorf("no images found in source catalog %q (run 'catalog scan' first)", catConfig.SourceCatalog)
 		}
-		sourceImage = img.ThumbJPG
 		sourceImageID = &img.ID
+		sourceImage, err = os.ReadFile(img.Src)
+		if err != nil {
+			return fmt.Errorf("read source image %s: %w", img.Src, err)
+		}
+		slog.Debug("generate: source image resolved", "id", img.ID, "thumb_size", len(sourceImage))
 	}
 
 	exec := &model.PipelineExecution{

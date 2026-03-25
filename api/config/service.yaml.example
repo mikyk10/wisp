@@ -102,7 +102,7 @@ catalog:
   #         - name: stylize
   #           output: image
   #           prompt: config/prompts/my_stylize.md
-  #           image_input: $source # Feed the source photo to the API
+  #           image_input: _source # Feed the source photo to the API
 
   # Example: destination catalog for favorited AI-generated images
   #

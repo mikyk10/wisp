@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 	"github.com/mikyk10/wisp/app/domain/finder"
@@ -189,6 +190,7 @@ func parseCatalogEntry(v raw.CatalogEntry) *config.ImageProviderConfig {
 	case config.ImageGenerateProviderType:
 		stages := make([]config.StageConfig, len(v.GenerateConfig.Pipeline.Stages))
 		for i, s := range v.GenerateConfig.Pipeline.Stages {
+			slog.Debug("config: parsed stage", "catalog", v.Key, "stage", s.Name, "image_input", s.ImageInput, "output", s.Output, "prompt", s.Prompt)
 			stages[i] = config.StageConfig{
 				Name:       s.Name,
 				Output:     s.Output,

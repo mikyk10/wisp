@@ -3,6 +3,6 @@ provider: openai
 model: gpt-image-1
 api_type: image_edit
 size: 1024x1024
-quality: high
+quality: low
 ---
-Transform this photograph into a surrealist painting inspired by Salvador Dalí. Preserve the original composition and subjects but warp perspective with melting, elongated, and dreamlike distortions. Apply rich oil-paint textures, dramatic desert lighting, and Dalí's signature palette of deep amber, cerulean blue, and burnt sienna. Add subtle surreal elements: impossible shadows, warped horizons, or floating objects. The result should feel like a lost Dalí canvas.
+Transform this photograph into an impressionist painting inspired by Claude Monet. Preserve the original composition and subjects but render them with soft, visible brushstrokes and dappled light. Dissolve hard edges into gentle transitions of color. Apply Monet's palette: soft lavenders, pale blues, warm yellows, and muted greens. Emphasize natural light — golden hour warmth, cool shadows with hints of blue and violet. The result should feel luminous and serene, like a painting from Monet's garden series.

@@ -20,5 +20,5 @@ type StageConfig struct {
 	Name       string `yaml:"name"`
 	Output     string `yaml:"output"`      // "text" or "image"
 	Prompt     string `yaml:"prompt"`      // path to prompt file
-	ImageInput string `yaml:"image_input"` // "$source" or stage name
+	ImageInput string `yaml:"image_input"` // "_source" or stage name
 }

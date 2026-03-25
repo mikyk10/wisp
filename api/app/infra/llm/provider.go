@@ -462,7 +462,11 @@ func (e *imageEditExecutor) Execute(ctx context.Context, prompt string, images [
 			ext = ".jpg"
 		}
 		partHeader := make(textproto.MIMEHeader)
-		partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="image[]"; filename="image_%d%s"`, i, ext))
+		name := "image"
+		if i > 0 {
+			name = fmt.Sprintf("image[]")
+		}
+		partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="image_%d%s"`, name, i, ext))
 		partHeader.Set("Content-Type", ct)
 		part, err := writer.CreatePart(partHeader)
 		if err != nil {

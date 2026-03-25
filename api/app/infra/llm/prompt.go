@@ -13,7 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-//go:embed prompts/descriptor.md prompts/tagger.md prompts/default_gen_meta.md prompts/default_gen_image.md prompts/stylize.md
+//go:embed prompts/descriptor.md prompts/tagger.md
 var embeddedPrompts embed.FS
 
 // API type constants for prompt frontmatter.
@@ -28,7 +28,7 @@ const (
 type PromptMeta struct {
 	Provider    string  `yaml:"provider"`
 	Model       string  `yaml:"model"`
-	ApiType     string  `yaml:"api_type"`    // "chat" (default), "image_generation", "comfyui"
+	ApiType     string  `yaml:"api_type"` // "chat" (default), "image_generation", "comfyui"
 	Temperature float64 `yaml:"temperature"`
 	MaxTokens   int     `yaml:"max_tokens"`
 	Size        string  `yaml:"size"`    // image_generation only

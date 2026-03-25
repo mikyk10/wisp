@@ -65,7 +65,7 @@ catalog:
   # Example: AI-generated image catalog (text-to-image)
   #
   # Each stage requires an external prompt file with provider/model in its
-  # YAML frontmatter. See config/prompts/example_gen_meta.md for reference.
+  # YAML frontmatter. See config/prompts/example/ for reference.
   #
   # Run:  wisp catalog generate run --catalog=ai-generated [--verbose]
   # List: wisp catalog generate list --catalog=ai-generated

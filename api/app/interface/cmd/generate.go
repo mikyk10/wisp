@@ -16,9 +16,13 @@ import (
 )
 
 func NewGenerateRunCommand(c *dig.Container) *cobra.Command {
-	var uc usecase.GenerateUsecase
-	if err := c.Invoke(func(u usecase.GenerateUsecase) {
+	var (
+		uc     usecase.GenerateUsecase
+		svcCfg *config.ServiceConfig
+	)
+	if err := c.Invoke(func(u usecase.GenerateUsecase, sc *config.ServiceConfig) {
 		uc = u
+		svcCfg = sc
 	}); err != nil {
 		log.Fatalf("failed to initialize generate: %v", err)
 	}
@@ -28,9 +32,6 @@ func NewGenerateRunCommand(c *dig.Container) *cobra.Command {
 		Short: "Run AI image generation batch",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			catalog, _ := cmd.Flags().GetString("catalog")
-			if catalog == "" {
-				return errors.New("--catalog is required")
-			}
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			if verbose {
 				slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
@@ -39,13 +40,37 @@ func NewGenerateRunCommand(c *dig.Container) *cobra.Command {
 			sourceID, _ := cmd.Flags().GetUint64("source-id")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
 
-			return uc.Run(context.Background(), usecase.GenerateRunOptions{
-				CatalogKey: catalog,
-				SourceID:   model.PrimaryKey(sourceID),
-				Workers:    workers,
-				DryRun:     dryRun,
-				Verbose:    verbose,
-			})
+			catalogs := []string{catalog}
+			if catalog == "" {
+				catalogs = nil
+				for key, prov := range svcCfg.Catalog {
+					if _, ok := prov.Config.(config.ImageGenerateProviderConfig); ok {
+						catalogs = append(catalogs, key)
+					}
+				}
+				if len(catalogs) == 0 {
+					return errors.New("no generate catalogs found in service config")
+				}
+				slog.Info("generate: running all generate catalogs", "catalogs", catalogs)
+			}
+
+			var firstErr error
+			for _, cat := range catalogs {
+				err := uc.Run(context.Background(), usecase.GenerateRunOptions{
+					CatalogKey: cat,
+					SourceID:   model.PrimaryKey(sourceID),
+					Workers:    workers,
+					DryRun:     dryRun,
+					Verbose:    verbose,
+				})
+				if err != nil {
+					slog.Error("generate: catalog failed", "catalog", cat, "err", err)
+					if firstErr == nil {
+						firstErr = err
+					}
+				}
+			}
+			return firstErr
 		},
 	}
 

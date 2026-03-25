@@ -14,16 +14,20 @@ import (
 	"github.com/mikyk10/wisp/app/infra/llm"
 )
 
+// ExecutorFactory creates a StageExecutor from prompt metadata and output type.
+type ExecutorFactory func(providers map[string]config.AIProviderConfig, meta llm.PromptMeta, outputType string, timeout time.Duration) (ai.StageExecutor, error)
+
 // PipelineRunner executes a pipeline definition for a single input,
 // recording each step in the database.
 type PipelineRunner struct {
-	cfg     *config.GlobalConfig
-	repo    repository.AIRepository
-	verbose bool
+	cfg             *config.GlobalConfig
+	repo            repository.AIRepository
+	executorFactory ExecutorFactory
+	verbose         bool
 }
 
 func NewPipelineRunner(cfg *config.GlobalConfig, repo repository.AIRepository) *PipelineRunner {
-	return &PipelineRunner{cfg: cfg, repo: repo}
+	return &PipelineRunner{cfg: cfg, repo: repo, executorFactory: llm.NewStageExecutor}
 }
 
 func (r *PipelineRunner) SetVerbose(v bool) { r.verbose = v }
@@ -114,7 +118,7 @@ func (r *PipelineRunner) RunPipeline(ctx context.Context, input RunPipelineInput
 		}
 
 		// Create StageExecutor based on output type + api_type
-		executor, err := llm.NewStageExecutor(r.cfg.AI.Providers, prompt.Meta, stage.Output, timeout)
+		executor, err := r.executorFactory(r.cfg.AI.Providers, prompt.Meta, stage.Output, timeout)
 		if err != nil {
 			return nil, r.recordStepFailure(input.PipelineExecID, stage, i, "executor_create_failed", err)
 		}

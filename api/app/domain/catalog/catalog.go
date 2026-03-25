@@ -132,8 +132,10 @@ func NewErrorMessageImageProviderConfig(msg string) *config.ImageProviderConfig 
 }
 
 
-// cronFilter returns only ImageProviders that have a cron expression configured.
+// cronFilter returns only ImageProviders that have a cron expression matching now.
+// The time is truncated to the minute because gronx checks seconds even for 5-field cron.
 func cronFilter(now time.Time, conf []*config.AssociatedImageProviders) []*config.AssociatedImageProviders {
+	now = now.Truncate(time.Minute)
 	copied := make([]*config.AssociatedImageProviders, len(conf))
 	copy(copied, conf)
 
@@ -154,7 +156,6 @@ func cronFilter(now time.Time, conf []*config.AssociatedImageProviders) []*confi
 		}
 
 		if due, _ := gron.IsDue(c.TimeRange.Cron, now); due {
-			// keep this entry
 			return false
 		}
 

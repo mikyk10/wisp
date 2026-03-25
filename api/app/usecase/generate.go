@@ -194,18 +194,10 @@ func (u *generateUsecase) generateOne(ctx context.Context, opts GenerateRunOptio
 		return err
 	}
 
-	// Embedded prompt fallbacks for default generation pipeline
-	embeddedPrompts := map[string]string{
-		"meta-prompt": "prompts/default_gen_meta.md",
-		"generate":    "prompts/default_gen_image.md",
-	}
-
 	result, err := u.runner.RunPipeline(ctx, RunPipelineInput{
-		PipelineExecID:  exec.ID,
-		Stages:          catConfig.Pipeline.Stages,
-		SourceImage:     sourceImage,
-		ConfigVars:      nil,
-		EmbeddedPrompts: embeddedPrompts,
+		PipelineExecID: exec.ID,
+		Stages:         catConfig.Pipeline.Stages,
+		SourceImage:    sourceImage,
 	})
 
 	exec.FinishedAt = sql.NullTime{Time: time.Now(), Valid: true}

@@ -220,19 +220,12 @@ func (u *taggingUsecase) processImage(ctx context.Context, img *model.Image, sta
 		configVars["MaxTags"] = 15
 	}
 
-	// Embedded prompt fallbacks for tagging stages
-	embeddedPrompts := map[string]string{
-		"descriptor": "prompts/descriptor.md",
-		"tagger":     "prompts/tagger.md",
-	}
-
 	result, err := u.runner.RunPipeline(ctx, RunPipelineInput{
-		PipelineExecID:  exec.ID,
-		Stages:          stages,
-		SourceImage:     img.ThumbJPG,
-		ConfigVars:      configVars,
-		SkipStages:      skipStages,
-		EmbeddedPrompts: embeddedPrompts,
+		PipelineExecID: exec.ID,
+		Stages:         stages,
+		SourceImage:    img.ThumbJPG,
+		ConfigVars:     configVars,
+		SkipStages:     skipStages,
 	})
 
 	exec.FinishedAt = sql.NullTime{Time: time.Now(), Valid: true}

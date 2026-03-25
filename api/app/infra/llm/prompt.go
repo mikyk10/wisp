@@ -3,8 +3,6 @@ package llm
 import (
 	"bytes"
 	"crypto/sha1" //nolint:gosec // sha1 used for prompt versioning, not cryptography
-	"embed"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -12,9 +10,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 )
-
-//go:embed prompts/descriptor.md prompts/tagger.md
-var embeddedPrompts embed.FS
 
 // API type constants for prompt frontmatter.
 const (
@@ -49,68 +44,6 @@ func LoadPrompt(path string) (*Prompt, error) {
 		return nil, fmt.Errorf("load prompt %s: %w", path, err)
 	}
 	return ParsePrompt(string(data))
-}
-
-// LoadEmbeddedPrompt reads a prompt from the embedded filesystem.
-func LoadEmbeddedPrompt(name string) (*Prompt, error) {
-	data, err := embeddedPrompts.ReadFile(name)
-	if err != nil {
-		return nil, fmt.Errorf("load embedded prompt %s: %w", name, err)
-	}
-	return ParsePrompt(string(data))
-}
-
-// DefaultDescriptorPrompt returns the embedded default descriptor prompt.
-func DefaultDescriptorPrompt() *Prompt {
-	p, err := LoadEmbeddedPrompt("prompts/descriptor.md")
-	if err != nil {
-		panic(fmt.Sprintf("missing embedded descriptor prompt: %v", err))
-	}
-	return p
-}
-
-// DefaultTaggerPrompt returns the embedded default tagger prompt.
-func DefaultTaggerPrompt() *Prompt {
-	p, err := LoadEmbeddedPrompt("prompts/tagger.md")
-	if err != nil {
-		panic(fmt.Sprintf("missing embedded tagger prompt: %v", err))
-	}
-	return p
-}
-
-// ResolvePrompt loads a prompt by trying, in order:
-//  1. External file at path (if path is non-empty)
-//  2. Embedded prompt at "prompts/{path}" (if file not found on disk)
-//  3. Embedded prompt at embeddedName (if path is empty)
-func ResolvePrompt(path, embeddedName string) (*Prompt, error) {
-	if path != "" {
-		p, err := LoadPrompt(path)
-		if err == nil {
-			return p, nil
-		}
-		// File not found on disk → try embedded
-		if os.IsNotExist(unwrapPathError(err)) {
-			if ep, eerr := LoadEmbeddedPrompt("prompts/" + path); eerr == nil {
-				return ep, nil
-			}
-		}
-		return nil, err
-	}
-	if embeddedName != "" {
-		return LoadEmbeddedPrompt(embeddedName)
-	}
-	return nil, fmt.Errorf("no prompt path or embedded name provided")
-}
-
-// unwrapPathError extracts the underlying error from wrapped path errors.
-func unwrapPathError(err error) error {
-	for err != nil {
-		if pe, ok := err.(*os.PathError); ok {
-			return pe.Err
-		}
-		err = errors.Unwrap(err)
-	}
-	return nil
 }
 
 // ParsePrompt parses a prompt string with YAML front-matter.

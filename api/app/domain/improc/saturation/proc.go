@@ -82,15 +82,15 @@ func autoSaturationOffset(img image.Image, target float64) float64 {
 
 // hslSaturation computes the HSL saturation for an RGB triplet in [0, 1].
 func hslSaturation(r, g, b float64) float64 {
-	max := math.Max(r, math.Max(g, b))
-	min := math.Min(r, math.Min(g, b))
-	d := max - min
+	hi := math.Max(r, math.Max(g, b))
+	lo := math.Min(r, math.Min(g, b))
+	d := hi - lo
 	if d == 0 {
 		return 0
 	}
-	l := (max + min) / 2.0
+	l := (hi + lo) / 2.0
 	if l <= 0.5 {
-		return d / (max + min)
+		return d / (hi + lo)
 	}
-	return d / (2.0 - max - min)
+	return d / (2.0 - hi - lo)
 }

@@ -22,9 +22,15 @@ func (e *DisplayNotFoundError) Error() string {
 	return fmt.Sprintf("display not found: %s", e.Key)
 }
 
-func PickImageProvider(now time.Time, epd epaper.DisplayMetadata, repo repository.ImageRepository, imageProviderConfigs ...*config.AssociatedImageProviders) ImageLocator {
-	errProvider := func(msg string) ImageLocator {
-		return &imageErrorMessageProvider{epd, &config.ImageErrorMessageProviderConfig{Message: msg}, nil}
+// PickResult holds the result of catalog selection, including the selected provider's config.
+type PickResult struct {
+	Locator        ImageLocator
+	ColorReduction *config.ColorReduction // per-catalog override (nil = use display default)
+}
+
+func PickImageProvider(now time.Time, epd epaper.DisplayMetadata, repo repository.ImageRepository, imageProviderConfigs ...*config.AssociatedImageProviders) PickResult {
+	errProvider := func(msg string) PickResult {
+		return PickResult{Locator: &imageErrorMessageProvider{epd, &config.ImageErrorMessageProviderConfig{Message: msg}, nil}}
 	}
 
 	// Prefer providers matched by a cron expression; fall back to those with no cron if none match.
@@ -76,16 +82,19 @@ func PickImageProvider(now time.Time, epd epaper.DisplayMetadata, repo repositor
 		total += c.weight
 	}
 	r := rand.Int64N(total)
-	var imgProviderConfig *config.ImageProviderConfig
+	var selected *config.AssociatedImageProviders
 	for _, c := range candidates {
 		r -= c.weight
 		if r < 0 {
-			imgProviderConfig = c.conf.ProviderConfig
+			selected = c.conf
 			break
 		}
 	}
 
-	return newLocatorFromConfig(now, epd, repo, imgProviderConfig)
+	return PickResult{
+		Locator:        newLocatorFromConfig(now, epd, repo, selected.ProviderConfig),
+		ColorReduction: selected.ColorReduction,
+	}
 }
 
 // newLocatorFromConfig is a factory that creates an ImageLocator based on the type of ImageProviderConfig.

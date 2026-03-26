@@ -47,7 +47,7 @@ func (ip *imageErrorMessageProvider) Resolve() (ImageLoader, error) {
 	// TODO: improve error type detection using errors.As or errors.Is
 	if ip.err != nil {
 		if _, ok := ip.err.(*DisplayNotFoundError); !ok {
-			msg = ip.classifyDatabaseError(ip.err)
+			msg = ip.classifyError(ip.err)
 		}
 	}
 
@@ -114,17 +114,25 @@ func (ip *imageErrorMessageProvider) Resolve() (ImageLoader, error) {
 	}, nil
 }
 
-// classifyDatabaseError analyzes a database error and returns a user-friendly message
+// classifyError analyzes an error and returns a user-friendly message.
 // TODO: replace string matching with proper error type detection (e.g., errors.As for driver-specific errors)
-func (ip *imageErrorMessageProvider) classifyDatabaseError(err error) string {
+func (ip *imageErrorMessageProvider) classifyError(err error) string {
 	errStr := err.Error()
+
+	// HTTP fetch errors
+	if strings.Contains(errStr, "http status") ||
+		strings.Contains(errStr, "http request") ||
+		strings.Contains(errStr, "unexpected content-type") ||
+		strings.Contains(errStr, "not a valid image") {
+		return "HTTP fetch failed:\n" + errStr
+	}
 
 	// Connection errors (database unavailable, network issue, auth failure)
 	if strings.Contains(errStr, "connection") ||
 		strings.Contains(errStr, "refused") ||
 		strings.Contains(errStr, "timeout") ||
 		strings.Contains(errStr, "dial") {
-		return "Database connection failed.\nCheck server availability and credentials."
+		return "Connection failed:\n" + errStr
 	}
 
 	// Query errors (schema mismatch, syntax error, constraint violation)
@@ -136,6 +144,6 @@ func (ip *imageErrorMessageProvider) classifyDatabaseError(err error) string {
 		return "Database schema error.\nTables may be missing. Restart server to initialize database."
 	}
 
-	// Generic database error with actual error message
-	return "Database error:\n" + errStr
+	// Generic error with actual error message
+	return "Error:\n" + errStr
 }

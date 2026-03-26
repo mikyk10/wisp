@@ -102,12 +102,20 @@ func (ldr *defaultConfigLoader) LoadConfig() (*config.GlobalConfig, *config.Serv
 			if cat.TimeRange.Cron != "" && !gron.IsValid(cat.TimeRange.Cron) {
 				return nil, nil, fmt.Errorf("display[%s].catalog[%d]: invalid cron expression %q", v.Key, i, cat.TimeRange.Cron)
 			}
-			disp.Catalog[i] = &config.AssociatedImageProviders{
+			assoc := &config.AssociatedImageProviders{
 				ProviderConfig: provConfig,
 				TimeRange: config.CronConfig{
 					Cron: cat.TimeRange.Cron,
 				},
 			}
+			if cat.ColorReduction != nil {
+				assoc.ColorReduction = &config.ColorReduction{
+					Type:     cat.ColorReduction.Type,
+					Size:     cat.ColorReduction.Size,
+					Strength: cat.ColorReduction.Strength,
+				}
+			}
+			disp.Catalog[i] = assoc
 		}
 
 		for i, v := range v.ImageProcessors {

@@ -136,4 +136,5 @@ type CronConfig struct {
 type AssociatedImageProviders struct {
 	ProviderConfig *ImageProviderConfig
 	TimeRange      CronConfig
+	ColorReduction *ColorReduction // per-catalog override (nil = use display default)
 }

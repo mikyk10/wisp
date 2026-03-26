@@ -14,8 +14,9 @@ type CatalogEntry struct {
 
 // Associated Catalog Entry
 type CatalogItem struct {
-	Key       string    `json:"key" yaml:"key"`
-	TimeRange TimeRange `json:"time_range" yaml:"time_range"`
+	Key            string          `json:"key" yaml:"key"`
+	TimeRange      TimeRange       `json:"time_range" yaml:"time_range"`
+	ColorReduction *ColorReduction `json:"color_reduction,omitempty" yaml:"color_reduction,omitempty"`
 }
 
 type ColorReduction struct {

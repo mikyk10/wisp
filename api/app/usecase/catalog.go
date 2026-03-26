@@ -367,7 +367,10 @@ func (uc *catalogUseCase) GetSequencerGroupForDisplay(displayKey string) (improc
 	if !ok {
 		return nil, nil, &catalog.DisplayNotFoundError{Key: displayKey}
 	}
+	return uc.getSequencerGroupForDisplay(displayConfigInUse, nil)
+}
 
+func (uc *catalogUseCase) getSequencerGroupForDisplay(displayConfigInUse *config.DisplayConfig, colorReductionOverride *config.ColorReduction) (improc.SequencerGroup, epaper.DisplayMetadata, error) {
 	display := epaper.NewDisplay(epaper.EPaperDisplayModel(displayConfigInUse.DisplayModel), model.CanonicalOrientation(displayConfigInUse.Orientation))
 
 	// Sequencer group
@@ -404,10 +407,15 @@ func (uc *catalogUseCase) GetSequencerGroupForDisplay(displayKey string) (improc
 		}
 	}
 
-	// Post-processing
+	// Post-processing: use per-catalog color reduction if provided, otherwise display default.
+	cr := displayConfigInUse.ColorReduction
+	if colorReductionOverride != nil {
+		cr = *colorReductionOverride
+	}
+
 	imPostProcessorSeq := improc.NewSequencer()
 	imseqGroup.Push(imPostProcessorSeq)
-	imPostProcessorSeq.Push(color_reduction.NewImageColorReduction(display, displayConfigInUse.ColorReduction))
+	imPostProcessorSeq.Push(color_reduction.NewImageColorReduction(display, cr))
 
 	if displayConfigInUse.ShowTimestamp {
 		imPostProcessorSeq.Push(timestamp.NewTimstamp())
@@ -423,30 +431,37 @@ func (uc *catalogUseCase) GetSequencerGroupForDisplay(displayKey string) (improc
 
 func (uc *catalogUseCase) Pick(displayKey string) (catalog.ImageLoader, epaper.DisplayMetadata, improc.SequencerGroup, error) {
 
-	imseqGroup, display, err := uc.GetSequencerGroupForDisplay(displayKey)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	displayConfigInUse, ok := uc.serviceConfig.Displays[displayKey]
 	if !ok {
 		return nil, nil, nil, &catalog.DisplayNotFoundError{Key: displayKey}
 	}
 
+	// Pick image first to determine per-catalog color reduction override.
 	var imgPtr catalog.ImageLoader
+	var colorReductionOverride *config.ColorReduction
+
 	if len(displayConfigInUse.Catalog) == 0 {
 		var err error
-		imgPtr, err = catalog.NewColorbarProvider(display).Resolve()
+		imgPtr, err = catalog.NewColorbarProvider(
+			epaper.NewDisplay(epaper.EPaperDisplayModel(displayConfigInUse.DisplayModel), model.CanonicalOrientation(displayConfigInUse.Orientation)),
+		).Resolve()
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to resolve image provider for display %s: %w", displayKey, err)
 		}
 	} else {
-		imgProvider := catalog.PickImageProvider(time.Now(), display, uc.imgr, displayConfigInUse.Catalog...)
+		display := epaper.NewDisplay(epaper.EPaperDisplayModel(displayConfigInUse.DisplayModel), model.CanonicalOrientation(displayConfigInUse.Orientation))
+		pick := catalog.PickImageProvider(time.Now(), display, uc.imgr, displayConfigInUse.Catalog...)
+		colorReductionOverride = pick.ColorReduction
 		var err error
-		imgPtr, err = imgProvider.Resolve()
+		imgPtr, err = pick.Locator.Resolve()
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to resolve image provider for display %s: %w", displayKey, err)
 		}
+	}
+
+	imseqGroup, display, err := uc.getSequencerGroupForDisplay(displayConfigInUse, colorReductionOverride)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	return imgPtr, display, imseqGroup, nil

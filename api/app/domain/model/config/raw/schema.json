@@ -25,7 +25,8 @@
               "http",
               "playwright",
               "lua",
-              "colorbar"
+              "colorbar",
+              "generate"
             ],
             "default": "file"
           },
@@ -274,14 +275,11 @@
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "cron"
-                  ]
+                  "required": []
                 }
               },
               "required": [
-                "key",
-                "time_range"
+                "key"
               ]
             },
             "description": "Associated Catalog Entry",

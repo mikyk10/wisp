@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 	"github.com/mikyk10/wisp/app/domain/finder"
@@ -51,7 +52,8 @@ func (ldr *defaultConfigLoader) LoadConfig() (*config.GlobalConfig, *config.Serv
 	for _, v := range rawSvcConfig.Catalog {
 		entry := parseCatalogEntry(v)
 		if entry == nil {
-			return nil, nil, fmt.Errorf("catalog[%s]: unsupported provider type %q", v.Key, v.Type)
+			slog.Warn("config: skipping unsupported catalog provider", "key", v.Key, "type", v.Type)
+			continue
 		}
 		svcConfig.Catalog[v.Key] = entry
 	}
@@ -186,28 +188,6 @@ func parseCatalogEntry(v raw.CatalogEntry) *config.ImageProviderConfig {
 			Config: config.ImageColorbarProviderConfig{},
 		}
 
-	case config.ImageGenerateProviderType:
-		stages := make([]config.StageConfig, len(v.GenerateConfig.Pipeline.Stages))
-		for i, s := range v.GenerateConfig.Pipeline.Stages {
-			stages[i] = config.StageConfig{
-				Name:       s.Name,
-				Output:     s.Output,
-				Prompt:     s.Prompt,
-				ImageInput: s.ImageInput,
-			}
-		}
-		return &config.ImageProviderConfig{
-			Key: v.Key,
-			Config: config.ImageGenerateProviderConfig{
-				CacheDepth:    v.GenerateConfig.CacheDepth,
-				EvictCount:    v.GenerateConfig.EvictCount,
-				SourceCatalog: v.GenerateConfig.SourceCatalog,
-				Pipeline: config.PipelineConfig{
-					Variables: v.GenerateConfig.Pipeline.Variables,
-					Stages:    stages,
-				},
-			},
-		}
 	}
 
 	return nil

@@ -11,7 +11,6 @@ export const usePhotosStore = defineStore('photos', () => {
   const timeline = ref<Record<string, Omit<TimelineEntry, 'key' | 'label'>>>({})
   const streamCompleted = ref(false)
   const error = ref<string | null>(null)
-
   // ── Getters ──────────────────────────────────────────────────────────────
   const totalPhotos = computed(() => items.value.length)
 

@@ -38,7 +38,7 @@ func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgM
 	v := p.value
 	if p.auto {
 		v = autoContrastOffset(src, p.target)
-		slog.Info("auto contrast", "stddev", p.target-v, "target", p.target, "offset", v)
+		slog.Debug("auto contrast", "stddev", p.target-v, "target", p.target, "offset", v)
 	}
 	if v == 0 {
 		return src, meta

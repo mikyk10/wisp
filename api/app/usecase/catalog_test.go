@@ -34,7 +34,7 @@ func setupScanUseCaseWithConfig(t *testing.T, svc *config.ServiceConfig) (usecas
 	conn.AutoMigrate(&model.Image{}) //nolint:errcheck
 
 	repo := infraRepo.NewImageRepositoryImpl(conn)
-	return usecase.NewCatalogUseCase(svc, repo, nil), repo
+	return usecase.NewCatalogUseCase(svc, repo), repo
 }
 
 // setupScanUseCase is a convenience helper for single-catalog scenarios.
@@ -100,7 +100,7 @@ func setupCatalogUseCase(t *testing.T) usecase.CatalogUsecase {
 		},
 	}
 
-	return usecase.NewCatalogUseCase(svc, repo, nil)
+	return usecase.NewCatalogUseCase(svc, repo)
 }
 
 // Pick() に存在しないディスプレイキーを渡した場合、error を返すこと。

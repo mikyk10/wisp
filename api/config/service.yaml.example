@@ -62,15 +62,10 @@ catalog:
   # - key: colorbar
   #   type: colorbar
 
-  # Example: AI-generated image catalog (text-to-image via gpt-image-1)
+  # Example: AI-generated image catalog (text-to-image)
   #
-  # The default pipeline uses two built-in prompts:
-  #   1. meta-prompt — LLM invents an image concept (text output)
-  #   2. generate    — gpt-image-1 creates the image  (image output)
-  # Omit prompt: to use built-in defaults; set prompt: to override with
-  # an external file path or another embedded prompt name.
-  #
-  # Variables are available in prompt templates as {{.config.KEY}}.
+  # Each stage requires an external prompt file with provider/model in its
+  # YAML frontmatter. See config/prompts/example/ for reference.
   #
   # Run:  wisp catalog generate run --catalog=ai-generated [--verbose]
   # List: wisp catalog generate list --catalog=ai-generated
@@ -81,19 +76,18 @@ catalog:
   #     cache_depth: 10        # Max images kept in cache
   #     evict_count: 3         # FIFO evict per batch run
   #     pipeline:
-  #       variables:
-  #         orientation: landscape
   #       stages:
   #         - name: meta-prompt
   #           output: text
+  #           prompt: config/prompts/my_gen_meta.md
   #         - name: generate
   #           output: image
+  #           prompt: config/prompts/my_gen_image.md
 
   # Example: AI style transfer (img2img from another catalog)
   #
   # Picks a random photo from source_catalog and transforms it using
-  # the /v1/images/edits API. Use --source-id=ID to target a specific photo.
-  # The built-in stylize.md prompt applies a surrealist painting style.
+  # the image edit API. Use --source-id=ID to target a specific photo.
   #
   # Run:  wisp catalog generate run --catalog=ai-stylized [--source-id=42] [--verbose]
   #
@@ -107,8 +101,8 @@ catalog:
   #       stages:
   #         - name: stylize
   #           output: image
-  #           prompt: stylize.md   # Built-in Dalí-style prompt (or your own)
-  #           image_input: $source # Feed the source photo to the API
+  #           prompt: config/prompts/my_stylize.md
+  #           image_input: _source # Feed the source photo to the API
 
   # Example: destination catalog for favorited AI-generated images
   #

@@ -35,7 +35,7 @@ ai:
       stages:
         - name: descriptor
           output: text
-          image_input: $source   # Thumbnail of the image being tagged
+          image_input: _source   # Thumbnail of the image being tagged
           # prompt:              # Omit to use built-in descriptor.md
         - name: tagger
           output: text

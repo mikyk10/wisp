@@ -1,1 +1,2 @@
 firmware/tools/defaults/src/*.html linguist-generated
+firmware/src/assets/**/*.h linguist-generated

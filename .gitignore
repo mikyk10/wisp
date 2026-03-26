@@ -12,6 +12,9 @@ Thumbs.db
 *.sln
 *.suo
 
+# AI prompt files (managed externally after microservice extraction)
+api/config/prompts/
+
 # Claude Code
 CLAUDE.md
 AGENT.md

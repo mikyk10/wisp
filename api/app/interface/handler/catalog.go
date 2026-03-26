@@ -8,7 +8,6 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
-	"maps"
 	"net/http"
 	"path/filepath"
 	"slices"
@@ -47,19 +46,23 @@ type CatalogHandler interface {
 }
 
 type catalogHandler struct {
-	imguc usecase.CatalogUsecase
-	svc   *config.ServiceConfig
+	imguc  usecase.CatalogUsecase
+	svc    *config.ServiceConfig
 }
 
 func NewCatalogHandler(svc *config.ServiceConfig, catr usecase.CatalogUsecase) CatalogHandler {
 	return &catalogHandler{
-		imguc: catr,
-		svc:   svc,
+		imguc:  catr,
+		svc:    svc,
 	}
 }
 
 func (uc *catalogHandler) ListCatalogs(c *echo.Context) error {
-	catalogs := slices.Sorted(maps.Keys(uc.svc.Catalog))
+	var catalogs []string
+	for key := range uc.svc.Catalog {
+		catalogs = append(catalogs, key)
+	}
+	slices.Sort(catalogs)
 	return c.JSON(http.StatusOK, map[string]any{"catalogs": catalogs})
 }
 

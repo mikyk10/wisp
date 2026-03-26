@@ -4,12 +4,12 @@ package raw
 
 // Catalog Entry (Image Provider)
 type CatalogEntry struct {
-	FileConfig       FileConfig       `json:"file,omitempty" yaml:"file,omitempty"`
-	HTTPConfig       HTTPConfig       `json:"http,omitempty" yaml:"http,omitempty"`
-	Key              string           `json:"key" yaml:"key"`
-	LuaConfig        LuaConfig        `json:"lua,omitempty" yaml:"lua,omitempty"`
+	FileConfig       FileConfig       `json:"file,omitempty"       yaml:"file,omitempty"`
+	HTTPConfig       HTTPConfig       `json:"http,omitempty"       yaml:"http,omitempty"`
+	Key              string           `json:"key"                  yaml:"key"`
+	LuaConfig        LuaConfig        `json:"lua,omitempty"        yaml:"lua,omitempty"`
 	PlaywrightConfig PlaywrightConfig `json:"playwright,omitempty" yaml:"playwright,omitempty"`
-	Type             string           `json:"type" yaml:"type"`
+	Type             string           `json:"type"                 yaml:"type"`
 }
 
 // Associated Catalog Entry
@@ -105,7 +105,7 @@ type PlaywrightConfig struct {
 	URL    string `json:"url" yaml:"url"`
 }
 
-type ColorbarConfig struct {}
+type ColorbarConfig struct{}
 
 // WiSP Service Configuration
 type ServiceConfig struct {

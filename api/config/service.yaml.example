@@ -62,6 +62,58 @@ catalog:
   # - key: colorbar
   #   type: colorbar
 
+  # Example: AI-generated image catalog (text-to-image)
+  #
+  # Each stage requires an external prompt file with provider/model in its
+  # YAML frontmatter. See config/prompts/example/ for reference.
+  #
+  # Run:  wisp catalog generate run --catalog=ai-generated [--verbose]
+  # List: wisp catalog generate list --catalog=ai-generated
+  #
+  # - key: ai-generated
+  #   type: generate
+  #   generate:
+  #     cache_depth: 10        # Max images kept in cache
+  #     evict_count: 3         # FIFO evict per batch run
+  #     pipeline:
+  #       stages:
+  #         - name: meta-prompt
+  #           output: text
+  #           prompt: config/prompts/my_gen_meta.md
+  #         - name: generate
+  #           output: image
+  #           prompt: config/prompts/my_gen_image.md
+
+  # Example: AI style transfer (img2img from another catalog)
+  #
+  # Picks a random photo from source_catalog and transforms it using
+  # the image edit API. Use --source-id=ID to target a specific photo.
+  #
+  # Run:  wisp catalog generate run --catalog=ai-stylized [--source-id=42] [--verbose]
+  #
+  # - key: ai-stylized
+  #   type: generate
+  #   generate:
+  #     cache_depth: 5
+  #     evict_count: 2
+  #     source_catalog: photos     # Pick random photo from this catalog
+  #     pipeline:
+  #       stages:
+  #         - name: stylize
+  #           output: image
+  #           prompt: config/prompts/my_stylize.md
+  #           image_input: _source # Feed the source photo to the API
+
+  # Example: destination catalog for favorited AI-generated images
+  #
+  # Use `wisp catalog generate favorite` to export a cached image here.
+  # The next `catalog scan` will index it for frame delivery.
+  #
+  # - key: ai-favorites
+  #   type: file
+  #   file:
+  #     src_path: /mnt/wspf/ai-favorites
+
 displays:
   - name: my-display
     # mac_address is the :displayKey path parameter in the API.
@@ -115,6 +167,9 @@ displays:
     # Add a cron field to restrict a catalog to specific times (standard 5-field cron):
     #   - key: holiday-photos
     #     cron: "0 0 * 12 *"   # only in December
+    # AI-generated catalogs (type: generate) work the same way:
+    #   - key: ai-generated
+    #   - key: ai-stylized
     catalog:
       - key: photos
 

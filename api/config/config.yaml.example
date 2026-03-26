@@ -10,3 +10,33 @@ database:
   # dsn: "user:pass@tcp(localhost:3306)/wspf?charset=utf8mb4&parseTime=True&loc=Local"
 
   log: true
+
+# AI pipeline configuration
+# Required for `catalog tagging run` and `catalog generate run`.
+ai:
+  providers:
+    # Local Ollama instance (used by default tagging prompts)
+    ollama_local:
+      endpoint: http://localhost:11434/v1
+      api_key: ""
+    # OpenAI API (used by default generation prompts)
+    # openai:
+    #   endpoint: https://api.openai.com/v1
+    #   api_key: ${OPENAI_API_KEY}
+
+  request_timeout_sec: 90    # Per-request timeout for LLM calls
+  max_retries: 3             # Retry count on transient failures
+
+  # Tagging pipeline settings
+  tagging:
+    max_tags: 10             # Maximum tags per image
+    workers: 2               # Parallel workers (override with --workers flag)
+    pipeline:
+      stages:
+        - name: descriptor
+          output: text
+          image_input: _source   # Thumbnail of the image being tagged
+          # prompt:              # Omit to use built-in descriptor.md
+        - name: tagger
+          output: text
+          # prompt:              # Omit to use built-in tagger.md

@@ -2,69 +2,95 @@ package catalog
 
 import (
 	"testing"
+	"time"
+
+	"github.com/mikyk10/wisp/app/domain/model/config"
 )
 
-/*
-func TestConfigLoad(t *testing.T) {
-	_, svcConf, _ := NewTestConfigLoader().LoadConfig()
-
-	picker := NewFirstImageProviderConfig(
-		&config.AssociatedImageProviders[any]{ProviderConfig: svcConf.Catalog["album-01"], TimeRange: config.CronConfig{Cron: "* * 13-14 * * *"}},
-		&config.AssociatedImageProviders[any]{ProviderConfig: svcConf.Catalog["album-02"], TimeRange: config.CronConfig{Cron: "* * 1-2 * * *"}},
-		&config.AssociatedImageProviders[any]{ProviderConfig: svcConf.Catalog["album-http"], TimeRange: config.CronConfig{Cron: "* * 14 * * *"}},
-	)
-
-	aaa := picker()
-	spew.Dump(aaa)
-	catalog := NewImageProviderFactory(aaa)
-	spew.Dump(catalog())
+func makeProvider(key string, cron string) *config.AssociatedImageProviders {
+	return &config.AssociatedImageProviders{
+		ProviderConfig: &config.ImageProviderConfig{
+			Key:    key,
+			Config: config.ImageColorbarProviderConfig{},
+		},
+		TimeRange: config.CronConfig{Cron: cron},
+	}
 }
-*/
 
-func TestConfigLoad(t *testing.T) {
-	/*
-		_, svcConf, _ := config.NewTestConfigLoader().LoadConfig()
+func TestCronFilter_MatchesWithNonZeroSeconds(t *testing.T) {
+	// 01:28:55 — minute 28 is within "24-30", second is non-zero.
+	// This was a real bug: gronx checks seconds even for 5-field cron,
+	// so without Truncate the filter returned no matches.
+	now := time.Date(2026, 3, 26, 1, 28, 55, 0, time.UTC)
 
-		displayInUse := svcConf.Displays["00:00:00:00:00:00"]
+	providers := []*config.AssociatedImageProviders{
+		makeProvider("morning", "24-30 1 * * *"),
+		makeProvider("fallback", ""),
+	}
 
-		// Retrieve the image catalog for the display.
+	got := cronFilter(now, providers)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(got))
+	}
+	if got[0].ProviderConfig.Key != "morning" {
+		t.Errorf("expected key %q, got %q", "morning", got[0].ProviderConfig.Key)
+	}
+}
 
-		// Resolve ImageProvider from the image catalog.
-		imgProvider := imgCatalog.PickImageProvider(time.Now())
+func TestCronFilter_NoMatchOutsideWindow(t *testing.T) {
+	now := time.Date(2026, 3, 26, 2, 0, 30, 0, time.UTC)
 
-		//slices.Collect(svcConf.Displays)
-		//aaaa := slices.Collect(maps.Values(svcConf.Displays))
+	providers := []*config.AssociatedImageProviders{
+		makeProvider("morning", "24-30 1 * * *"),
+	}
 
-		// Pass the target display and orientation to start processing.
-		epDisplayMeta := epaper.NewDisplay(epaper.EPaperDisplayModel(displayInUse.DisplayModel), model.CanonicalOrientation(displayInUse.Orientation))
-		if epDisplayMeta == nil {
-			// yaml validation required
-			panic("config problem") //TODO: error handling
-		}
+	got := cronFilter(now, providers)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 matches, got %d", len(got))
+	}
+}
 
-		imPtr := imgProvider.Resolve(epDisplayMeta)
+func TestCronFilter_SkipsEmptyCron(t *testing.T) {
+	now := time.Date(2026, 3, 26, 1, 28, 0, 0, time.UTC)
 
-		// Process according to provider and display settings.
-		imseq := improc.NewSequencer()
-		imseq.Push(crop.NewImageCropper(epDisplayMeta, config.CropStrategyCenter))
-		//	imseq.Push(saturation.NewSaturationFactory()())
-		//	imseq.Push(hue.NewImageHueFactory()())
-		//	imseq.Push(color_reduction.NewImageColorReductionFactory(epDisplayMeta)())
-		imseq.Push(timestamp.NewTimstamp())
+	providers := []*config.AssociatedImageProviders{
+		makeProvider("always", ""),
+	}
 
-		meta := imPtr.GetMeta()
-		meta.ExifDateTime = time.Now()
-		resultImg, _ := imseq.Apply(context.Background(), imPtr.GetImage(), meta)
+	got := cronFilter(now, providers)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 (empty cron excluded from cronFilter), got %d", len(got))
+	}
+}
 
-		// Encode.
+func TestNonCronFilter_ReturnsOnlyEmptyCron(t *testing.T) {
+	providers := []*config.AssociatedImageProviders{
+		makeProvider("scheduled", "0 9 * * *"),
+		makeProvider("fallback", ""),
+	}
 
-		f, _ := os.OpenFile("/tmp/test.png", os.O_CREATE|os.O_WRONLY, 0644)
-		if err := png.Encode(f, resultImg); err != nil {
-			f.Close()
-			log.Fatal(err)
-		}
+	got := nonCronFilter(providers)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(got))
+	}
+	if got[0].ProviderConfig.Key != "fallback" {
+		t.Errorf("expected key %q, got %q", "fallback", got[0].ProviderConfig.Key)
+	}
+}
 
-		if err := f.Close(); err != nil {
-			log.Fatal(err)
-		}*/
+func TestCronFilter_DoesNotMutateInput(t *testing.T) {
+	now := time.Date(2026, 3, 26, 1, 28, 0, 0, time.UTC)
+
+	providers := []*config.AssociatedImageProviders{
+		makeProvider("hit", "24-30 1 * * *"),
+		makeProvider("miss", "0 9 * * *"),
+		makeProvider("fallback", ""),
+	}
+	origLen := len(providers)
+
+	cronFilter(now, providers)
+
+	if len(providers) != origLen {
+		t.Errorf("input slice was mutated: len was %d, now %d", origLen, len(providers))
+	}
 }

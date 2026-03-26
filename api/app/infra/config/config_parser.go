@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 	"github.com/mikyk10/wisp/app/domain/finder"
@@ -49,7 +50,12 @@ func (ldr *defaultConfigLoader) LoadConfig() (*config.GlobalConfig, *config.Serv
 	svcConfig.Catalog = make(map[string]*config.ImageProviderConfig)
 
 	for _, v := range rawSvcConfig.Catalog {
-		svcConfig.Catalog[v.Key] = parseCatalogEntry(v)
+		entry := parseCatalogEntry(v)
+		if entry == nil {
+			slog.Warn("config: skipping unsupported catalog provider", "key", v.Key, "type", v.Type)
+			continue
+		}
+		svcConfig.Catalog[v.Key] = entry
 	}
 
 	svcConfig.Displays = make(map[string]*config.DisplayConfig)
@@ -181,6 +187,7 @@ func parseCatalogEntry(v raw.CatalogEntry) *config.ImageProviderConfig {
 			Key:    v.Key,
 			Config: config.ImageColorbarProviderConfig{},
 		}
+
 	}
 
 	return nil
@@ -206,7 +213,7 @@ func (ldr *defaultConfigLoader) loadRawConfig() (*config.GlobalConfig, *raw.Serv
 	}
 	var conf config.GlobalConfig
 
-	if err := yaml.Unmarshal(b, &conf); err != nil {
+	if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(b))), &conf); err != nil {
 		return nil, nil, err
 	}
 
@@ -216,7 +223,7 @@ func (ldr *defaultConfigLoader) loadRawConfig() (*config.GlobalConfig, *raw.Serv
 	}
 
 	var rawServiceConfig raw.ServiceConfig
-	if err := yaml.Unmarshal(c, &rawServiceConfig); err != nil {
+	if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(c))), &rawServiceConfig); err != nil {
 		return nil, nil, err
 	}
 

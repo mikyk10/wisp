@@ -37,7 +37,7 @@ func (d *digBuilder) WithConfig(globalConfig *config.GlobalConfig, serviceConfig
 	})
 }
 
-func (d *digBuilder) WithDatabase(globalConfig *config.GlobalConfig) *digBuilder {
+func (d *digBuilder) WithDatabase(globalConfig *config.GlobalConfig, migrate bool) *digBuilder {
 
 	return d.mustProvide(func() (*gorm.DB, error) {
 
@@ -60,7 +60,11 @@ func (d *digBuilder) WithDatabase(globalConfig *config.GlobalConfig) *digBuilder
 			return nil, fmt.Errorf("failed to open database: %w", err)
 		}
 
-		conn.AutoMigrate(model.AllModels()...) //nolint:errcheck
+		if migrate {
+			if err := conn.AutoMigrate(model.AllModels()...); err != nil {
+				return nil, fmt.Errorf("auto-migrate failed: %w", err)
+			}
+		}
 
 		return conn, nil
 	})

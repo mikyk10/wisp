@@ -14,6 +14,18 @@ const (
 	ImgCanonicalOrientationPortrait
 )
 
+// NewCanonicalOrientation parses a string orientation value.
+func NewCanonicalOrientation(s string) CanonicalOrientation {
+	switch s {
+	case "landscape":
+		return ImgCanonicalOrientationLandscape
+	case "portrait":
+		return ImgCanonicalOrientationPortrait
+	default:
+		return ImgCanonicalOrientationLandscape
+	}
+}
+
 const (
 	NoExifOrientation = ExifOrientation(0)
 )

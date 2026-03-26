@@ -71,10 +71,6 @@ func NewCatalogListCommand(c *dig.Container) *cobra.Command {
 					fmt.Printf("%s : FileProvider(%s)\n", v.Key, prv.SrcPath)
 				case config.ImageHTTPProviderConfig:
 					fmt.Printf("%s : HTTPProvider\n", v.Key)
-				case config.ImagePlaywrightProviderConfig:
-					fmt.Printf("%s : PlayWrightProvider\n", v.Key)
-				case config.ImageLuaProviderConfig:
-					fmt.Printf("%s : LuaProvider\n", v.Key)
 				}
 			}
 

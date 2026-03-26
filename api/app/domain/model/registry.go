@@ -5,5 +5,7 @@ package model
 func AllModels() []any {
 	return []any{
 		&Image{},
+		&Tag{},
+		&ImageTag{},
 	}
 }

@@ -1,11 +1,14 @@
 package catalog
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"image"
 	"net/http"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"github.com/mikyk10/wisp/app/domain/model"
+	"github.com/mikyk10/wisp/app/domain/repository"
 )
 
 // ImageLoader represents an image source.
@@ -108,4 +111,39 @@ func (i *imageLocalFilePointer) GetSourcePath() string {
 // to avoid holding large images in memory while waiting for I/O.
 func (i *imageLocalFilePointer) ClearImage() {
 	i.img = nil
+}
+
+// -----
+
+// imageDBLoader loads an image from the database image_data column.
+// Used for background HTTP catalog images.
+type imageDBLoader struct {
+	id   model.PrimaryKey
+	url  string
+	repo repository.ImageRepository
+	img  image.Image
+	meta *model.ImgMeta
+}
+
+func (i *imageDBLoader) Load() (image.Image, *model.ImgMeta, error) {
+	data, err := i.repo.FindImageData(i.id)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(data) == 0 {
+		return nil, nil, errors.New("image_data is empty")
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	i.img = img
+	i.meta = &model.ImgMeta{}
+	return i.img, i.meta, nil
+}
+
+func (i *imageDBLoader) GetSourcePath() string {
+	return i.url
 }

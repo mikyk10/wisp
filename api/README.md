@@ -9,7 +9,7 @@ HTTP backend that serves processed images to ESP32-based e-paper photo frames.
 - Serves vendor-specific binary images to ESP32 firmware over HTTP
 - Full image processing pipeline: EXIF rotation, aspect-ratio crop, brightness / contrast / gamma / hue / saturation / blur, dithering-based color reduction, timestamp overlay, and explicit rotation
 - Floyd-Steinberg, Bayer, and Sierra3 dithering algorithms
-- Multiple catalog providers: local filesystem, HTTP URL, Lua script, and color-bar test pattern
+- Multiple catalog providers: local filesystem, HTTP URL, and color-bar test pattern
 - NDJSON streaming for large photo catalogs
 - Concurrent image scanning using all available CPU cores
 - SQLite (development) and MySQL (production) database backends, switched via config
@@ -107,7 +107,7 @@ user:password@tcp(host:3306)/dbname?parseTime=true&charset=utf8mb4
 ```yaml
 catalog:
   - key: photos
-    type: file         # file | http | lua | colorbar
+    type: file         # file | http | colorbar
     file:
       src_path: /mnt/wisp
 
@@ -168,7 +168,6 @@ Base URL: `http://localhost:9002`
 |--------|-------------|
 | `file` | Scans a local directory for JPEG, PNG, GIF, BMP, HEIF, TIFF, and WebP files |
 | `http` | Fetches images from an HTTP URL |
-| `lua` | Generates image URLs dynamically via an embedded Lua script |
 | `colorbar` | Generates a color-bar test pattern (useful for display tuning) |
 
 ### Supported display models

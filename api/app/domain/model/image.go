@@ -13,10 +13,12 @@ type Image struct {
 	Rnd        float64    `gorm:"type:double;not null;index:idx_random,priority:5"`
 	Src        string     `gorm:"not null;type:varchar(2048)"`
 	SrcHash    string     `gorm:"not null;type:char(40);uniqueIndex:idx_catalog_src,priority:2"`
+	SrcType    string     `gorm:"type:varchar(16);not null;default:'file'"`
 
 	TakenAt          sql.NullTime         `gorm:"index:idx_list_all,priority:2;index:idx_list_catalog,priority:3"`
 	ImageOrientation CanonicalOrientation `gorm:"type:int;index:idx_random,priority:2"`
 	ThumbJPG         []byte               `gorm:"not null;type:blob;"`
+	ImageData        []byte               `gorm:"type:blob;"`
 
 	// Excluded: excluded by catalog configuration (negative index). Records with true are hidden from listings.
 	// User-initiated hiding uses DeletedAt. The two are not managed in the same column.

@@ -3,11 +3,9 @@ package config
 import "log/slog"
 
 const (
-	ImageFileProviderType       string = "file"
-	ImageHTTPProviderType       string = "http"
-	ImagePlaywrightProviderType string = "playwright-go"
-	ImageLuaProviderType        string = "lua"
-	ImageColorbarProviderType   string = "colorbar"
+	ImageFileProviderType     string = "file"
+	ImageHTTPProviderType     string = "http"
+	ImageColorbarProviderType string = "colorbar"
 )
 
 type DisplayOrientation int
@@ -46,6 +44,14 @@ type GlobalConfig struct {
 			}
 		}
 	}
+	Tagging TaggingConfig `yaml:"tagging"`
+}
+
+// TaggingConfig holds settings for the external tagging service.
+type TaggingConfig struct {
+	Endpoint   string `yaml:"endpoint"`    // e.g. http://wisp-ai:8082/pipeline/tag
+	TimeoutSec int    `yaml:"timeout_sec"` // per-request timeout (default: 180)
+	MaxTags    int    `yaml:"max_tags"`    // default: 10
 }
 
 // ServiceConfig holds catalog and display configuration.

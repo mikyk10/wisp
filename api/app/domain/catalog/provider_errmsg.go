@@ -43,8 +43,7 @@ type imageErrorMessageProvider struct {
 func (ip *imageErrorMessageProvider) Resolve() (ImageLoader, error) {
 	msg := ip.providerConfig.Message
 
-	// Classify error details, unless it's a display-not-found error
-	// TODO: improve error type detection using errors.As or errors.Is
+	// Append a user-friendly description of the underlying error, unless it's a display-not-found error.
 	if ip.err != nil {
 		if _, ok := ip.err.(*DisplayNotFoundError); !ok {
 			msg = ip.classifyError(ip.err)
@@ -114,36 +113,35 @@ func (ip *imageErrorMessageProvider) Resolve() (ImageLoader, error) {
 	}, nil
 }
 
-// classifyError analyzes an error and returns a user-friendly message.
-// TODO: replace string matching with proper error type detection (e.g., errors.As for driver-specific errors)
+// classifyError analyzes an error and returns a user-friendly message for the error image.
 func (ip *imageErrorMessageProvider) classifyError(err error) string {
 	errStr := err.Error()
 
-	// HTTP fetch errors
-	if strings.Contains(errStr, "http status") ||
-		strings.Contains(errStr, "http request") ||
-		strings.Contains(errStr, "unexpected content-type") ||
-		strings.Contains(errStr, "not a valid image") {
-		return "HTTP fetch failed:\n" + errStr
+	// HTTP / network errors (external service unreachable)
+	if strings.Contains(errStr, "http") ||
+		strings.Contains(errStr, "url") ||
+		strings.Contains(errStr, "unexpected content-type") {
+		return "Failed to fetch image from external source.\n" + errStr
 	}
 
-	// Connection errors (database unavailable, network issue, auth failure)
-	if strings.Contains(errStr, "connection") ||
-		strings.Contains(errStr, "refused") ||
-		strings.Contains(errStr, "timeout") ||
-		strings.Contains(errStr, "dial") {
-		return "Connection failed:\n" + errStr
+	// Network-level errors (covers both DB and HTTP)
+	if strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "dial tcp") ||
+		strings.Contains(errStr, "no such host") {
+		return "Network error: target unreachable.\n" + errStr
 	}
 
-	// Query errors (schema mismatch, syntax error, constraint violation)
-	if strings.Contains(errStr, "syntax") ||
-		strings.Contains(errStr, "column") ||
-		strings.Contains(errStr, "unknown") ||
-		strings.Contains(errStr, "constraint") ||
-		strings.Contains(errStr, "no such table") {
+	// Database schema errors
+	if strings.Contains(errStr, "no such table") ||
+		strings.Contains(errStr, "no such column") ||
+		strings.Contains(errStr, "constraint") {
 		return "Database schema error.\nTables may be missing. Restart server to initialize database."
 	}
 
-	// Generic error with actual error message
-	return "Error:\n" + errStr
+	// Record not found (empty catalog)
+	if strings.Contains(errStr, "record not found") {
+		return "No images available.\nRun 'catalog scan' or 'catalog fetch' to index images."
+	}
+
+	return "Unexpected error:\n" + errStr
 }

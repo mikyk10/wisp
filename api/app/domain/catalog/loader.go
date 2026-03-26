@@ -1,7 +1,7 @@
 package catalog
 
 import (
-	"errors"
+	"fmt"
 	"image"
 	"net/http"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
@@ -56,7 +56,7 @@ func (i *imageURLLoader) Load() (image.Image, *model.ImgMeta, error) {
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, errors.New("failed to load image")
+		return nil, nil, fmt.Errorf("http status %d from %s", resp.StatusCode, i.url)
 	}
 
 	img, _, err := image.Decode(resp.Body)

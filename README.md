@@ -59,6 +59,10 @@ displays:
 
 See the `.example` files for all available options and color reduction settings.
 
+### HTTP catalogs
+
+In addition to local photo directories, WiSP supports **HTTP catalogs** that pull images from external services. Point an HTTP catalog at any endpoint that returns an image — dashboards, AI-generated artwork, weather maps, or any other visual content.
+
 ### Accessing from another device on the network
 
 Set `API_BASE_URL` in `.env` to your machine's LAN IP so the browser can reach the API:

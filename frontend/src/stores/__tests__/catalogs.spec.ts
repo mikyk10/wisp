@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { useCatalogsStore } from '../catalogs'
 import { usePhotosStore } from '../photos'
@@ -148,7 +149,8 @@ describe('useCatalogsStore', () => {
       const store = useCatalogsStore()
       await store.initCatalogs() // loads 'default'
 
-      await store.setCurrentCatalog('new-album')
+      store.setCurrentCatalog('new-album')
+      await flushPromises()
 
       expect(store.currentCatalog).toBe('new-album')
       // Photos stream must have completed for the new catalog

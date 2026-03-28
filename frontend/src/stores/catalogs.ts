@@ -40,9 +40,9 @@ export const useCatalogsStore = defineStore('catalogs', () => {
     }
   }
 
-  async function setCurrentCatalog(catalog: string) {
+  function setCurrentCatalog(catalog: string) {
     currentCatalog.value = catalog
-    await _loadCatalog(catalog)
+    _loadCatalog(catalog)
   }
 
   return {

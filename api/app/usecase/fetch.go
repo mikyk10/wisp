@@ -304,6 +304,10 @@ func (cu *catalogUseCase) loadSourceImage(src *config.HTTPImageSource) (io.Reade
 		return nil, "", fmt.Errorf("find source image: %w", err)
 	}
 
+	if rec.SrcType == "http" {
+		return nil, "", fmt.Errorf("image_source does not support http-sourced images (catalog=%s, id=%d)", src.Catalog, rec.ID)
+	}
+
 	// Load from filesystem (file catalogs only).
 	img, _, loadErr := catalog.LoadImageFromPath(rec.Src)
 	if loadErr != nil {

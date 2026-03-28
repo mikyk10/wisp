@@ -1,10 +1,18 @@
-# WiSP
+<p align="center">
+  <img src="docs/logo.svg" width="120" height="120" alt="WiSP logo">
+</p>
 
-[![CI - API](https://github.com/mikyk10/wisp/actions/workflows/ci-api.yml/badge.svg)](https://github.com/mikyk10/wisp/actions/workflows/ci-api.yml)
-[![CI - Frontend](https://github.com/mikyk10/wisp/actions/workflows/ci-frontend.yml/badge.svg)](https://github.com/mikyk10/wisp/actions/workflows/ci-frontend.yml)
-[![CI - Firmware](https://github.com/mikyk10/wisp/actions/workflows/ci-firmware.yml/badge.svg)](https://github.com/mikyk10/wisp/actions/workflows/ci-firmware.yml)
+<h1 align="center">WiSP</h1>
 
-DIY battery-powered digital photo frame using Waveshare e-Paper displays and ESP32 microcontrollers.
+<p align="center">
+  DIY battery-powered digital photo frame using Waveshare e-Paper displays and ESP32 microcontrollers.
+</p>
+
+<p align="center">
+  <a href="https://github.com/mikyk10/wisp/actions/workflows/ci-api.yml"><img src="https://github.com/mikyk10/wisp/actions/workflows/ci-api.yml/badge.svg" alt="CI - API"></a>
+  <a href="https://github.com/mikyk10/wisp/actions/workflows/ci-frontend.yml"><img src="https://github.com/mikyk10/wisp/actions/workflows/ci-frontend.yml/badge.svg" alt="CI - Frontend"></a>
+  <a href="https://github.com/mikyk10/wisp/actions/workflows/ci-firmware.yml"><img src="https://github.com/mikyk10/wisp/actions/workflows/ci-firmware.yml/badge.svg" alt="CI - Firmware"></a>
+</p>
 
 ## Components
 

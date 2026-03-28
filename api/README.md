@@ -1,4 +1,4 @@
-<img src="./docs/logo.svg" width="100" alt="WiSP">
+<img src="../docs/logo.svg" width="100" alt="WiSP">
 
 # WiSP Server
 

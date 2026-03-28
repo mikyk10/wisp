@@ -119,7 +119,7 @@ func TestFetch_PullGET_StoresImages(t *testing.T) {
 
 	uc, repo := setupFetchUseCase(t, svc)
 
-	if err := uc.Fetch("http-bg", 1, 1, false); err != nil {
+	if err := uc.Fetch([]string{"http-bg"}, 1, 1, false); err != nil {
 		t.Fatalf("Fetch() error: %v", err)
 	}
 
@@ -213,7 +213,7 @@ func TestFetch_Eviction(t *testing.T) {
 	}
 
 	// Run Fetch — should evict 1 oldest and fetch 1 new.
-	if err := uc.Fetch("evict-cat", 1, 1, false); err != nil {
+	if err := uc.Fetch([]string{"evict-cat"}, 1, 1, false); err != nil {
 		t.Fatalf("Fetch() error: %v", err)
 	}
 
@@ -264,7 +264,7 @@ func TestFetch_SkipsRealtimeCatalogs(t *testing.T) {
 
 	uc, repo := setupFetchUseCase(t, svc)
 
-	if err := uc.Fetch("", 1, 1, false); err != nil {
+	if err := uc.Fetch(nil, 1, 1, false); err != nil {
 		t.Fatalf("Fetch() error: %v", err)
 	}
 
@@ -291,7 +291,7 @@ func TestFetch_SkipsFileCatalogs(t *testing.T) {
 
 	uc, repo := setupFetchUseCase(t, svc)
 
-	if err := uc.Fetch("", 1, 1, false); err != nil {
+	if err := uc.Fetch(nil, 1, 1, false); err != nil {
 		t.Fatalf("Fetch() error: %v", err)
 	}
 

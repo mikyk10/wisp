@@ -71,8 +71,8 @@ type CatalogUsecase interface {
 	GetSequencerGroupForDisplay(displayKey string) (improc.SequencerGroup, epaper.DisplayMetadata, error)
 
 	// Fetch retrieves images from background HTTP catalogs and stores them in the database.
-	// If catalogKey is empty, all background HTTP catalogs are fetched.
-	Fetch(catalogKey string, workers int, maxRetries int, verbose bool) error
+	// If catalogKeys is empty, all background HTTP catalogs are fetched.
+	Fetch(catalogKeys []string, workers int, maxRetries int, verbose bool) error
 
 	//
 	Pick(displayKey string) (catalog.ImageLoader, epaper.DisplayMetadata, improc.SequencerGroup, error)

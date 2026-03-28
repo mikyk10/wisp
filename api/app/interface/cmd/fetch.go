@@ -28,13 +28,13 @@ func NewCatalogFetchCommand(c *dig.Container) *cobra.Command {
 					Level: slog.LevelDebug,
 				})))
 			}
-			catalogKey, _ := cmd.Flags().GetString("catalog")
+			catalogKeys, _ := cmd.Flags().GetStringSlice("catalog")
 			workers, _ := cmd.Flags().GetInt("workers")
 			maxRetries, _ := cmd.Flags().GetInt("max-retries")
-			return catUc.Fetch(catalogKey, workers, maxRetries, verbose)
+			return catUc.Fetch(catalogKeys, workers, maxRetries, verbose)
 		},
 	}
-	cmd.Flags().StringP("catalog", "c", "", "Specific catalog to fetch (empty = all background HTTP catalogs)")
+	cmd.Flags().StringSliceP("catalog", "c", nil, "Catalogs to fetch (comma-separated, empty = all background HTTP catalogs)")
 	cmd.Flags().IntP("workers", "w", 0, "Number of parallel fetch goroutines (0 = auto)")
 	cmd.Flags().Int("max-retries", 3, "Max retries per fetch (exponential backoff)")
 	cmd.Flags().BoolP("verbose", "v", false, "Enable debug logging")

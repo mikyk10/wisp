@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -28,7 +29,7 @@ import (
 	"github.com/sunshineplan/imgconv"
 )
 
-func (cu *catalogUseCase) Fetch(catalogKey string, workers int, maxRetries int, verbose bool) error {
+func (cu *catalogUseCase) Fetch(catalogKeys []string, workers int, maxRetries int, verbose bool) error {
 	if verbose {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	}
@@ -59,7 +60,7 @@ func (cu *catalogUseCase) Fetch(catalogKey string, workers int, maxRetries int, 
 		if !ok || !httpConf.IsBackground() {
 			continue
 		}
-		if catalogKey != "" && cat.Key != catalogKey {
+		if len(catalogKeys) > 0 && !slices.Contains(catalogKeys, cat.Key) {
 			continue
 		}
 		targets = append(targets, cat)

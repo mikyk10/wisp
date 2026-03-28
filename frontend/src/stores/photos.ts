@@ -88,6 +88,7 @@ export const usePhotosStore = defineStore('photos', () => {
           batch = []
           // Yield control back to the UI thread
           await new Promise((resolve) => setTimeout(resolve, 0))
+          if (signal.aborted) break
         }
       }
 

@@ -22,14 +22,23 @@ export class NDJSONStreamReader<T = unknown> {
       throw new Error('Response body is not readable')
     }
 
+    // Ensure reader.read() rejects immediately when the signal fires,
+    // even if the response body is already buffered locally.
+    if (signal) {
+      signal.addEventListener('abort', () => reader.cancel(), { once: true })
+    }
+
     const decoder = new TextDecoder()
     let buffer = ''
 
     try {
       while (true) {
+        if (signal?.aborted) return
+
         const { done, value } = await reader.read()
 
         if (done) {
+          if (signal?.aborted) return
           // Flush any remaining buffered data
           if (buffer.trim()) {
             try {
@@ -48,6 +57,7 @@ export class NDJSONStreamReader<T = unknown> {
         buffer = lines.pop() ?? ''
 
         for (const line of lines) {
+          if (signal?.aborted) return
           const trimmedLine = line.trim()
           if (trimmedLine) {
             try {

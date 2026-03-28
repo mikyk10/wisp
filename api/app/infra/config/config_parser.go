@@ -170,24 +170,28 @@ func parseCatalogEntry(v raw.CatalogEntry) *config.ImageProviderConfig {
 		}
 
 	case config.ImageHTTPProviderType:
-		return &config.ImageProviderConfig{
-			Key:    v.Key,
-			Config: config.ImageHTTPProviderConfig{URL: v.HTTPConfig.URL},
-		}
-
-	case config.ImagePlaywrightProviderType:
-		return &config.ImageProviderConfig{
-			Key: v.Key,
-			Config: config.ImagePlaywrightProviderConfig{
-				URL:    v.PlaywrightConfig.URL,
-				Server: v.PlaywrightConfig.Server,
+		httpConf := config.ImageHTTPProviderConfig{
+			URL:        v.HTTPConfig.URL,
+			Method:     v.HTTPConfig.Method,
+			TimeoutSec: v.HTTPConfig.TimeoutSec,
+			Headers:    v.HTTPConfig.Headers,
+			Cache: config.HTTPCacheConfig{
+				Type:       v.HTTPConfig.Cache.Type,
+				Depth:      v.HTTPConfig.Cache.Depth,
+				EvictCount: v.HTTPConfig.Cache.EvictCount,
 			},
 		}
-
-	case config.ImageLuaProviderType:
+		if v.HTTPConfig.ImageSource != nil {
+			httpConf.ImageSource = &config.HTTPImageSource{
+				Catalog:     v.HTTPConfig.ImageSource.Catalog,
+				Mode:        v.HTTPConfig.ImageSource.Mode,
+				ImageID:     v.HTTPConfig.ImageSource.ImageID,
+				Orientation: v.HTTPConfig.ImageSource.Orientation,
+			}
+		}
 		return &config.ImageProviderConfig{
 			Key:    v.Key,
-			Config: config.ImageLuaProviderConfig{Script: v.LuaConfig.Script},
+			Config: httpConf,
 		}
 
 	case config.ImageColorbarProviderType:

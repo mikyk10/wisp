@@ -48,7 +48,7 @@ func PickImageProvider(now time.Time, epd epaper.DisplayMetadata, repo repositor
 
 	// File providers are weighted by the number of images in the DB.
 	// Providers with 0 images are excluded from selection (prevents empty catalog → 404).
-	// Non-file providers (HTTP, Lua, etc.) are treated with weight 1.
+	// Non-file providers (HTTP, etc.) are treated with weight 1.
 	type weightedEntry struct {
 		conf   *config.AssociatedImageProviders
 		weight int64
@@ -107,10 +107,6 @@ func newLocatorFromConfig(now time.Time, epd epaper.DisplayMetadata, repo reposi
 		return NewImageIndexedFileProvider(now, epd, repo, cfg.Key, provConf)
 	case config.ImageHTTPProviderConfig:
 		return NewImageHttpProvider(now, epd, repo, cfg.Key, provConf)
-	case config.ImagePlaywrightProviderConfig:
-		return errProvider("Not implemented yet (playwright)")
-	case config.ImageLuaProviderConfig:
-		return NewLuaScriptProvider(now, epd, repo, cfg.Key, provConf)
 	case config.ImageColorbarProviderConfig:
 		return NewColorbarProvider(epd)
 	}

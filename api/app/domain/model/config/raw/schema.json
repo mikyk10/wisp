@@ -23,8 +23,6 @@
             "enum": [
               "file",
               "http",
-              "playwright",
-              "lua",
               "colorbar",
               "generate"
             ],
@@ -154,35 +152,6 @@
             ],
             "title": "http_config"
           },
-          "playwright": {
-            "type": "object",
-            "properties": {
-              "url": {
-                "type": "string",
-                "format": "uri"
-              },
-              "server": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "url",
-              "server"
-            ],
-            "title": "playwright_config"
-          },
-          "lua": {
-            "type": "object",
-            "properties": {
-              "script": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "script"
-            ],
-            "title": "lua_config"
-          }
         },
         "required": [
           "key",

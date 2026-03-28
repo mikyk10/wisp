@@ -59,7 +59,11 @@ func NewCatalogHandler(svc *config.ServiceConfig, catr usecase.CatalogUsecase) C
 
 func (uc *catalogHandler) ListCatalogs(c *echo.Context) error {
 	var catalogs []string
-	for key := range uc.svc.Catalog {
+	for key, cfg := range uc.svc.Catalog {
+		// Exclude realtime HTTP catalogs from SPA listing (they have no images in DB).
+		if httpConf, ok := cfg.Config.(config.ImageHTTPProviderConfig); ok && !httpConf.IsBackground() {
+			continue
+		}
 		catalogs = append(catalogs, key)
 	}
 	slices.Sort(catalogs)

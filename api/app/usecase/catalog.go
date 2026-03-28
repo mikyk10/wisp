@@ -70,6 +70,10 @@ type CatalogUsecase interface {
 	// GetSequencerGroupForDisplay returns the image processing sequence group for a given display key.
 	GetSequencerGroupForDisplay(displayKey string) (improc.SequencerGroup, epaper.DisplayMetadata, error)
 
+	// Fetch retrieves images from background HTTP catalogs and stores them in the database.
+	// If catalogKey is empty, all background HTTP catalogs are fetched.
+	Fetch(catalogKey string, workers int, maxRetries int, verbose bool) error
+
 	//
 	Pick(displayKey string) (catalog.ImageLoader, epaper.DisplayMetadata, improc.SequencerGroup, error)
 }
@@ -328,6 +332,11 @@ func (cu *catalogUseCase) processExcludedFile(catalogKey string, srcHash [20]byt
 func (uc *catalogUseCase) PurgeOrphans() error {
 
 	uc.imgr.FindAll(func(c *model.Image) error {
+		// Only check filesystem existence for file-based images.
+		// HTTP images have URLs in Src, not file paths.
+		if c.SrcType != "" && c.SrcType != "file" {
+			return nil
+		}
 		if _, err := os.Stat(c.Src); errors.Is(err, os.ErrNotExist) {
 			slog.Info("purge: deleted orphan", "path", c.Src)
 			return uc.imgr.RemoveImage(c.ID)

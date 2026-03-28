@@ -26,7 +26,7 @@ func (p *imageRepositoryImpl) RemoveImage(id model.PrimaryKey) error {
 func (p *imageRepositoryImpl) FindAll(cb func(*model.Image) error) {
 	imgs := []*model.Image{}
 	// ThumbJPG is not needed to verify whether Src exists; omit it to reduce memory usage.
-	p.conn.Unscoped().Omit("thumb_jpg").FindInBatches(&imgs, 100, func(tx *gorm.DB, batch int) error {
+	p.conn.Unscoped().Omit("thumb_jpg", "image_data").FindInBatches(&imgs, 100, func(tx *gorm.DB, batch int) error {
 		for _, c := range imgs {
 			if err := cb(c); err != nil {
 				return err
@@ -60,6 +60,14 @@ func (p *imageRepositoryImpl) CountByCatalog(catalogKey string, ori model.Canoni
 	return count, err
 }
 
+func (p *imageRepositoryImpl) CountAllByCatalog(catalogKey string) (int64, error) {
+	var count int64
+	err := p.conn.Model(&model.Image{}).
+		Where("catalog_key = ? AND excluded = false", catalogKey).
+		Count(&count).Error
+	return count, err
+}
+
 func (p *imageRepositoryImpl) FindByHash(catalogKey, srcHash string) (*model.Image, error) {
 	existing := &model.Image{}
 	// Unscoped: include soft-deleted rows (deleted_at IS NOT NULL).
@@ -85,7 +93,7 @@ func (p *imageRepositoryImpl) UpsertActiveImage(rec *model.Image) error {
 		// and must not be overwritten by a scan. Resetting it here would un-hide images the
 		// user explicitly hid via the UI.
 		// excluded is updated to handle files that move between included/excluded criteria.
-		DoUpdates: clause.AssignmentColumns([]string{"image_orientation", "rnd", "taken_at", "thumb_jpg", "file_modified_at", "excluded"}),
+		DoUpdates: clause.AssignmentColumns([]string{"image_orientation", "rnd", "taken_at", "thumb_jpg", "file_modified_at", "excluded", "src_type", "image_data"}),
 	}).Save(rec).Error
 }
 
@@ -156,4 +164,29 @@ func (p *imageRepositoryImpl) FindByRandom(catalogKey string, ori model.Canonica
 	}
 
 	return img, nil
+}
+
+func (p *imageRepositoryImpl) FindImageData(id model.PrimaryKey) ([]byte, error) {
+	img := &model.Image{}
+	if err := p.conn.Select("image_data").Where("id = ?", id).First(img).Error; err != nil {
+		return nil, err
+	}
+	return img.ImageData, nil
+}
+
+func (p *imageRepositoryImpl) EvictOldestImages(catalogKey string, count int) error {
+	// Subquery to find IDs of oldest images, then hard-delete them.
+	// Using Unscoped to bypass soft-delete and perform physical deletion.
+	var ids []model.PrimaryKey
+	if err := p.conn.Model(&model.Image{}).
+		Where("catalog_key = ? AND excluded = false", catalogKey).
+		Order("created_at ASC").
+		Limit(count).
+		Pluck("id", &ids).Error; err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return p.conn.Unscoped().Where("id IN ?", ids).Delete(&model.Image{}).Error
 }

@@ -4,12 +4,10 @@ package raw
 
 // Catalog Entry (Image Provider)
 type CatalogEntry struct {
-	FileConfig       FileConfig       `json:"file,omitempty"       yaml:"file,omitempty"`
-	HTTPConfig       HTTPConfig       `json:"http,omitempty"       yaml:"http,omitempty"`
-	Key              string           `json:"key"                  yaml:"key"`
-	LuaConfig        LuaConfig        `json:"lua,omitempty"        yaml:"lua,omitempty"`
-	PlaywrightConfig PlaywrightConfig `json:"playwright,omitempty" yaml:"playwright,omitempty"`
-	Type             string           `json:"type"                 yaml:"type"`
+	FileConfig FileConfig `json:"file,omitempty" yaml:"file,omitempty"`
+	HTTPConfig HTTPConfig `json:"http,omitempty" yaml:"http,omitempty"`
+	Key        string     `json:"key"            yaml:"key"`
+	Type       string     `json:"type"           yaml:"type"`
 }
 
 // Associated Catalog Entry
@@ -80,7 +78,25 @@ type Filter struct {
 }
 
 type HTTPConfig struct {
-	URL string `json:"url" yaml:"url"`
+	URL         string            `json:"url"                    yaml:"url"`
+	Method      string            `json:"method,omitempty"       yaml:"method,omitempty"`
+	ImageSource *ImageSource      `json:"image_source,omitempty" yaml:"image_source,omitempty"`
+	Cache       HTTPCacheConfig   `json:"cache,omitempty"        yaml:"cache,omitempty"`
+	TimeoutSec  int               `json:"timeout_sec,omitempty"  yaml:"timeout_sec,omitempty"`
+	Headers     map[string]string `json:"headers,omitempty"      yaml:"headers,omitempty"`
+}
+
+type ImageSource struct {
+	Catalog     string `json:"catalog"              yaml:"catalog"`
+	Mode        string `json:"mode,omitempty"       yaml:"mode,omitempty"`
+	ImageID     uint   `json:"image_id,omitempty"   yaml:"image_id,omitempty"`
+	Orientation string `json:"orientation,omitempty" yaml:"orientation,omitempty"`
+}
+
+type HTTPCacheConfig struct {
+	Type       string `json:"type,omitempty"        yaml:"type,omitempty"`
+	Depth      int    `json:"depth,omitempty"       yaml:"depth,omitempty"`
+	EvictCount int    `json:"evict_count,omitempty" yaml:"evict_count,omitempty"`
 }
 
 // file_criteria
@@ -95,15 +111,6 @@ type IncludeTimeRangeItem struct {
 	From string `json:"from" yaml:"from"`
 	Last string `json:"last" yaml:"last"`
 	To   string `json:"to" yaml:"to"`
-}
-
-type LuaConfig struct {
-	Script string `json:"script" yaml:"script"`
-}
-
-type PlaywrightConfig struct {
-	Server string `json:"server" yaml:"server"`
-	URL    string `json:"url" yaml:"url"`
 }
 
 type ColorbarConfig struct{}

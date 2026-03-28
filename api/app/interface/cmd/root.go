@@ -67,6 +67,14 @@ func setupCommands(rootCmd *cobra.Command, container *dig.Container) {
 	catalogCmd.AddCommand(NewAlbumScanCommand(container))
 	catalogCmd.AddCommand(NewAlbumCleanupCommand(container))
 	catalogCmd.AddCommand(NewCatalogListImagesCommand(container))
+	catalogCmd.AddCommand(NewCatalogFetchCommand(container))
+
+	taggingCmd := &cobra.Command{
+		Use:   "tagging",
+		Short: "Image tagging via AI service",
+	}
+	catalogCmd.AddCommand(taggingCmd)
+	taggingCmd.AddCommand(NewTaggingRunCommand(container))
 
 	imageCmd := &cobra.Command{
 		Use:   "image",

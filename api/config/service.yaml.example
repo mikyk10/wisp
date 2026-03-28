@@ -8,9 +8,6 @@
 #   Catalog types:
 #     file          — Scan a local directory for JPEG/PNG images.
 #     http          — Fetch a single image from an HTTP URL on each request.
-#     playwright-go — Capture a screenshot of a web page (requires a
-#                     playwright-go server sidecar; useful for dashboards).
-#     lua           — Generate an image via a Lua script.
 #     colorbar      — Render a test color bar (useful for display calibration).
 #
 # DISPLAY
@@ -44,13 +41,6 @@ catalog:
       #   # {file} is replaced with the absolute path of the new file.
       #   # Errors are logged but never block the scan.
       #   on_new_file: "python3 /path/to/tag_subject_area.py {file}"
-
-  # Example: capture a web page as an image
-  # - key: dashboard
-  #   type: playwright-go
-  #   playwright:
-  #     url: http://grafana.local/d/abc123
-  #     server: http://playwright:3000
 
   # Example: fetch a remote image on each request
   # - key: apod

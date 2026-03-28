@@ -22,19 +22,6 @@ catalog:
     type: http
     url: https://foo.bar.test/image.jpg
 
-  - key: album-playwright
-    type: playwright-go
-    server: localhost:3000
-    url: https://foo.bar.test/test.html
-
-  - key: album-lua
-    type: lua
-    script: |
-      function get_image()
-        return "https://foo.bar.test/image.jpg"
-      end
-      get_image()
-
 displays:
   - key: entrance-01
     api_version: 2025-03-01 

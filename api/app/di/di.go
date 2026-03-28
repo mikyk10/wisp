@@ -94,8 +94,10 @@ func (d *digBuilder) Build() *dig.Container {
 func setupDefaultDependency(d *digBuilder) {
 	d.mustProvide(repository.NewImageRepositoryImpl)
 	d.mustProvide(repository.NewSystemRepositoryImpl)
+	d.mustProvide(repository.NewTagRepositoryImpl)
 	d.mustProvide(usecase.NewSystemUsecase)
 	d.mustProvide(usecase.NewCatalogUseCase)
+	d.mustProvide(usecase.NewTaggingUsecase)
 	d.mustProvide(handler.NewCatalogHandler)
 }
 

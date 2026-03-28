@@ -14,6 +14,10 @@
   <a href="https://github.com/mikyk10/wisp/actions/workflows/ci-firmware.yml"><img src="https://github.com/mikyk10/wisp/actions/workflows/ci-firmware.yml/badge.svg" alt="CI - Firmware"></a>
 </p>
 
+---
+
+> **Experimental.** This project is a work in progress. APIs, configuration formats, and hardware targets may change without notice. Use at your own risk.
+
 ## Components
 
 | Directory | Role |

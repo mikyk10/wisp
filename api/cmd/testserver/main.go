@@ -22,6 +22,7 @@ import (
 	"log"
 	"math/rand/v2"
 	"net/http"
+	"time"
 )
 
 func main() {
@@ -38,16 +39,21 @@ func main() {
 	log.Printf("testserver listening on %s", *addr)
 	log.Printf("  GET  /image  → random color image")
 	log.Printf("  POST /remix  → tinted remix of posted image")
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	srv := &http.Server{
+		Addr:         *addr,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+	log.Fatal(srv.ListenAndServe())
 }
 
 // handleImage generates a random solid-color 800x600 JPEG.
 func handleImage(w http.ResponseWriter, r *http.Request) {
 	img := image.NewRGBA(image.Rect(0, 0, 800, 600))
 	c := color.RGBA{
-		R: uint8(rand.IntN(256)),
-		G: uint8(rand.IntN(256)),
-		B: uint8(rand.IntN(256)),
+		R: uint8(rand.IntN(256)), //nolint:gosec // 0-255 always fits uint8
+		G: uint8(rand.IntN(256)), //nolint:gosec // 0-255 always fits uint8
+		B: uint8(rand.IntN(256)), //nolint:gosec // 0-255 always fits uint8
 		A: 255,
 	}
 	draw.Draw(img, img.Bounds(), &image.Uniform{c}, image.Point{}, draw.Src)
@@ -89,18 +95,18 @@ func handleRemix(w http.ResponseWriter, r *http.Request) {
 	dst := image.NewRGBA(bounds)
 
 	// Apply a random color tint.
-	tintR := uint8(rand.IntN(128))
-	tintG := uint8(rand.IntN(128))
-	tintB := uint8(rand.IntN(128))
+	tintR := uint8(rand.IntN(128)) //nolint:gosec // 0-127 always fits uint8
+	tintG := uint8(rand.IntN(128)) //nolint:gosec // 0-127 always fits uint8
+	tintB := uint8(rand.IntN(128)) //nolint:gosec // 0-127 always fits uint8
 
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r, g, b, a := src.At(x, y).RGBA()
 			dst.Set(x, y, color.RGBA{
-				R: uint8(r>>8)/2 + tintR,
-				G: uint8(g>>8)/2 + tintG,
-				B: uint8(b>>8)/2 + tintB,
-				A: uint8(a >> 8),
+				R: uint8(r>>8)/2 + tintR,   //nolint:gosec // r>>8 is 0-255
+				G: uint8(g>>8)/2 + tintG,   //nolint:gosec // g>>8 is 0-255
+				B: uint8(b>>8)/2 + tintB,   //nolint:gosec // b>>8 is 0-255
+				A: uint8(a >> 8),            //nolint:gosec // a>>8 is 0-255
 			})
 		}
 	}

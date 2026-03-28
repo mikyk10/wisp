@@ -143,31 +143,65 @@ func (u *taggingUsecase) tagCatalog(ctx context.Context, catalogKey string, conc
 
 	wg.Wait()
 	slog.Info("tagging: completed", "catalog", catalogKey, "processed", processed, "total", len(ids))
-	return nil
+	return ctx.Err()
 }
 
 func (u *taggingUsecase) tagOne(ctx context.Context, imageID model.PrimaryKey, endpoint string, timeoutSec int) error {
-	// Load thumbnail from DB.
+	imgBytes, err := u.loadTaggingImage(imageID)
+	if err != nil {
+		return err
+	}
+
+	tags, err := u.callTaggingService(ctx, endpoint, imgBytes, timeoutSec)
+	if err != nil {
+		return err
+	}
+
+	if len(tags) == 0 {
+		slog.Debug("tagging: no tags returned", "image_id", imageID)
+		return nil
+	}
+
+	var tagIDs []model.PrimaryKey
+	for _, name := range tags {
+		tag, err := u.tagRepo.FindOrCreateTag(name)
+		if err != nil {
+			slog.Warn("tagging: failed to create tag", "tag", name, "err", err)
+			continue
+		}
+		tagIDs = append(tagIDs, tag.ID)
+	}
+
+	if err := u.tagRepo.ReplaceImageTags(imageID, tagIDs); err != nil {
+		return fmt.Errorf("store tags: %w", err)
+	}
+
+	slog.Debug("tagging: tagged", "image_id", imageID, "tags", tags)
+	return nil
+}
+
+func (u *taggingUsecase) loadTaggingImage(imageID model.PrimaryKey) ([]byte, error) {
 	img, err := u.imgRepo.FindById(imageID)
 	if err != nil {
-		return fmt.Errorf("find image: %w", err)
+		return nil, fmt.Errorf("find image: %w", err)
 	}
 
-	// Use thumbnail if available, otherwise skip.
-	imgBytes := img.ThumbJPG
-	if len(imgBytes) == 0 {
-		// For HTTP images, load from image_data and generate a thumbnail on the fly.
-		if img.SrcType == "http" && len(img.ImageData) > 0 {
-			thumb, err := makeThumbnail(img.ImageData)
-			if err != nil {
-				return fmt.Errorf("generate thumbnail: %w", err)
-			}
-			imgBytes = thumb
-		} else {
-			return fmt.Errorf("image %d has no thumbnail", imageID)
+	if len(img.ThumbJPG) > 0 {
+		return img.ThumbJPG, nil
+	}
+
+	if img.SrcType == "http" && len(img.ImageData) > 0 {
+		thumb, err := makeThumbnail(img.ImageData)
+		if err != nil {
+			return nil, fmt.Errorf("generate thumbnail: %w", err)
 		}
+		return thumb, nil
 	}
 
+	return nil, fmt.Errorf("image %d has no thumbnail", imageID)
+}
+
+func (u *taggingUsecase) callTaggingService(ctx context.Context, endpoint string, imgBytes []byte, timeoutSec int) ([]string, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 	defer cancel()
 
@@ -182,53 +216,32 @@ func (u *taggingUsecase) tagOne(ctx context.Context, imageID model.PrimaryKey, e
 
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, url, bytes.NewReader(imgBytes))
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "image/jpeg")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL from config
 	if err != nil {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return nil, ctx.Err()
 		}
-		return fmt.Errorf("call ai service: %w", err)
+		return nil, fmt.Errorf("call ai service: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("ai service returned %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("ai service returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result struct {
 		Tags []string `json:"tags"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("decode response: %w", err)
+		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	if len(result.Tags) == 0 {
-		slog.Debug("tagging: no tags returned", "image_id", imageID)
-		return nil
-	}
-
-	// Store tags.
-	var tagIDs []model.PrimaryKey
-	for _, name := range result.Tags {
-		tag, err := u.tagRepo.FindOrCreateTag(name)
-		if err != nil {
-			slog.Warn("tagging: failed to create tag", "tag", name, "err", err)
-			continue
-		}
-		tagIDs = append(tagIDs, tag.ID)
-	}
-
-	if err := u.tagRepo.ReplaceImageTags(imageID, tagIDs); err != nil {
-		return fmt.Errorf("store tags: %w", err)
-	}
-
-	slog.Debug("tagging: tagged", "image_id", imageID, "tags", result.Tags)
-	return nil
+	return result.Tags, nil
 }
 
 func makeThumbnail(imageData []byte) ([]byte, error) {

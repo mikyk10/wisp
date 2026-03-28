@@ -147,7 +147,7 @@ func (cu *catalogUseCase) fetchCatalog(ctx context.Context, catalogKey string, c
 
 	wg.Wait()
 	slog.Info("fetch: completed", "catalog", catalogKey)
-	return nil
+	return ctx.Err()
 }
 
 func (cu *catalogUseCase) fetchOne(ctx context.Context, catalogKey string, conf config.ImageHTTPProviderConfig, method string, timeout time.Duration, maxRetries int, idx int, total int) {
@@ -254,7 +254,7 @@ func (cu *catalogUseCase) httpFetch(ctx context.Context, conf config.ImageHTTPPr
 		req.Header.Set(k, os.ExpandEnv(v))
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL from config
 	if err != nil {
 		return nil, fmt.Errorf("http request: %w", err)
 	}

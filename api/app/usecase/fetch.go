@@ -295,7 +295,11 @@ func (cu *catalogUseCase) loadSourceImage(src *config.HTTPImageSource) (io.Reade
 		rec, err = cu.imgr.FindById(model.PrimaryKey(src.ImageID))
 	case "random":
 		ori := model.NewCanonicalOrientation(src.Orientation)
-		rec, err = cu.imgr.FindByRandom(src.Catalog, ori)
+		rec, err = cu.imgr.FindByRandom(model.ImageFilter{
+			CatalogKeys: src.Catalogs,
+			Orientation: ori,
+			Tags:        src.Tags,
+		})
 	default:
 		return nil, "", fmt.Errorf("unknown image_source mode: %s", mode)
 	}
@@ -305,7 +309,7 @@ func (cu *catalogUseCase) loadSourceImage(src *config.HTTPImageSource) (io.Reade
 	}
 
 	if rec.SrcType == "http" {
-		return nil, "", fmt.Errorf("image_source does not support http-sourced images (catalog=%s, id=%d)", src.Catalog, rec.ID)
+		return nil, "", fmt.Errorf("image_source does not support http-sourced images (catalogs=%v, id=%d)", src.Catalogs, rec.ID)
 	}
 
 	// Load from filesystem (file catalogs only).

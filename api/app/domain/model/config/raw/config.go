@@ -87,10 +87,11 @@ type HTTPConfig struct {
 }
 
 type ImageSource struct {
-	Catalog     string `json:"catalog"              yaml:"catalog"`
-	Mode        string `json:"mode,omitempty"       yaml:"mode,omitempty"`
-	ImageID     uint   `json:"image_id,omitempty"   yaml:"image_id,omitempty"`
-	Orientation string `json:"orientation,omitempty" yaml:"orientation,omitempty"`
+	Catalogs    []string `json:"catalogs"             yaml:"catalogs"`
+	Mode        string   `json:"mode,omitempty"       yaml:"mode,omitempty"`
+	ImageID     uint     `json:"image_id,omitempty"   yaml:"image_id,omitempty"`
+	Orientation string   `json:"orientation,omitempty" yaml:"orientation,omitempty"`
+	Tags        []string `json:"tags,omitempty"       yaml:"tags,omitempty"`
 }
 
 type HTTPCacheConfig struct {

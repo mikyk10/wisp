@@ -19,10 +19,11 @@ func (c ImageHTTPProviderConfig) IsBackground() bool {
 
 // HTTPImageSource configures the source image for push-pull (POST) mode.
 type HTTPImageSource struct {
-	Catalog     string // source file catalog key
-	Mode        string // "random" (default) or "fixed"
-	ImageID     uint   // source image ID (mode=fixed only)
-	Orientation string // "landscape" or "portrait"
+	Catalogs    []string // source file catalog keys
+	Mode        string   // "random" (default) or "fixed"
+	ImageID     uint     // source image ID (mode=fixed only)
+	Orientation string   // "landscape" or "portrait"
+	Tags        []string // tag filter: match any of these tags (OR)
 }
 
 // HTTPCacheConfig defines the caching behavior for an HTTP catalog.

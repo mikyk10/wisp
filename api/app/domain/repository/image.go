@@ -11,7 +11,7 @@ type ImageRepository interface {
 
 	FindAll(func(*model.Image) error)
 
-	FindByRandom(catalogKey string, ori model.CanonicalOrientation) (*model.Image, error)
+	FindByRandom(filter model.ImageFilter) (*model.Image, error)
 
 	ListByCatalog(catalogKey string, cb func(*model.Image) error) error
 

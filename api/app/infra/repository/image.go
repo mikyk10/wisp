@@ -137,16 +137,30 @@ func (p *imageRepositoryImpl) ListByCatalog(catalogKey string, cb func(*model.Im
 	return nil
 }
 
-func (p *imageRepositoryImpl) FindByRandom(catalogKey string, ori model.CanonicalOrientation) (*model.Image, error) {
+func (p *imageRepositoryImpl) FindByRandom(filter model.ImageFilter) (*model.Image, error) {
 	rnd := rand.Float64()
 
+	buildQuery := func(op string) *gorm.DB {
+		q := p.conn.Model(&model.Image{}).
+			Where("catalog_key IN ? AND image_orientation = ? AND excluded = false", filter.CatalogKeys, filter.Orientation)
+		if op == ">=" {
+			q = q.Where("rnd >= ?", rnd)
+		} else {
+			q = q.Where("rnd < ?", rnd)
+		}
+		if len(filter.Tags) > 0 {
+			q = q.Where("id IN (SELECT image_id FROM image_tags INNER JOIN tags ON tags.id = image_tags.tag_id WHERE tags.name_normalized IN ?)", filter.Tags)
+		}
+		return q.Order("rnd ASC")
+	}
+
 	img := &model.Image{}
-	err := p.conn.Model(img).Where("catalog_key = ? AND image_orientation = ? AND excluded = false AND rnd >= ?", catalogKey, ori, rnd).Order("rnd ASC").First(img).Error
+	err := buildQuery(">=").First(img).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 	if img.ID == 0 {
-		err = p.conn.Model(img).Where("catalog_key = ? AND image_orientation = ? AND excluded = false AND rnd < ?", catalogKey, ori, rnd).Order("rnd ASC").First(img).Error
+		err = buildQuery("<").First(img).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}

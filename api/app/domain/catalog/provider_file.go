@@ -10,6 +10,7 @@ import (
 	"time"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"github.com/mikyk10/wisp/app/domain/finder/fs"
+	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/mikyk10/wisp/app/domain/repository"
 
@@ -43,7 +44,10 @@ func (i *imageIndexedFileProvider) Resolve() (ImageLoader, error) {
 		}, nil}
 	}
 
-	selectedImage, err := i.repo.FindByRandom(i.catalogKey, i.epd.InstalledOrientation())
+	selectedImage, err := i.repo.FindByRandom(model.ImageFilter{
+		CatalogKeys: []string{i.catalogKey},
+		Orientation: i.epd.InstalledOrientation(),
+	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nfProviderFunc("No images indexed").Resolve()

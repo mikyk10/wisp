@@ -183,10 +183,11 @@ func parseCatalogEntry(v raw.CatalogEntry) *config.ImageProviderConfig {
 		}
 		if v.HTTPConfig.ImageSource != nil {
 			httpConf.ImageSource = &config.HTTPImageSource{
-				Catalog:     v.HTTPConfig.ImageSource.Catalog,
+				Catalogs:    v.HTTPConfig.ImageSource.Catalogs,
 				Mode:        v.HTTPConfig.ImageSource.Mode,
 				ImageID:     v.HTTPConfig.ImageSource.ImageID,
 				Orientation: v.HTTPConfig.ImageSource.Orientation,
+				Tags:        v.HTTPConfig.ImageSource.Tags,
 			}
 		}
 		return &config.ImageProviderConfig{

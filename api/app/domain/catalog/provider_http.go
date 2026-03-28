@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/mikyk10/wisp/app/domain/repository"
 )
@@ -40,7 +41,10 @@ func (i *imageHttpProvider) resolveRealtime() (ImageLoader, error) {
 
 // resolveBackground selects a random cached image from the DB (like file provider).
 func (i *imageHttpProvider) resolveBackground() (ImageLoader, error) {
-	img, err := i.repo.FindByRandom(i.catalogKey, i.epd.InstalledOrientation())
+	img, err := i.repo.FindByRandom(model.ImageFilter{
+		CatalogKeys: []string{i.catalogKey},
+		Orientation: i.epd.InstalledOrientation(),
+	})
 	if err != nil {
 		return nil, err
 	}

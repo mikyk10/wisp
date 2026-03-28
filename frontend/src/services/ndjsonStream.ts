@@ -6,9 +6,12 @@ import { getDataSourceUrl } from '../config'
  * @template T The expected shape of each JSON record.
  */
 export class NDJSONStreamReader<T = unknown> {
-  async *readStream(resourcePath: string): AsyncGenerator<T, void, unknown> {
+  async *readStream(
+    resourcePath: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<T, void, unknown> {
     const finalUrl = getDataSourceUrl(resourcePath)
-    const response = await fetch(finalUrl)
+    const response = await fetch(finalUrl, { signal })
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)

@@ -11,6 +11,7 @@ export const usePhotosStore = defineStore('photos', () => {
   const timeline = ref<Record<string, Omit<TimelineEntry, 'key' | 'label'>>>({})
   const streamCompleted = ref(false)
   const error = ref<string | null>(null)
+  let abortController: AbortController | null = null
   // ── Getters ──────────────────────────────────────────────────────────────
   const totalPhotos = computed(() => items.value.length)
 
@@ -58,6 +59,12 @@ export const usePhotosStore = defineStore('photos', () => {
 
   // ── Actions ──────────────────────────────────────────────────────────────
   async function loadPhotosStream(catalogKey: string) {
+    if (abortController) {
+      abortController.abort()
+    }
+    abortController = new AbortController()
+    const { signal } = abortController
+
     loading.value = true
     error.value = null
 
@@ -70,7 +77,7 @@ export const usePhotosStore = defineStore('photos', () => {
 
       const resource = isApiMode() ? API_PATHS.catalogImages(catalogKey) : 'photos.ndjson'
 
-      for await (const rec of reader.readStream(resource)) {
+      for await (const rec of reader.readStream(resource, signal)) {
         const url = buildImageUrl(catalogKey, rec.id)
         batch.push({ ...rec, url })
 
@@ -94,6 +101,7 @@ export const usePhotosStore = defineStore('photos', () => {
       _buildTimeline()
       streamCompleted.value = true
     } catch (err) {
+      if (signal.aborted) return
       error.value = err instanceof Error ? err.message : 'Failed to load photos'
       console.error('Photo load error:', err)
     } finally {

@@ -13,7 +13,7 @@ type Tag struct {
 
 // ImageTag links an image to a tag.
 type ImageTag struct {
-	ImageID   PrimaryKey `gorm:"primaryKey"`
-	TagID     PrimaryKey `gorm:"primaryKey"`
+	ImageID   PrimaryKey `gorm:"primaryKey;index:idx_tag_lookup,priority:2"`
+	TagID     PrimaryKey `gorm:"primaryKey;index:idx_tag_lookup,priority:1"`
 	CreatedAt time.Time  `gorm:"not null;"`
 }

@@ -149,7 +149,7 @@ func (p *imageRepositoryImpl) FindByRandom(filter model.ImageFilter) (*model.Ima
 			q = q.Where("rnd < ?", rnd)
 		}
 		if len(filter.Tags) > 0 {
-			q = q.Where("id IN (SELECT image_id FROM image_tags INNER JOIN tags ON tags.id = image_tags.tag_id WHERE tags.name_normalized IN ?)", filter.Tags)
+			q = q.Where("EXISTS (SELECT 1 FROM image_tags INNER JOIN tags ON tags.id = image_tags.tag_id WHERE image_tags.image_id = images.id AND tags.name_normalized IN ?)", filter.Tags)
 		}
 		return q.Order("rnd ASC")
 	}

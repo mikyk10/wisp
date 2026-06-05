@@ -127,23 +127,49 @@ void setup() {
 
 
     String ssid, password;
-    if (!wifiManager.loadCredentials(ssid, password) ||
-        !wifiManager.connectToWiFi(ssid.c_str(), password.c_str(), 15000)) {
-        Serial.println("[WiFi] Connection failed, showing error and entering SoftAP mode...");
+
+    // No saved credentials → genuinely unconfigured: open SoftAP for setup.
+    if (!wifiManager.loadCredentials(ssid, password)) {
+        Serial.println("[WiFi] No credentials saved, entering SoftAP setup mode...");
 
         initEPaper();
-
         epaper->sendErrorScreen();
         epaper->displayImage();
         epaper->enterSleep();
 
-        // Display error and keep SoftAP active for reconfiguration:
-        // - User sees error screen on display (device not broken)
-        // - User can access Web UI at http://wisp.local without manual reset
-        // - No sleep delay: user gets immediate feedback and can reconfigure
         wifiManager.startSoftAPWithWebServer();
         return;
     }
+
+    // Credentials exist: try to connect, using a cached channel/BSSID hint to skip
+    // the scan on the first attempt (with full-scan fallback inside connectToWiFi).
+    int32_t hintChannel = 0;
+    uint8_t hintBssid[6];
+    bool hasHint = wifiManager.loadConnHint(hintChannel, hintBssid);
+
+    if (!wifiManager.connectToWiFi(ssid.c_str(), password.c_str(), 15000,
+                                   hasHint ? hintChannel : 0,
+                                   hasHint ? hintBssid : nullptr)) {
+        // connectToWiFi already exhausted its in-call retries. Credentials are present,
+        // so this is a transient/environmental failure (AP busy, weak signal, server
+        // down), not a misconfiguration — show the error screen and go back to a normal
+        // sleep. The next wake retries from scratch. We do NOT drop into SoftAP forever
+        // (which would need a manual reset to escape); to reconfigure WiFi, hold BOOT at
+        // power-on to enter setup mode.
+        Serial.printf("[WiFi] Connection failed, showing error and sleeping %ds...\n",
+                      FALLBACK_SLEEP_SECONDS);
+
+        initEPaper();
+        epaper->sendErrorScreen();
+        epaper->displayImage();
+        epaper->enterSleep();
+
+        deepSleep(FALLBACK_SLEEP_SECONDS);
+        return;
+    }
+
+    // Connected: refresh the fast-connect hint for next wake (no-op if unchanged).
+    wifiManager.saveConnHint(WiFi.channel(), WiFi.BSSID());
 
     initEPaper();
 

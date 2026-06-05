@@ -1,4 +1,5 @@
 #include "WiFiManager.h"
+#include <string.h>
 
 String WiFiManager::getMacSuffix()
 {
@@ -23,34 +24,60 @@ String WiFiManager::generateSSID()
     return apSSID;
 }
 
-bool WiFiManager::connectToWiFi(const char *ssid, const char *password, int timeout)
+bool WiFiManager::connectToWiFi(const char *ssid, const char *password, int timeout,
+                                int32_t channelHint, const uint8_t *bssidHint)
 {
     String hostname = generateHostname();
-    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
-    WiFi.setHostname(hostname.c_str());
 
-    WiFi.begin(ssid, password);
-    Serial.print("[WiFi] Connecting to ");
-    Serial.println(ssid);
-
-    int elapsed = 0;
-    while (WiFi.status() != WL_CONNECTED && elapsed < timeout)
+    // Retry across a few attempts: a single WiFi.begin() right after deep-sleep wake
+    // often fails to associate, but a disconnect + retry usually succeeds.
+    const int maxAttempts = 3;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++)
     {
-        Serial.print(".");
-        delay(500);
-        elapsed += 500;
+        WiFi.persistent(false);
+        WiFi.mode(WIFI_STA);
+        WiFi.setHostname(hostname.c_str());
+        WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+
+        // Only the first attempt uses the cached channel/BSSID hint; if it fails the
+        // hint is likely stale (AP changed channel / roamed), so fall back to a scan.
+        bool useHint = (attempt == 1 && channelHint > 0 && bssidHint != nullptr);
+        if (useHint)
+        {
+            Serial.printf("[WiFi] Attempt %d/%d: fast connect to %s (ch %d, cached BSSID)\n",
+                          attempt, maxAttempts, ssid, channelHint);
+            WiFi.begin(ssid, password, channelHint, bssidHint);
+        }
+        else
+        {
+            Serial.printf("[WiFi] Attempt %d/%d: full-scan connect to %s\n",
+                          attempt, maxAttempts, ssid);
+            WiFi.begin(ssid, password);
+        }
+
+        // Give the hinted attempt a shorter budget so we fail fast to a full scan.
+        int budget = (useHint && timeout > 6000) ? 6000 : timeout;
+        int elapsed = 0;
+        while (WiFi.status() != WL_CONNECTED && elapsed < budget)
+        {
+            Serial.print(".");
+            delay(250);
+            elapsed += 250;
+        }
+
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            Serial.printf("\n[WiFi] Connected! IP: %s (ch %d)\n",
+                          WiFi.localIP().toString().c_str(), WiFi.channel());
+            return true;
+        }
+
+        Serial.printf("\n[WiFi] Attempt %d failed\n", attempt);
+        WiFi.disconnect(true); // also powers down the radio to clear association state
+        delay(200);
     }
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        Serial.println("\n[WiFi] Connected!");
-        Serial.print("[WiFi] IP Address: ");
-        Serial.println(WiFi.localIP());
-        return true;
-    }
-
-    Serial.println("\n[WiFi] Connection failed");
-    WiFi.disconnect();
+    Serial.println("[WiFi] All connection attempts failed");
     return false;
 }
 
@@ -317,6 +344,34 @@ bool WiFiManager::loadServerURL(String &url)
     url = preferences.getString("server_url", "");
     preferences.end();
     return url.length() > 0;
+}
+
+bool WiFiManager::loadConnHint(int32_t &channel, uint8_t *bssid)
+{
+    preferences.begin("wifi", true);
+    channel = preferences.getInt("ch", 0);
+    size_t n = preferences.getBytes("bssid", bssid, 6);
+    preferences.end();
+    return channel > 0 && n == 6;
+}
+
+void WiFiManager::saveConnHint(int32_t channel, const uint8_t *bssid)
+{
+    // Only write when the hint actually changes — avoids needless NVS flash wear,
+    // since the AP channel/BSSID is stable across the vast majority of wakes.
+    int32_t curChannel;
+    uint8_t curBssid[6];
+    if (loadConnHint(curChannel, curBssid) &&
+        curChannel == channel && memcmp(curBssid, bssid, 6) == 0)
+    {
+        return;
+    }
+
+    preferences.begin("wifi", false);
+    preferences.putInt("ch", channel);
+    preferences.putBytes("bssid", bssid, 6);
+    preferences.end();
+    Serial.printf("[WiFi] Cached connect hint (ch %d)\n", channel);
 }
 
 void WiFiManager::enableMDNS()

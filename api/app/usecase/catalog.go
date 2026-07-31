@@ -1,14 +1,12 @@
 package usecase
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha1" //nolint:gosec // sha1 is cryptographically weak, but is used here only as a hash to avoid collisions
 	"database/sql"
 	"errors"
 	"fmt"
 	"image"
-	"image/jpeg"
 	"log/slog"
 	"maps"
 	"math/rand/v2"
@@ -41,8 +39,6 @@ import (
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/mikyk10/wisp/app/domain/repository"
-
-	"github.com/sunshineplan/imgconv"
 )
 
 type ImageTaskCallback func(path string) error
@@ -271,14 +267,12 @@ func (cu *catalogUseCase) processIncludedFile(ctx context.Context, catalogKey st
 	img, _ = imseq.Apply(ctx2, img, meta)
 
 	// The full-size image is no longer needed after thumbnail generation; clear the reference early to encourage GC (OOM mitigation).
-	jbuf := &bytes.Buffer{}
-	resized := imgconv.Resize(img, &imgconv.ResizeOption{Width: 256})
+	thumb, err := encodeThumbnail(img)
 	img = nil //nolint:ineffassign // intentionally cleared to encourage GC (OOM mitigation)
-	if err := jpeg.Encode(jbuf, resized, &jpeg.Options{Quality: jpeg.DefaultQuality}); err != nil {
+	if err != nil {
 		slog.Error("scan: failed to encode thumbnail", "path", info.GetSourcePath(), "err", err)
 		return
 	}
-	resized = nil //nolint:ineffassign // intentionally cleared to encourage GC (OOM mitigation)
 
 	// Release the full-size image cached inside the loader before the DB write.
 	// Without this, info holds the decoded image until the goroutine exits — which may be
@@ -301,7 +295,7 @@ func (cu *catalogUseCase) processIncludedFile(ctx context.Context, catalogKey st
 			Valid: !meta.ExifDateTime.IsZero(),
 		},
 		ImageOrientation: meta.ImageOrientation,
-		ThumbJPG:         jbuf.Bytes(),
+		ThumbJPG:         thumb,
 	}
 	if err = cu.imgr.UpsertActiveImage(rec); err != nil {
 		slog.Error("scan: failed to upsert image", "path", meta.ImageSourcePath, "err", err)

@@ -26,7 +26,6 @@ import (
 	"github.com/mikyk10/wisp/app/domain/catalog"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
-	"github.com/sunshineplan/imgconv"
 )
 
 func (cu *catalogUseCase) Fetch(catalogKeys []string, workers int, maxRetries int, verbose bool) error {
@@ -194,10 +193,9 @@ func (cu *catalogUseCase) fetchOne(ctx context.Context, catalogKey string, conf 
 	}
 
 	// Generate thumbnail.
-	thumb := imgconv.Resize(img, &imgconv.ResizeOption{Width: 256})
+	thumb, err := encodeThumbnail(img)
 	img = nil //nolint:ineffassign
-	thumbBuf := &bytes.Buffer{}
-	if err := jpeg.Encode(thumbBuf, thumb, &jpeg.Options{Quality: jpeg.DefaultQuality}); err != nil {
+	if err != nil {
 		slog.Error("fetch: thumbnail encode failed", "catalog", catalogKey, "idx", idx, "err", err)
 		return
 	}
@@ -213,7 +211,7 @@ func (cu *catalogUseCase) fetchOne(ctx context.Context, catalogKey string, conf 
 		SrcType:          "http",
 		TakenAt:          sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		ImageOrientation: model.ImgCanonicalOrientationLandscape,
-		ThumbJPG:         thumbBuf.Bytes(),
+		ThumbJPG:         thumb,
 		ImageData:        data,
 		FileModifiedAt:   sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}

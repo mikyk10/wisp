@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
-	"image/jpeg"
 	_ "image/png"
 	"io"
 	"log/slog"
@@ -20,7 +19,6 @@ import (
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/mikyk10/wisp/app/domain/repository"
-	"github.com/sunshineplan/imgconv"
 )
 
 type TaggingUsecase interface {
@@ -249,12 +247,7 @@ func makeThumbnail(imageData []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	resized := imgconv.Resize(img, &imgconv.ResizeOption{Width: 256})
-	buf := &bytes.Buffer{}
-	if err := jpeg.Encode(buf, resized, &jpeg.Options{Quality: jpeg.DefaultQuality}); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return encodeThumbnail(img)
 }
 
 func decodeImageFromReader(r io.Reader) (image.Image, error) {

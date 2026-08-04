@@ -47,6 +47,11 @@ type ImgMeta struct {
 
 	FileModifiedAt time.Time
 
+	// RequiredCorrectionAngle is how far crop turned the image, clockwise, to
+	// match the installed orientation of the panel. It still means only that,
+	// even though crop now performs the EXIF normalisation in the same
+	// operation: PendingExifOp is not counted here, because what reads this is
+	// asking where the photograph's own edges went.
 	//TODO: should be better naming
 	RequiredCorrectionAngle float64
 

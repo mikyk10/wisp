@@ -382,7 +382,9 @@ func (uc *catalogUseCase) getSequencerGroupForDisplay(displayConfigInUse *config
 	// Pre-processing
 	imPreProcessingSeq := improc.NewSequencer()
 	imseqGroup.Push(imPreProcessingSeq)
-	imPreProcessingSeq.Push(exif_rotation.NewExifRotation())
+	// Deferred: crop carries out the EXIF normalisation together with its own
+	// orientation correction, in one pass over the full-resolution image.
+	imPreProcessingSeq.Push(exif_rotation.NewDeferredExifRotation())
 	imPreProcessingSeq.Push(crop.NewImageCropper(display, displayConfigInUse.Crop.Strategy))
 
 	// Image processors configured for the display.

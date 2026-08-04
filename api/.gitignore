@@ -9,5 +9,8 @@ app/tmp/*
 data/
 *.png
 !**/error-icon.png
+# Golden images for the image-processing pipeline; regenerate with
+# `go test ./app/domain/improc/ -run Golden -update`.
+!app/domain/improc/testdata/golden/*.png
 config/*.yaml
 .env

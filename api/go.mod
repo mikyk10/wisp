@@ -10,6 +10,7 @@ require (
 	github.com/anthonynsimon/bild v0.13.0
 	github.com/bfontaine/jsons v1.1.0
 	github.com/caarlos0/env/v10 v10.0.0
+	github.com/disintegration/imaging v1.6.2
 	github.com/glebarez/sqlite v1.8.0
 	github.com/goark/gocli v0.13.0
 	github.com/gofrs/uuid v4.4.0+incompatible
@@ -29,7 +30,6 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/glebarez/go-sqlite v1.21.1 // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect

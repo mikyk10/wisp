@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mikyk10/wisp/app/domain/improc/exif_rotation"
+	"github.com/mikyk10/wisp/app/domain/improc/ortho"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -98,6 +99,38 @@ func TestExifRotation_TransformsSubjectArea(t *testing.T) {
 				"subject area point should be transformed to post-rotation coordinates")
 		})
 	}
+}
+
+// TestExifRotation_RotatesImmediately covers the form used by the thumbnail
+// pass during a catalogue scan, where nothing downstream would rotate the
+// image. It has to hand back pixels that are already upright.
+func TestExifRotation_RotatesImmediately(t *testing.T) {
+	proc := exif_rotation.NewExifRotation()
+	input := image.NewRGBA(image.Rect(0, 0, 300, 200))
+	meta := &model.ImgMeta{ExifOrientation: 6} // quarter turn: 300x200 becomes 200x300
+
+	out, outMeta := proc.Apply(context.Background(), input, meta)
+
+	assert.Equal(t, 200, out.Bounds().Dx(), "width after rotation")
+	assert.Equal(t, 300, out.Bounds().Dy(), "height after rotation")
+	assert.Equal(t, model.ImgCanonicalOrientationPortrait, outMeta.ImageOrientation)
+	assert.Equal(t, ortho.Identity, outMeta.PendingExifOp, "nothing should be left outstanding")
+}
+
+// TestExifRotation_DeferredLeavesPixelsAlone covers the form used by the
+// delivery path, where crop performs the operation as part of its own.
+func TestExifRotation_DeferredLeavesPixelsAlone(t *testing.T) {
+	proc := exif_rotation.NewDeferredExifRotation()
+	input := image.NewRGBA(image.Rect(0, 0, 300, 200))
+	meta := &model.ImgMeta{ExifOrientation: 6}
+
+	out, outMeta := proc.Apply(context.Background(), input, meta)
+
+	assert.Same(t, input, out, "the pixels should not be touched")
+	assert.Equal(t, ortho.Rotate90CW, outMeta.PendingExifOp, "the operation should be recorded")
+	// The orientation still describes the image as it will be once crop has
+	// applied the recorded operation, because crop chooses its correction from it.
+	assert.Equal(t, model.ImgCanonicalOrientationPortrait, outMeta.ImageOrientation)
 }
 
 // TestExifRotation_SubjectAreaUnchangedWhenAbsent verifies that Apply() does not modify

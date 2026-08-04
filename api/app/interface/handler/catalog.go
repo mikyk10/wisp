@@ -13,8 +13,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
+
 	"github.com/mikyk10/wisp/app/domain/catalog"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/display/wake"
 	"github.com/mikyk10/wisp/app/domain/encoder"
 	"github.com/mikyk10/wisp/app/domain/improc/color_reduction"
 	"github.com/mikyk10/wisp/app/domain/model"
@@ -300,7 +303,14 @@ func (uc *catalogHandler) RandomImg(c *echo.Context) error {
 		return uc.renderErrorImage(c, ext, display, msg, statusCode, pickErr)
 	}
 
-	sleepSecs := uc.svc.Displays[displayKey].SleepDurationSeconds
+	// How long to stay away. With a wake schedule this is the distance to the
+	// next moment the panel is wanted, so panels land on the same minute every
+	// day instead of drifting by however long each sleep happened to be.
+	displayConf := uc.svc.Displays[displayKey]
+	sleepSecs := wake.Plan{
+		Schedule: displayConf.WakeSchedule,
+		Fallback: displayConf.SleepDurationSeconds,
+	}.SleepSeconds(time.Now())
 
 	// Pass through the sequencer to obtain the desired image.
 	ctx := context.Background()

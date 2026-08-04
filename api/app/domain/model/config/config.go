@@ -86,6 +86,11 @@ type DisplayConfig struct {
 	Catalog              []*AssociatedImageProviders
 	ImageProcessors      []*ImageProcessorConfig
 	SleepDurationSeconds int
+
+	// WakeSchedule names the moments this panel should be awake, as cron
+	// expressions. When set, the sleep interval handed to the device is the
+	// distance to the next of them rather than SleepDurationSeconds.
+	WakeSchedule []string
 }
 
 type CropStrategy string

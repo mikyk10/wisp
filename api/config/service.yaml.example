@@ -132,6 +132,29 @@ displays:
     # Rotate the final image 180°. Enable when the display is mounted upside down.
     flip: false
 
+    # How long the device sleeps before asking for the next picture, in
+    # seconds. Sent back as the X-Sleep-Seconds header.
+    sleep_duration: 300
+
+    # wake_schedule names the moments this panel should be awake, as standard
+    # 5-field cron expressions, and takes over from sleep_duration when set.
+    # The device is told to sleep until the next of them rather than for a
+    # fixed interval, so it lands on the same minute every day instead of
+    # drifting by however long each sleep happened to be.
+    #
+    # Listing several is usually clearer than contriving one: a dense evening
+    # laid over a sparse day reads better as two rules. The earliest match
+    # wins. Hours with no rule are simply not woken for, which is where the
+    # battery goes — e-paper holds its picture on no power at all.
+    #
+    # Expressions are read in the server's local time, so set TZ on the
+    # container. Sleeps are held to between 60 seconds and 24 hours.
+    #
+    # wake_schedule:
+    #   - "*/30 7-16 * * *"   # every half hour through the day
+    #   - "*/5 17-21 * * *"   # every five minutes through the evening
+    #   - "0 6 * * *"         # and once to greet the morning
+
     # Color reduction maps full-color input to the display's limited palette.
     #
     #   bayer          — Ordered dithering. Produces a regular dot pattern;

@@ -38,4 +38,14 @@ type ImageRepository interface {
 
 	// EvictOldestImages hard-deletes the oldest N images (by created_at ASC) in the given catalog.
 	EvictOldestImages(catalogKey string, count int) error
+
+	// ReshuffleRandom spreads the rnd column evenly across (0, 1].
+	//
+	// FindByRandom draws a number and takes the first row at or past it, so a
+	// row's chance of being picked is the distance back to the row before it.
+	// Values drawn at random leave gaps of wildly differing size, and since a
+	// row is only ever assigned one at insert, the same rows stay favoured and
+	// the same rows stay all but unreachable for as long as the catalogue
+	// lives. Spacing the values evenly makes every gap the same width.
+	ReshuffleRandom() error
 }

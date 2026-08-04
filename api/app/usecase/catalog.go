@@ -116,6 +116,17 @@ func (cu *catalogUseCase) Scan(workers int) error {
 		cu.scanCatalog(ctx, provConf, workers)
 	}
 
+	// Spread rnd evenly now that the catalogue has settled. New rows arrive
+	// with a value drawn at random, which leaves gaps of wildly differing size,
+	// and since a row keeps its value the same photographs stay favoured and
+	// the same ones stay unreachable. Doing it here rather than per row keeps
+	// the delivery path free of writes.
+	if err := cu.imgr.ReshuffleRandom(); err != nil {
+		// The scan itself succeeded; an uneven spread is the state the
+		// catalogue was already in, so it is not worth failing over.
+		slog.Error("scan: failed to even out the random ordering", "err", err)
+	}
+
 	return nil
 }
 

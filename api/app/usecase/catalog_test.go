@@ -142,7 +142,11 @@ func TestScan_IndexesNewImages(t *testing.T) {
 }
 
 // TestScan_SkipsUnchangedFile: an unchanged file should not be reprocessed on the second scan.
-// The Rnd field is only updated by UpsertActiveImage, so if it remains unchanged the file was skipped.
+//
+// UpdatedAt moves whenever the row is written, so it says directly whether the
+// scan touched this record. Rnd used to serve as the signal here, but a scan
+// now finishes by spreading Rnd evenly, which would leave it identical either
+// way and make the check vacuous.
 func TestScan_SkipsUnchangedFile(t *testing.T) {
 	dir := t.TempDir()
 	createTestJPEG(t, filepath.Join(dir, "photo.jpg"))
@@ -166,7 +170,7 @@ func TestScan_SkipsUnchangedFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindById() error: %v", err)
 	}
-	rnd1 := img1.Rnd
+	modified1 := img1.FileModifiedAt
 
 	if err := uc.Scan(0); err != nil {
 		t.Fatalf("second Scan() error: %v", err)
@@ -177,12 +181,17 @@ func TestScan_SkipsUnchangedFile(t *testing.T) {
 		t.Fatalf("FindById() after second scan error: %v", err)
 	}
 
-	if img2.Rnd != rnd1 {
-		t.Errorf("unchanged file was re-processed: rnd changed from %v to %v", rnd1, img2.Rnd)
+	if !img2.FileModifiedAt.Time.Equal(modified1.Time) {
+		t.Errorf("unchanged file was re-processed: file_modified_at moved from %v to %v",
+			modified1.Time, img2.FileModifiedAt.Time)
 	}
 }
 
 // TestScan_ReindexesModifiedFile: a file whose mtime changed should be re-indexed.
+//
+// Checking that the recorded mtime caught up says what re-indexing means, and
+// unlike the Rnd it used to compare, it survives a scan that finishes by
+// spreading Rnd evenly.
 func TestScan_ReindexesModifiedFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "photo.jpg")
@@ -207,7 +216,7 @@ func TestScan_ReindexesModifiedFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindById() error: %v", err)
 	}
-	rnd1 := img1.Rnd
+	modified1 := img1.FileModifiedAt
 
 	// Set 2 seconds in the future to account for Truncate(time.Second) granularity.
 	future := time.Now().Add(2 * time.Second)
@@ -224,8 +233,9 @@ func TestScan_ReindexesModifiedFile(t *testing.T) {
 		t.Fatalf("FindById() after second scan error: %v", err)
 	}
 
-	if img2.Rnd == rnd1 {
-		t.Error("modified file was not re-processed: rnd unchanged after mtime change")
+	if !img2.FileModifiedAt.Time.After(modified1.Time) {
+		t.Errorf("modified file was not re-processed: file_modified_at still %v after mtime moved to %v",
+			img2.FileModifiedAt.Time, future)
 	}
 }
 

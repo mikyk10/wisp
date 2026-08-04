@@ -4,11 +4,14 @@ import (
 	"database/sql"
 	"errors"
 	"math/rand/v2"
+	"strings"
+
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/repository"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/logger"
 )
 
 type imageRepositoryImpl struct {
@@ -203,4 +206,80 @@ func (p *imageRepositoryImpl) EvictOldestImages(catalogKey string, count int) er
 		return nil
 	}
 	return p.conn.Unscoped().Where("id IN ?", ids).Delete(&model.Image{}).Error
+}
+
+// reshuffleBatchSize is how many rows go into one CASE expression.
+//
+// Against a MariaDB on the far side of a network, 500 rows take a little over
+// 200ms each, so a 190k-row catalogue costs roughly a minute and a half spread
+// across some four hundred statements. Larger batches do not help: the cost of
+// evaluating the CASE overtakes the round trip it saves.
+const reshuffleBatchSize = 500
+
+func (p *imageRepositoryImpl) ReshuffleRandom() error {
+	var ids []model.PrimaryKey
+	if err := p.conn.Unscoped().Model(&model.Image{}).Order("id").Pluck("id", &ids).Error; err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	total := float64(len(ids))
+
+	// Which row gets which value is decided at random, and that matters more
+	// than it looks. A scan registers one catalogue at a time, so ids arrive in
+	// catalogue order; handing out the values in that order would give each
+	// catalogue a contiguous band of the range. A display that draws on some
+	// catalogues but not others would then be selecting across a range with a
+	// hole in it, and every draw landing in the hole returns the one row just
+	// past it. With three catalogues and a display using two, that single row
+	// answered nearly a third of all requests.
+	ranks := rand.Perm(len(ids))
+
+	// Every statement here is slow by the logger's reckoning and carries five
+	// hundred WHEN clauses, so leaving them to the shared logger buries a
+	// week's worth of real messages under tens of megabytes of arithmetic.
+	// Errors still surface: they are returned, and the caller logs them.
+	db := p.conn.Session(&gorm.Session{Logger: p.conn.Logger.LogMode(logger.Error)})
+
+	// Deliberately not one transaction. Holding write locks on every row for
+	// the length of the whole pass would put the delivery path — which updates
+	// rnd on each request — at risk of waiting out its lock timeout, and this
+	// runs on the same evening a panel may well wake. Committing per batch
+	// keeps each lock to about the length of one statement.
+	//
+	// Stopping half way is therefore possible, and harmless: the catalogue is
+	// left partly evenly spaced and partly as it was, which is no worse than
+	// before and is put right by the next run.
+	//
+	// One statement shape serves both SQLite and MariaDB on purpose. The
+	// obvious alternative — a single UPDATE driven by ROW_NUMBER() — has to be
+	// written once per dialect, since SQLite wants UPDATE ... FROM and MariaDB
+	// wants UPDATE ... JOIN. Worse, MariaDB divides integers into a DECIMAL
+	// rounded to four places by default, so ROW_NUMBER()/COUNT(*) quietly
+	// collapses 150k rows onto ten thousand distinct values: plausible enough
+	// to pass review, and impossible to reproduce on the SQLite used in
+	// development.
+	for start := 0; start < len(ids); start += reshuffleBatchSize {
+		end := min(start+reshuffleBatchSize, len(ids))
+
+		var sb strings.Builder
+		args := make([]any, 0, (end-start)*2+2)
+
+		sb.WriteString("UPDATE images SET rnd = CASE id ")
+		for i := start; i < end; i++ {
+			sb.WriteString("WHEN ? THEN ? ")
+			args = append(args, ids[i], float64(ranks[i]+1)/total)
+		}
+		// ids are ascending, so bounding by the batch's own range keeps the
+		// statement off every row it has no value for.
+		sb.WriteString("END WHERE id BETWEEN ? AND ?")
+		args = append(args, ids[start], ids[end-1])
+
+		if err := db.Exec(sb.String(), args...).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

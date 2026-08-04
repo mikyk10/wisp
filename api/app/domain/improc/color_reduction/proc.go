@@ -22,7 +22,18 @@ type processor struct {
 
 func NewImageColorReduction(epd epaper.DisplayMetadata, algorithm config.ColorReduction) improc.ImageProcessor {
 
-	palette := slices.Collect(maps.Values(epd.Palette()))
+	// Ordered by the panel's own colour index. Ranging a map in Go yields its
+	// entries in a deliberately random order, and that order decides which
+	// colour wins when a pixel sits equidistant between two of them. Under
+	// error diffusion one flipped tie propagates to its neighbours and
+	// spreads, so leaving this to chance made the same photograph come out
+	// differently on every request.
+	indices := slices.Sorted(maps.Keys(epd.Palette()))
+	palette := make([]color.Color, 0, len(indices))
+	for _, i := range indices {
+		palette = append(palette, epd.Palette()[i])
+	}
+
 	skipDithering := algorithm.Type == config.ColorReductionTypeSimple
 
 	var ditherer *dither.Ditherer

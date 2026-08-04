@@ -13,6 +13,11 @@
 #define EPD_WIDTH       600
 #define EPD_HEIGHT      400
 
+// One full image at 4 bits per pixel. Used only when the response does not
+// declare its length, so that the transfer loop still counts down to an end
+// instead of waiting for a timeout that shows nothing.
+#define EPD_STREAM_SIZE (EPD_WIDTH * EPD_HEIGHT / 2)
+
 static constexpr uint8_t EPD_BLACK = 0x00;
 static constexpr uint8_t EPD_WHITE = 0x01;
 
@@ -148,12 +153,19 @@ void EPD4InE6Impl::sendImageData(HTTPClient *client, int length) {
         
     uint8_t buff[BUF_SIZE];
 
+    // A chunked response reports no length. Count down the panel's own size
+    // instead: waiting for the stream to run dry only reaches the timeout,
+    // which sleeps without drawing anything.
+    if (length < 0) {
+      length = EPD_STREAM_SIZE;
+    }
+
     unsigned long lastRecv = millis();
-    while(length > 0 || length == -1) {
+    while(length > 0) {
       size_t size = wifiStream->available();
 
       if(size) {
-        int c = wifiStream->read(buff, BUF_SIZE);
+        int c = wifiStream->read(buff, min(length, (int)BUF_SIZE));
         Serial.printf(".");
 
         uint8_t *p = buff;
@@ -162,9 +174,7 @@ void EPD4InE6Impl::sendImageData(HTTPClient *client, int length) {
           p++;
         }
 
-        if(length > 0) {
-            length -= c;
-        }
+        length -= c;
         lastRecv = millis();
       } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
         sleepOnError("sendImageData stream timeout");

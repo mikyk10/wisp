@@ -122,45 +122,72 @@ func BenchmarkRotation(b *testing.B) {
 // into crop's rotation or performed as its own pass. Measuring them together
 // keeps the comparison honest: a machine busy enough to slow one down slows
 // the other down with it.
+// The source carries EXIF 6, which turns the photograph portrait. A portrait
+// mount then needs the opposite turn, so the two cancel and the fused wiring
+// has no full-resolution work to do at all. A landscape mount needs the same
+// turn again, so they compound into a half turn that still has to be
+// performed. Both are measured: the first is the best case for the fusion, the
+// second is the case where it saves a pass rather than the work itself.
 func BenchmarkDeliveryPipeline(b *testing.B) {
-	variants := []struct {
-		name string
-		exif improc.ImageProcessor
+	mounts := []struct {
+		name        string
+		orientation model.CanonicalOrientation
 	}{
-		{"fused", exif_rotation.NewDeferredExifRotation()},
-		{"separate", exif_rotation.NewExifRotation()},
+		{"cancelling", model.ImgCanonicalOrientationPortrait},
+		{"compounding", model.ImgCanonicalOrientationLandscape},
+	}
+	wirings := []struct {
+		name string
+		exif func() improc.ImageProcessor
+	}{
+		{"fused", exif_rotation.NewDeferredExifRotation},
+		{"separate", exif_rotation.NewExifRotation},
 	}
 
-	for _, v := range variants {
-		b.Run(v.name, func(b *testing.B) {
-			display := epaper.NewWS7in3E(model.ImgCanonicalOrientationPortrait)
-			shot := time.Date(2026, 7, 6, 12, 0, 0, 0, time.UTC)
+	for _, m := range mounts {
+		for _, w := range wirings {
+			b.Run(m.name+"/"+w.name, func(b *testing.B) {
+				display := epaper.NewWS7in3E(m.orientation)
+				shot := time.Date(2026, 7, 6, 12, 0, 0, 0, time.UTC)
 
-			group := improc.NewSequencerGroup()
+				group := improc.NewSequencerGroup()
 
-			pre := improc.NewSequencer()
-			group.Push(pre)
-			pre.Push(v.exif)
-			pre.Push(crop.NewImageCropper(display, config.CropStrategyCenter))
+				pre := improc.NewSequencer()
+				group.Push(pre)
+				pre.Push(w.exif())
+				pre.Push(crop.NewImageCropper(display, config.CropStrategyCenter))
 
-			post := improc.NewSequencer()
-			group.Push(post)
-			post.Push(color_reduction.NewImageColorReduction(display, config.ColorReduction{
-				Type: config.ColorReductionTypeBayer, Size: 4, Strength: 1.0,
-			}))
-			post.Push(timestamp.NewTimstamp())
-			post.Push(rotation.NewRotation())
+				post := improc.NewSequencer()
+				group.Push(post)
+				post.Push(color_reduction.NewImageColorReduction(display, config.ColorReduction{
+					Type: config.ColorReductionTypeBayer, Size: 4, Strength: 1.0,
+				}))
+				post.Push(timestamp.NewTimstamp())
+				post.Push(rotation.NewRotation())
 
-			src := benchYCbCr(benchSrcW, benchSrcH)
-			ctx := context.Background()
+				src := benchYCbCr(benchSrcW, benchSrcH)
+				ctx := context.Background()
 
-			b.ReportAllocs()
-			for b.Loop() {
-				meta := &model.ImgMeta{ExifOrientation: 6, ExifDateTime: shot}
-				group.Apply(ctx, src, meta)
-			}
-		})
+				b.ReportAllocs()
+				for b.Loop() {
+					meta := &model.ImgMeta{ExifOrientation: 6, ExifDateTime: shot}
+					group.Apply(ctx, src, meta)
+				}
+			})
+		}
 	}
+}
+
+// BenchmarkColorReduction measures the dithering stage on its own, so that the
+// pipeline total can be accounted for rather than guessed at.
+func BenchmarkColorReduction(b *testing.B) {
+	display := epaper.NewWS7in3E(model.ImgCanonicalOrientationLandscape)
+	proc := color_reduction.NewImageColorReduction(display, config.ColorReduction{
+		Type: config.ColorReductionTypeBayer, Size: 4, Strength: 1.0,
+	})
+
+	src := benchRGBA(800, 480)
+	benchApply(b, proc, src, func() *model.ImgMeta { return &model.ImgMeta{} })
 }
 
 func benchApply(b *testing.B, proc improc.ImageProcessor, src image.Image, meta func() *model.ImgMeta) {

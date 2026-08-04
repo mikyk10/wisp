@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/labstack/echo/v5"
@@ -121,5 +122,36 @@ func TestRandomImg_UnknownDisplay(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 		assert.Equal(t, "image/jpeg", rec.Header().Get(echo.HeaderContentType))
 		assert.NotEmpty(t, rec.Body.Bytes())
+	}
+}
+
+// TestRandomImg_ErrorImageDeclaresLength checks that the error image announces
+// its length, the way the normal image already does.
+//
+// Without a Content-Length the response goes out chunked, and the firmware
+// reads the length with HTTPClient::getSize(), which returns -1 for a chunked
+// body. It treats that as "no content received", discards both the picture the
+// server drew and the X-Sleep-Seconds it asked for, and falls back to its own
+// error screen and a 24-hour sleep. The entire error-image contract rests on
+// this one header.
+func TestRandomImg_ErrorImageDeclaresLength(t *testing.T) {
+	e, h, _ := setupHandler()
+
+	// .bin is what a panel asks for, and the body is far too large for
+	// net/http to work the length out by itself.
+	req := httptest.NewRequest(http.MethodGet, "/pf/nonexistent/image/random.bin", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/pf/:displayKey/image/random.*")
+	c.SetPathValues(echo.PathValues{
+		{Name: "displayKey", Value: "nonexistent"},
+	})
+
+	if assert.NoError(t, h.RandomImg(c)) {
+		assert.NotEmpty(t, rec.Body.Bytes())
+		assert.Equal(t, strconv.Itoa(rec.Body.Len()), rec.Header().Get(echo.HeaderContentLength),
+			"the error image must declare its length or the firmware throws it away")
+		assert.NotEmpty(t, rec.Header().Get("X-Sleep-Seconds"),
+			"the retry interval is only useful if the response survives")
 	}
 }

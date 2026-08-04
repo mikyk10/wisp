@@ -215,6 +215,13 @@ func (uc *catalogHandler) renderErrorImage(
 	}
 
 	c.Response().Header().Set("X-Sleep-Seconds", strconv.Itoa(errorSleepSeconds))
+
+	// Without this the response is chunked, and the firmware reads the length
+	// with HTTPClient::getSize(), which answers -1 for a chunked body. It takes
+	// that for an empty response and throws away both this picture and the
+	// retry interval above.
+	c.Response().Header().Set(echo.HeaderContentLength, fmt.Sprintf("%d", buf.Len()))
+
 	return c.Stream(statusCode, mime, buf)
 }
 

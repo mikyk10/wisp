@@ -83,6 +83,34 @@ func Apply(img image.Image, op Op) image.Image {
 	}
 }
 
+// ApplyPoint returns where op sends the pixel at p, for a source image of w×h.
+// It agrees with Apply: the colour at p in the source is the colour at
+// ApplyPoint(p, op, w, h) in the result.
+//
+// This is what lets a caller reason about a region of the image without
+// transforming the image to find out where the region went.
+func ApplyPoint(p image.Point, op Op, w, h int) image.Point {
+	x, y := p.X, p.Y
+	switch op {
+	case Rotate90CW:
+		return image.Point{X: h - 1 - y, Y: x}
+	case Rotate180:
+		return image.Point{X: w - 1 - x, Y: h - 1 - y}
+	case Rotate270CW:
+		return image.Point{X: y, Y: w - 1 - x}
+	case FlipH:
+		return image.Point{X: w - 1 - x, Y: y}
+	case FlipV:
+		return image.Point{X: x, Y: h - 1 - y}
+	case Transpose:
+		return image.Point{X: y, Y: x}
+	case Transverse:
+		return image.Point{X: h - 1 - y, Y: w - 1 - x}
+	default:
+		return p
+	}
+}
+
 // composition[first][second] is the single operation equivalent to performing
 // first and then second. Columns run in declaration order:
 //

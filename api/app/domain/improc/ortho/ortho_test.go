@@ -51,6 +51,12 @@ func TestApply_MatchesIndexPermutation(t *testing.T) {
 					require.Equal(t,
 						[4]uint32{wr, wg, wb, wa}, [4]uint32{gr, gg, gb, ga},
 						"source (%d,%d) should land at (%d,%d)", x, y, dx, dy)
+
+					// ApplyPoint must predict exactly what Apply does, since
+					// callers use it to locate a region without moving pixels.
+					require.Equal(t, image.Pt(dx, dy),
+						ortho.ApplyPoint(image.Pt(x, y), tt.op, w, h),
+						"ApplyPoint disagrees with Apply for (%d,%d)", x, y)
 				}
 			}
 		})

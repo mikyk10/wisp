@@ -59,12 +59,19 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
         Serial.printf("[http] HTTP error %d — attempting to render server error image\n", httpCode);
     }
 
+    // -1 means the length is unknown, which is what a chunked response looks
+    // like. The drivers fall back to the byte count their own panel needs, so
+    // that is worth attempting rather than discarding along with the sleep
+    // interval below. Only an explicitly empty body is hopeless.
     int contentLength = httpClient.getSize();
-    if (contentLength <= 0) {
+    if (contentLength == 0) {
         Serial.println("[http] No content received");
         httpClient.end();
         delete secureClient;
         return -1;
+    }
+    if (contentLength < 0) {
+        Serial.println("[http] Content length unknown, falling back to panel size");
     }
 
     int sleepSeconds = 300;
@@ -200,11 +207,16 @@ void setup() {
     }
 
     // ここに来ているということはなんか問題があった
+    //
+    // Everything that lands here is transient: the server is down, the network
+    // dropped the request, the response was unusable. Retry on the same
+    // schedule as a failed WiFi connection rather than leaving the frame dark
+    // for a day — a server restart should not cost a day of pictures.
     Serial.println("[fallback] Default error page");
     epaper->sendErrorScreen();
     epaper->displayImage();
     epaper->enterSleep();
-    deepSleep(86400);
+    deepSleep(FALLBACK_SLEEP_SECONDS);
 }
 
 void loop() {

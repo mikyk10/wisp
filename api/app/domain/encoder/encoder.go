@@ -3,21 +3,22 @@ package encoder
 import (
 	"bytes"
 	"fmt"
-	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"image"
 	"image/color"
+
+	"github.com/mikyk10/wisp/app/domain/display/epaper"
 )
 
 type wsEpaperEncoder struct {
-	colorIndex map[uint32]int // mapping from pixel red component to palette index
+	colorIndex paletteIndex
 }
 
 type ws13in3EpaperEEncoder struct {
-	colorIndex map[uint32]int // mapping from pixel red component to palette index
+	colorIndex paletteIndex
 }
 
 type ws13in3EpaperKEncoder struct {
-	colorIndex map[uint32]int // mapping from pixel red component to palette index
+	colorIndex paletteIndex
 }
 
 func NewWaveshareEPEncoder(epd epaper.DisplayMetadata) epaper.Encoder {
@@ -27,15 +28,15 @@ func NewWaveshareEPEncoder(epd epaper.DisplayMetadata) epaper.Encoder {
 	switch epaper.EPaperDisplayModel(epd.ModelName()) {
 	case epaper.WS13in3EPaperE:
 		encoder = &ws13in3EpaperEEncoder{
-			colorIndex: BuildIndex(epd.Palette()),
+			colorIndex: newPaletteIndex(BuildIndex(epd.Palette())),
 		}
 	case epaper.WS13in3EPaperK:
 		encoder = &ws13in3EpaperKEncoder{
-			colorIndex: BuildIndex(epd.Palette()),
+			colorIndex: newPaletteIndex(BuildIndex(epd.Palette())),
 		}
 	default:
 		encoder = &wsEpaperEncoder{
-			colorIndex: BuildIndex(epd.Palette()),
+			colorIndex: newPaletteIndex(BuildIndex(epd.Palette())),
 		}
 	}
 
@@ -60,39 +61,119 @@ func TypeOf(enc epaper.Encoder) string {
 	return fmt.Sprintf("%T", enc)
 }
 
-// default encoder
-func (enc *wsEpaperEncoder) Encode(img image.Image) (*bytes.Buffer, error) {
-	bounds := img.Bounds()
-	buf := bytes.Buffer{}
+// paletteIndex resolves a pixel's red component to its palette index without
+// hashing. Palette colours are eight bits per channel, so the top eight bits
+// of the red component identify one uniquely, and 256 entries cover every
+// possible value.
+//
+// A colour that is not in the palette lands on index 0, as it did when this
+// was a map lookup that missed. The one difference is a colour whose red is
+// not a multiple of 257 but shares its top eight bits with a palette entry:
+// the map missed on that, this resolves it. Only a 16-bit-per-channel source
+// can produce one, and nothing in the pipeline does.
+type paletteIndex [256]uint8
 
-	var odd uint8 = 1
-	var twopx uint8
+func newPaletteIndex(colorIndex map[uint32]int) paletteIndex {
+	var idx paletteIndex
+	for red, i := range colorIndex {
+		//nolint:gosec // G115: palette indices are small by construction
+		idx[red>>8] = uint8(i)
+	}
+	return idx
+}
 
-	// Read 2 pixels, convert the first into MSB 4bits, other goes 4 bits of LSB.
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := img.At(x, y)
+// scan resolves every pixel to its palette index, in row order.
+//
+// The three panel formats pack these indices differently but all need the same
+// lookup first, so it happens once here. Doing it through image.Image.At would
+// box a color.Color per pixel — one heap allocation each, 1.9 million of them
+// on the 13.3 inch panel — so the layouts the pipeline actually produces are
+// read straight out of their pixel buffers.
+func (idx *paletteIndex) scan(img image.Image) []uint8 {
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	out := make([]uint8, w*h)
 
-			red, _, _, _ := c.RGBA()
-			colorIndex := enc.colorIndex[red]
-			//nolint:gosec // G115: integer overflow conversion int -> uint8
-			twopx |= uint8(colorIndex) << (uint8(4) * odd)
-			if odd == 0 {
-				buf.WriteByte(twopx)
-				twopx = 0
+	switch src := img.(type) {
+	case *image.RGBA:
+		// Pix already holds premultiplied values, which is what RGBA() returns.
+		for y := 0; y < h; y++ {
+			i := src.PixOffset(b.Min.X, b.Min.Y+y)
+			row, dst := src.Pix[i:i+w*4], out[y*w:(y+1)*w]
+			for x := range dst {
+				dst[x] = idx[row[x*4]]
 			}
+		}
 
-			odd ^= 1
+	case *image.NRGBA:
+		for y := 0; y < h; y++ {
+			i := src.PixOffset(b.Min.X, b.Min.Y+y)
+			row, dst := src.Pix[i:i+w*4], out[y*w:(y+1)*w]
+			for x := range dst {
+				p := row[x*4 : x*4+4 : x*4+4]
+				if p[3] == 0xff {
+					dst[x] = idx[p[0]]
+					continue
+				}
+				// Mirror color.NRGBA.RGBA(), which premultiplies.
+				r := uint32(p[0])
+				r |= r << 8
+				r *= uint32(p[3])
+				r /= 0xff
+				dst[x] = idx[r>>8]
+			}
+		}
+
+	default:
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				red, _, _, _ := img.At(b.Min.X+x, b.Min.Y+y).RGBA()
+				out[y*w+x] = idx[red>>8]
+			}
 		}
 	}
 
-	return &buf, nil
+	return out
+}
+
+// nibblePacker writes palette indices four bits at a time, the first of each
+// pair into the high nibble. A trailing odd pixel is dropped, as it always was.
+type nibblePacker struct {
+	out  []byte
+	pair uint8
+	odd  uint8
+}
+
+func newNibblePacker(pixels int) *nibblePacker {
+	return &nibblePacker{out: make([]byte, 0, pixels/2), odd: 1}
+}
+
+func (p *nibblePacker) write(index uint8) {
+	p.pair |= index << (4 * p.odd)
+	if p.odd == 0 {
+		p.out = append(p.out, p.pair)
+		p.pair = 0
+	}
+	p.odd ^= 1
+}
+
+// default encoder
+func (enc *wsEpaperEncoder) Encode(img image.Image) (*bytes.Buffer, error) {
+	indices := enc.colorIndex.scan(img)
+
+	packer := newNibblePacker(len(indices))
+	for _, index := range indices {
+		packer.write(index)
+	}
+
+	return bytes.NewBuffer(packer.out), nil
 }
 
 // 13.3 inch E6 full color encoder
 func (enc *ws13in3EpaperEEncoder) Encode(img image.Image) (*bytes.Buffer, error) {
 	bounds := img.Bounds()
-	buf := bytes.Buffer{}
+	width, height := bounds.Dx(), bounds.Dy()
+	indices := enc.colorIndex.scan(img)
 
 	// Split the image data vertically in half and encode the left half followed by the right half.
 	// The resulting data width is half the original and the height is doubled.
@@ -105,59 +186,39 @@ func (enc *ws13in3EpaperEEncoder) Encode(img image.Image) (*bytes.Buffer, error)
 	//              RR
 	//              RR
 
-	var odd uint8 = 1
-	var twopx uint8
+	halfWidth := width / 2
+	packer := newNibblePacker(halfWidth * height * 2)
 
-	for i := 0; i < 2; i++ {
-		// Read 2 pixels, convert the first into MSB 4bits, other goes 4 bits of LSB.
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			halfWidth := bounds.Max.X / 2
-			for x := (halfWidth * i); x < (halfWidth*i)+halfWidth; x++ {
-				c := img.At(x, y)
-
-				red, _, _, _ := c.RGBA()
-				colorIndex := enc.colorIndex[red]
-				//nolint:gosec // G115: integer overflow conversion int -> uint8
-				twopx |= uint8(colorIndex) << (uint8(4) * odd)
-				if odd == 0 {
-					buf.WriteByte(twopx)
-					twopx = 0
-				}
-
-				odd ^= 1
+	for half := 0; half < 2; half++ {
+		for y := 0; y < height; y++ {
+			row := indices[y*width+halfWidth*half : y*width+halfWidth*(half+1)]
+			for _, index := range row {
+				packer.write(index)
 			}
 		}
 	}
 
-	return &buf, nil
+	return bytes.NewBuffer(packer.out), nil
 }
 
 func (enc *ws13in3EpaperKEncoder) Encode(img image.Image) (*bytes.Buffer, error) {
-	bounds := img.Bounds()
-	buf := bytes.Buffer{}
-
-	var subBits uint8 = 0
-	var fourpx uint8
+	indices := enc.colorIndex.scan(img)
 
 	// Read 4 pixels, convert the first two pixels into MSB 4bits, other goes 4bits of LSB.
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := img.At(x, y)
+	out := make([]byte, 0, len(indices)/4)
+	var fourpx uint8
+	var subBits uint8
 
-			red, _, _, _ := c.RGBA()
-			colorIndex := enc.colorIndex[red]
+	for _, index := range indices {
+		fourpx |= index << (2 * (3 - subBits))
 
-			//nolint:gosec // G115: integer overflow conversion int -> uint8
-			fourpx |= (uint8(colorIndex) << (2 * (uint8(3) - uint8(subBits))))
-
-			if subBits == 3 {
-				buf.WriteByte(fourpx)
-				fourpx = 0
-			}
-
-			subBits = (subBits + 1) % 4
+		if subBits == 3 {
+			out = append(out, fourpx)
+			fourpx = 0
 		}
+
+		subBits = (subBits + 1) % 4
 	}
 
-	return &buf, nil
+	return bytes.NewBuffer(out), nil
 }

@@ -46,6 +46,17 @@ func TestLoadConfig_InvalidCronExpression(t *testing.T) {
 	}
 }
 
+// TestLoadConfig_InvalidWakeSchedule: the wake schedule decides when a panel
+// comes back, so an expression nothing can read would leave the device waiting
+// on a moment that never arrives. Refuse the config while there is still
+// someone to tell about it.
+func TestLoadConfig_InvalidWakeSchedule(t *testing.T) {
+	_, _, err := newLoaderFromDir("testdata_invalid_wake_schedule").LoadConfig()
+	if err == nil {
+		t.Fatal("LoadConfig() expected error for invalid wake schedule, got nil")
+	}
+}
+
 func TestLoadConfig_ParsesFileHooks(t *testing.T) {
 	_, svc, err := newLoaderFromDir("testdata_hooks").LoadConfig()
 	if err != nil {

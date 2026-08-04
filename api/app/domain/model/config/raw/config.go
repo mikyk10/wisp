@@ -46,6 +46,7 @@ type Display struct {
 	Name                   string         `json:"name" yaml:"name"`
 	ShowTimestamp          bool           `json:"show_timestamp,omitempty" yaml:"show_timestamp,omitempty"`
 	SleepDurationSeconds   int            `json:"sleep_duration" yaml:"sleep_duration"`
+	WakeSchedule           []string       `json:"wake_schedule,omitempty" yaml:"wake_schedule,omitempty"`
 }
 
 // file_criteria

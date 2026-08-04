@@ -1,0 +1,15 @@
+catalog:
+  - key: album-01
+    type: file
+    file:
+      src_path: /tmp
+
+displays:
+  - key: display-01
+    model: ws7in3e
+    orientation: landscape
+    wake_schedule:
+      - "*/10 6-22 * * *"
+      - "every so often"
+    catalog:
+      - key: album-01

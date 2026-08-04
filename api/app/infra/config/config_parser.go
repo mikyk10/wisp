@@ -58,11 +58,13 @@ func (ldr *defaultConfigLoader) LoadConfig() (*config.GlobalConfig, *config.Serv
 		svcConfig.Catalog[v.Key] = entry
 	}
 
+	gron := gronx.New()
+
 	svcConfig.Displays = make(map[string]*config.DisplayConfig)
 	for _, v := range rawSvcConfig.Displays {
 
-		if !epaper.IsValidModel(epaper.EPaperDisplayModel(v.DisplayModel)) {
-			return nil, nil, fmt.Errorf("display[%s]: unknown model %q", v.Key, v.DisplayModel)
+		if err := validateDisplay(gron, v); err != nil {
+			return nil, nil, err
 		}
 
 		disp := config.DisplayConfig{
@@ -81,6 +83,7 @@ func (ldr *defaultConfigLoader) LoadConfig() (*config.GlobalConfig, *config.Serv
 				Strength: v.ColorReduction.Strength,
 			},
 			SleepDurationSeconds: v.SleepDurationSeconds,
+			WakeSchedule:         v.WakeSchedule,
 		}
 
 		if disp.SleepDurationSeconds == 0 {
@@ -93,7 +96,6 @@ func (ldr *defaultConfigLoader) LoadConfig() (*config.GlobalConfig, *config.Serv
 		}
 		disp.Crop = config.CropConfig{Strategy: cropStrategy}
 
-		gron := gronx.New()
 		for i, cat := range v.AssociatedCatalogEntry {
 			provConfig, ok := svcConfig.Catalog[cat.Key]
 			if !ok {
@@ -201,6 +203,26 @@ func parseCatalogEntry(v raw.CatalogEntry) *config.ImageProviderConfig {
 			Config: config.ImageColorbarProviderConfig{},
 		}
 
+	}
+
+	return nil
+}
+
+// validateDisplay rejects a display the rest of the system could not serve.
+//
+// A wake schedule is checked here, while there is still someone to tell. It
+// decides when a panel comes back, so an expression nothing can read would
+// leave the device waiting on a moment that never arrives, and a panel that
+// stops returning is not something anyone notices quickly.
+func validateDisplay(gron *gronx.Gronx, v raw.Display) error {
+	if !epaper.IsValidModel(epaper.EPaperDisplayModel(v.DisplayModel)) {
+		return fmt.Errorf("display[%s]: unknown model %q", v.Key, v.DisplayModel)
+	}
+
+	for i, expr := range v.WakeSchedule {
+		if !gron.IsValid(expr) {
+			return fmt.Errorf("display[%s].wake_schedule[%d]: invalid cron expression %q", v.Key, i, expr)
+		}
 	}
 
 	return nil

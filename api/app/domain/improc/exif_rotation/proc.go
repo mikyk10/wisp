@@ -2,11 +2,11 @@ package exif_rotation
 
 import (
 	"context"
-	"github.com/mikyk10/wisp/app/domain/improc"
-	"github.com/mikyk10/wisp/app/domain/model"
 	"image"
 
-	"github.com/anthonynsimon/bild/transform"
+	"github.com/mikyk10/wisp/app/domain/improc"
+	"github.com/mikyk10/wisp/app/domain/improc/ortho"
+	"github.com/mikyk10/wisp/app/domain/model"
 )
 
 type processor struct{}
@@ -18,33 +18,7 @@ func NewExifRotation() improc.ImageProcessor {
 
 func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgMeta) (image.Image, *model.ImgMeta) {
 
-	img := src
-
-	// https://qiita.com/yoya/items/4e14f696e1afd5a54403
-	switch meta.ExifOrientation {
-	case model.NoExifOrientation:
-		fallthrough
-	case 1:
-	case 2:
-		img = transform.FlipH(img)
-
-	case 3:
-		img = transform.Rotate(img, 180, &transform.RotationOptions{ResizeBounds: true})
-
-	case 4:
-		img = transform.FlipV(img)
-
-	case 5:
-		img = transform.Rotate(img, 90, &transform.RotationOptions{ResizeBounds: true})
-		img = transform.FlipH(img)
-	case 6:
-		img = transform.Rotate(img, 90, &transform.RotationOptions{ResizeBounds: true})
-	case 7:
-		img = transform.Rotate(img, -90, &transform.RotationOptions{ResizeBounds: true})
-		img = transform.FlipH(img)
-	case 8:
-		img = transform.Rotate(img, -90, &transform.RotationOptions{ResizeBounds: true})
-	}
+	img := ortho.Apply(src, opForOrientation(meta.ExifOrientation))
 
 	//TODO: allow square images to be displayed in either orientation
 	// an empty image may arrive
@@ -65,6 +39,46 @@ func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgM
 	}
 
 	return img, meta
+}
+
+// opForOrientation returns the transformation that brings an image stored with
+// the given EXIF orientation tag upright.
+// https://qiita.com/yoya/items/4e14f696e1afd5a54403
+//
+//	EXIF  operation          previously
+//	1     none               none
+//	2     flip horizontally  flip horizontally
+//	3     rotate 180°        rotate 180°
+//	4     flip vertically    flip vertically
+//	5     transpose          rotate 90° clockwise, then flip horizontally
+//	6     rotate 90° CW      rotate 90° clockwise
+//	7     transverse         rotate 90° counter-clockwise, then flip horizontally
+//	8     rotate 90° CCW     rotate 90° counter-clockwise
+//
+// Orientations 5 and 7 are reflections in a diagonal. Composing them from a
+// rotation and a flip walks the image twice to reach somewhere a single
+// permutation reaches directly.
+func opForOrientation(o model.ExifOrientation) ortho.Op {
+	switch o {
+	case 2:
+		return ortho.FlipH
+	case 3:
+		return ortho.Rotate180
+	case 4:
+		return ortho.FlipV
+	case 5:
+		return ortho.Transpose
+	case 6:
+		return ortho.Rotate90CW
+	case 7:
+		return ortho.Transverse
+	case 8:
+		return ortho.Rotate270CW
+	default:
+		// 1 is upright. NoExifOrientation and any unrecognised tag are treated
+		// as upright too, which is what the pipeline did before.
+		return ortho.Identity
+	}
 }
 
 // transformSubjectPointByOrientation transforms a point from the original image coordinate

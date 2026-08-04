@@ -6,9 +6,10 @@ import (
 	"image"
 	"log/slog"
 
-	"github.com/anthonynsimon/bild/transform"
+	"github.com/disintegration/imaging"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
 	"github.com/mikyk10/wisp/app/domain/improc"
+	"github.com/mikyk10/wisp/app/domain/improc/ortho"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/sunshineplan/imgconv"
@@ -42,7 +43,16 @@ func (p *processor) crop(img image.Image, meta *model.ImgMeta) image.Image {
 	meta.RequiredCorrectionAngle = angle
 
 	preBounds := img.Bounds()
-	img = transform.Rotate(img, angle, &transform.RotationOptions{ResizeBounds: true})
+
+	// The angle is 0 or ±90 by construction above, so it is always a quarter
+	// turn and always an exact index permutation. An unexpected value leaves
+	// the image alone rather than corrupting it.
+	op, ok := ortho.FromAngleCW(angle)
+	if !ok {
+		slog.Warn("crop: correction angle is not a quarter turn, skipping rotation", "angle", angle)
+	}
+	img = ortho.Apply(img, op)
+
 	bounds := img.Bounds()
 
 	// apply display-orientation correction to subject area coordinates
@@ -70,7 +80,11 @@ func (p *processor) crop(img image.Image, meta *model.ImgMeta) image.Image {
 
 	offsetX, offsetY := p.cropOffset(bounds, cropW, cropH, meta)
 
-	return transform.Crop(img, image.Rect(offsetX, offsetY, cropW+offsetX, cropH+offsetY))
+	// imaging reads the requested window straight out of the source, whatever
+	// colour model it is in. The alternative in bild converts the entire frame
+	// to RGBA before taking the window, which for an uncorrected image is the
+	// single most expensive thing the pre-processing stage does.
+	return imaging.Crop(img, image.Rect(offsetX, offsetY, cropW+offsetX, cropH+offsetY))
 }
 
 // cropOffset returns the top-left corner of the crop rectangle based on the active strategy.

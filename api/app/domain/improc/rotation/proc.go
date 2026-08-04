@@ -2,29 +2,25 @@ package rotation
 
 import (
 	"context"
-	"github.com/mikyk10/wisp/app/domain/improc"
-	"github.com/mikyk10/wisp/app/domain/model"
 	"image"
 
-	"github.com/anthonynsimon/bild/transform"
+	"github.com/mikyk10/wisp/app/domain/improc"
+	"github.com/mikyk10/wisp/app/domain/improc/ortho"
+	"github.com/mikyk10/wisp/app/domain/model"
 )
 
 type processor struct {
-	angle float64
+	op ortho.Op
 }
 
+// NewRotation turns the finished image upside down, for panels mounted the
+// other way up.
 func NewRotation() improc.ImageProcessor {
 	return &processor{
-		angle: 180,
+		op: ortho.Rotate180,
 	}
 }
 
 func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgMeta) (image.Image, *model.ImgMeta) {
-
-	if p.angle == 0 {
-		return src, meta
-	}
-
-	dst := transform.Rotate(src, p.angle, &transform.RotationOptions{ResizeBounds: true})
-	return dst, meta
+	return ortho.Apply(src, p.op), meta
 }

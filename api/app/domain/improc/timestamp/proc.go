@@ -2,14 +2,14 @@ package timestamp
 
 import (
 	"context"
-	"github.com/mikyk10/wisp/app/domain/display/epaper/wsdisplay"
-	"github.com/mikyk10/wisp/app/domain/improc"
-	"github.com/mikyk10/wisp/app/domain/model"
 	"image"
 	"image/draw"
 
 	"github.com/anthonynsimon/bild/blend"
-	"github.com/anthonynsimon/bild/transform"
+	"github.com/mikyk10/wisp/app/domain/display/epaper/wsdisplay"
+	"github.com/mikyk10/wisp/app/domain/improc"
+	"github.com/mikyk10/wisp/app/domain/improc/ortho"
+	"github.com/mikyk10/wisp/app/domain/model"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
@@ -29,10 +29,14 @@ func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgM
 		return src, meta
 	}
 
-	// rotate the subject image boforehand
-	if meta.RequiredCorrectionAngle != 0 {
-		src = transform.Rotate(src, meta.RequiredCorrectionAngle*-1, &transform.RotationOptions{ResizeBounds: true})
-	}
+	// Undo the display-orientation correction, so that "bottom right" below
+	// means the bottom right of the photograph rather than of the panel. Both
+	// operations are exact permutations, which matters here because the image
+	// has already been reduced to the panel's palette and must not acquire
+	// colours outside it.
+	upright, _ := ortho.FromAngleCW(-meta.RequiredCorrectionAngle)
+	installed, _ := ortho.FromAngleCW(meta.RequiredCorrectionAngle)
+	src = ortho.Apply(src, upright)
 
 	bound := src.Bounds()
 	width := bound.Max.X
@@ -57,10 +61,6 @@ func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgM
 	d.DrawString(meta.ExifDateTime.Format("2006/01/02"))
 	result := blend.Normal(src, fgcanvas)
 
-	// rotate back the subject image if needed
-	if meta.RequiredCorrectionAngle != 0 {
-		result = transform.Rotate(result, meta.RequiredCorrectionAngle, &transform.RotationOptions{ResizeBounds: true})
-	}
-
-	return result, meta
+	// put the image back into the installed orientation
+	return ortho.Apply(result, installed), meta
 }

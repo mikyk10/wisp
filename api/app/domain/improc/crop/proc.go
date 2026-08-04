@@ -42,22 +42,33 @@ func (p *processor) crop(img image.Image, meta *model.ImgMeta) image.Image {
 
 	meta.RequiredCorrectionAngle = angle
 
-	preBounds := img.Bounds()
-
 	// The angle is 0 or ±90 by construction above, so it is always a quarter
 	// turn and always an exact index permutation. An unexpected value leaves
 	// the image alone rather than corrupting it.
-	op, ok := ortho.FromAngleCW(angle)
+	correction, ok := ortho.FromAngleCW(angle)
 	if !ok {
 		slog.Warn("crop: correction angle is not a quarter turn, skipping rotation", "angle", angle)
 	}
-	img = ortho.Apply(img, op)
 
+	// exif_rotation may have left its normalisation for this stage to carry
+	// out. Performing both as one operation walks a full-resolution image once
+	// instead of twice, and skips it altogether when they cancel out.
+	pending := meta.PendingExifOp
+	meta.PendingExifOp = ortho.Identity
+
+	// The subject point is expressed in the coordinates exif_rotation reported,
+	// which are the source dimensions with the pending operation applied.
+	preW, preH := img.Bounds().Max.X, img.Bounds().Max.Y
+	if ortho.SwapsAxes(pending) {
+		preW, preH = preH, preW
+	}
+
+	img = ortho.Apply(img, ortho.Compose(pending, correction))
 	bounds := img.Bounds()
 
 	// apply display-orientation correction to subject area coordinates
 	if meta.HasExifSubjectArea {
-		meta.ExifSubjectArea = rotatePointByAngle(meta.ExifSubjectArea, angle, preBounds.Max.X, preBounds.Max.Y)
+		meta.ExifSubjectArea = rotatePointByAngle(meta.ExifSubjectArea, angle, preW, preH)
 	}
 
 	hwAspectRatioX := float64(p.epd.Width()) / float64(p.epd.Height())

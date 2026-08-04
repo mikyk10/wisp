@@ -67,7 +67,9 @@ func NewImageConvertCommand(c *dig.Container) *cobra.Command {
 			// Pre-processing: EXIF-based rotation, then crop to display dimensions.
 			preSeq := improc.NewSequencer()
 			imseqGroup.Push(preSeq)
-			preSeq.Push(exif_rotation.NewExifRotation())
+			// Deferred: crop carries out the EXIF normalisation together with
+			// its own orientation correction, in one pass.
+			preSeq.Push(exif_rotation.NewDeferredExifRotation())
 			cropStrategy := config.CropStrategyCenter
 			if cropStrategyStr == string(config.CropStrategyExifSubject) {
 				cropStrategy = config.CropStrategyExifSubject

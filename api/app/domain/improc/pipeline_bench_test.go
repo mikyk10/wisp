@@ -115,34 +115,51 @@ func BenchmarkRotation(b *testing.B) {
 
 // BenchmarkDeliveryPipeline measures everything a single image request does
 // after decoding: EXIF normalisation, orientation correction, crop, resize,
-// dithering, timestamp and flip. Orientation 6 with a portrait installation is
-// the configuration that forces a physical rotation at every opportunity.
+// dithering, timestamp and flip. Orientation 6 on a portrait installation is
+// the configuration that gives every stage something to do.
+//
+// The two variants differ only in whether the EXIF normalisation is folded
+// into crop's rotation or performed as its own pass. Measuring them together
+// keeps the comparison honest: a machine busy enough to slow one down slows
+// the other down with it.
 func BenchmarkDeliveryPipeline(b *testing.B) {
-	display := epaper.NewWS7in3E(model.ImgCanonicalOrientationPortrait)
-	shot := time.Date(2026, 7, 6, 12, 0, 0, 0, time.UTC)
+	variants := []struct {
+		name string
+		exif improc.ImageProcessor
+	}{
+		{"fused", exif_rotation.NewDeferredExifRotation()},
+		{"separate", exif_rotation.NewExifRotation()},
+	}
 
-	group := improc.NewSequencerGroup()
+	for _, v := range variants {
+		b.Run(v.name, func(b *testing.B) {
+			display := epaper.NewWS7in3E(model.ImgCanonicalOrientationPortrait)
+			shot := time.Date(2026, 7, 6, 12, 0, 0, 0, time.UTC)
 
-	pre := improc.NewSequencer()
-	group.Push(pre)
-	pre.Push(exif_rotation.NewExifRotation())
-	pre.Push(crop.NewImageCropper(display, config.CropStrategyCenter))
+			group := improc.NewSequencerGroup()
 
-	post := improc.NewSequencer()
-	group.Push(post)
-	post.Push(color_reduction.NewImageColorReduction(display, config.ColorReduction{
-		Type: config.ColorReductionTypeBayer, Size: 4, Strength: 1.0,
-	}))
-	post.Push(timestamp.NewTimstamp())
-	post.Push(rotation.NewRotation())
+			pre := improc.NewSequencer()
+			group.Push(pre)
+			pre.Push(v.exif)
+			pre.Push(crop.NewImageCropper(display, config.CropStrategyCenter))
 
-	src := benchYCbCr(benchSrcW, benchSrcH)
-	ctx := context.Background()
+			post := improc.NewSequencer()
+			group.Push(post)
+			post.Push(color_reduction.NewImageColorReduction(display, config.ColorReduction{
+				Type: config.ColorReductionTypeBayer, Size: 4, Strength: 1.0,
+			}))
+			post.Push(timestamp.NewTimstamp())
+			post.Push(rotation.NewRotation())
 
-	b.ReportAllocs()
-	for b.Loop() {
-		meta := &model.ImgMeta{ExifOrientation: 6, ExifDateTime: shot}
-		group.Apply(ctx, src, meta)
+			src := benchYCbCr(benchSrcW, benchSrcH)
+			ctx := context.Background()
+
+			b.ReportAllocs()
+			for b.Loop() {
+				meta := &model.ImgMeta{ExifOrientation: 6, ExifDateTime: shot}
+				group.Apply(ctx, src, meta)
+			}
+		})
 	}
 }
 

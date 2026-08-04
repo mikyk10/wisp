@@ -83,6 +83,34 @@ func Apply(img image.Image, op Op) image.Image {
 	}
 }
 
+// composition[first][second] is the single operation equivalent to performing
+// first and then second. Columns run in declaration order:
+//
+//	Identity, Rotate90CW, Rotate180, Rotate270CW, FlipH, FlipV, Transpose, Transverse
+//
+// The eight operations are closed under composition, which is what lets the
+// pipeline fold the EXIF normalisation and the display-orientation correction
+// into a single pass over a full-resolution image.
+var composition = [8][8]Op{
+	Identity:    {Identity, Rotate90CW, Rotate180, Rotate270CW, FlipH, FlipV, Transpose, Transverse},
+	Rotate90CW:  {Rotate90CW, Rotate180, Rotate270CW, Identity, Transpose, Transverse, FlipV, FlipH},
+	Rotate180:   {Rotate180, Rotate270CW, Identity, Rotate90CW, FlipV, FlipH, Transverse, Transpose},
+	Rotate270CW: {Rotate270CW, Identity, Rotate90CW, Rotate180, Transverse, Transpose, FlipH, FlipV},
+	FlipH:       {FlipH, Transverse, FlipV, Transpose, Identity, Rotate180, Rotate270CW, Rotate90CW},
+	FlipV:       {FlipV, Transpose, FlipH, Transverse, Rotate180, Identity, Rotate90CW, Rotate270CW},
+	Transpose:   {Transpose, FlipH, Transverse, FlipV, Rotate90CW, Rotate270CW, Identity, Rotate180},
+	Transverse:  {Transverse, FlipV, Transpose, FlipH, Rotate270CW, Rotate90CW, Rotate180, Identity},
+}
+
+// Compose returns the single operation equivalent to performing first and then
+// second.
+func Compose(first, second Op) Op {
+	if int(first) >= len(composition) || int(second) >= len(composition) {
+		return Identity
+	}
+	return composition[first][second]
+}
+
 // SwapsAxes reports whether op exchanges the width and height of the image.
 func SwapsAxes(op Op) bool {
 	switch op {

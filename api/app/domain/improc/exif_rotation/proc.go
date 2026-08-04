@@ -9,26 +9,49 @@ import (
 	"github.com/mikyk10/wisp/app/domain/model"
 )
 
-type processor struct{}
+// The processor knows what makes an image upright. It can either do it, or say
+// what needs doing and let a later stage do it.
+//
+// Saying is worth the extra concept because the delivery path immediately
+// corrects for the display orientation as well, and both corrections are
+// members of the same eight-element group. Composed first and performed once,
+// a full-resolution image is walked half as often, and not at all when the two
+// cancel each other out — which they do for a portrait photograph on a
+// portrait-mounted panel, among others.
+type processor struct {
+	deferred bool
+}
 
+// NewExifRotation returns a processor that puts the image upright there and
+// then. Use it wherever nothing downstream is going to rotate the image
+// anyway, such as the thumbnail pass during a catalogue scan.
 func NewExifRotation() improc.ImageProcessor {
 	return &processor{}
+}
 
+// NewDeferredExifRotation returns a processor that records the operation in
+// meta.PendingExifOp and leaves the pixels untouched. Only use it directly
+// ahead of crop, which is what consumes the record.
+func NewDeferredExifRotation() improc.ImageProcessor {
+	return &processor{deferred: true}
 }
 
 func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgMeta) (image.Image, *model.ImgMeta) {
 
-	img := ortho.Apply(src, opForOrientation(meta.ExifOrientation))
+	op := opForOrientation(meta.ExifOrientation)
 
+	// ImageOrientation describes the image as it looks once op has been
+	// applied, whether that happens here or in crop. Downstream stages choose
+	// the correction angle from it, so it cannot wait for the pixels.
 	//TODO: allow square images to be displayed in either orientation
 	// an empty image may arrive
-	xyp := xyPropotion(img)
-	switch xyp {
-	case -1:
+	w, h := src.Bounds().Max.X, src.Bounds().Max.Y
+	if ortho.SwapsAxes(op) {
+		w, h = h, w
+	}
+	if w < h {
 		meta.ImageOrientation = model.ImgCanonicalOrientationPortrait
-	case 0:
-		fallthrough
-	case 1:
+	} else {
 		meta.ImageOrientation = model.ImgCanonicalOrientationLandscape
 	}
 
@@ -38,7 +61,12 @@ func (p *processor) Apply(ctx context.Context, src image.Image, meta *model.ImgM
 		meta.ExifSubjectArea = transformSubjectPointByOrientation(meta.ExifSubjectArea, meta.ExifOrientation, origW, origH)
 	}
 
-	return img, meta
+	if p.deferred {
+		meta.PendingExifOp = op
+		return src, meta
+	}
+
+	return ortho.Apply(src, op), meta
 }
 
 // opForOrientation returns the transformation that brings an image stored with
@@ -104,16 +132,5 @@ func transformSubjectPointByOrientation(p image.Point, o model.ExifOrientation, 
 		return image.Point{X: y, Y: W - x}
 	default: // case 1 (normal) and unknown
 		return p
-	}
-}
-
-func xyPropotion(img image.Image) int {
-	bounds := img.Bounds()
-	if bounds.Max.X < bounds.Max.Y {
-		return -1
-	} else if bounds.Max.X > bounds.Max.Y {
-		return 1
-	} else {
-		return 0
 	}
 }

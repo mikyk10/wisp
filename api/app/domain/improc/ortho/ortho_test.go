@@ -132,6 +132,53 @@ func TestFromAngleCW_InverseCancels(t *testing.T) {
 	}
 }
 
+// TestCompose_MatchesSequentialApplication checks every one of the 64 entries
+// in the composition table against actually performing the two operations one
+// after the other. The table is written out by hand, so this is what makes it
+// trustworthy.
+func TestCompose_MatchesSequentialApplication(t *testing.T) {
+	const w, h = 7, 5
+
+	for _, first := range operations {
+		for _, second := range operations {
+			t.Run(first.op.String()+"_then_"+second.op.String(), func(t *testing.T) {
+				src := newCoordinateImage(w, h)
+
+				want := ortho.Apply(ortho.Apply(src, first.op), second.op)
+				got := ortho.Apply(src, ortho.Compose(first.op, second.op))
+
+				require.Equal(t, want.Bounds().Dx(), got.Bounds().Dx(), "output width")
+				require.Equal(t, want.Bounds().Dy(), got.Bounds().Dy(), "output height")
+				for y := 0; y < want.Bounds().Dy(); y++ {
+					for x := 0; x < want.Bounds().Dx(); x++ {
+						require.Equal(t, colorOf(want, x, y), colorOf(got, x, y),
+							"%s then %s should equal %s at (%d,%d)",
+							first.op, second.op, ortho.Compose(first.op, second.op), x, y)
+					}
+				}
+			})
+		}
+	}
+}
+
+// TestCompose_FormsAGroup states the properties the fusion in crop relies on:
+// Identity does nothing, and every operation can be undone, so composing can
+// never strand an image in an orientation the pipeline cannot express.
+func TestCompose_FormsAGroup(t *testing.T) {
+	for _, tt := range operations {
+		assert.Equal(t, tt.op, ortho.Compose(ortho.Identity, tt.op), "identity before %s", tt.op)
+		assert.Equal(t, tt.op, ortho.Compose(tt.op, ortho.Identity), "identity after %s", tt.op)
+
+		var inverses int
+		for _, other := range operations {
+			if ortho.Compose(tt.op, other.op) == ortho.Identity {
+				inverses++
+			}
+		}
+		assert.Equal(t, 1, inverses, "%s should have exactly one inverse", tt.op)
+	}
+}
+
 // destExtent derives the output dimensions of a mapping by looking at where it
 // sends the four corners of a w×h source.
 func destExtent(dest func(x, y, w, h int) (int, int), w, h int) (int, int) {

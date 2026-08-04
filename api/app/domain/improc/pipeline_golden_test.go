@@ -15,8 +15,10 @@ import (
 	"github.com/mikyk10/wisp/app/domain/improc"
 	"github.com/mikyk10/wisp/app/domain/improc/crop"
 	"github.com/mikyk10/wisp/app/domain/improc/exif_rotation"
+	"github.com/mikyk10/wisp/app/domain/improc/ortho"
 	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,13 +63,16 @@ func TestPreSeqGolden(t *testing.T) {
 					}
 
 					seq := improc.NewSequencer()
-					seq.Push(exif_rotation.NewExifRotation())
+					seq.Push(exif_rotation.NewDeferredExifRotation())
 					// exif_subject makes the crop window itself depend on the
 					// transformed subject point, so a regression in the point
 					// arithmetic shows up in the pixels too.
 					seq.Push(crop.NewImageCropper(goldenDisplay{installed: installed.orientation}, config.CropStrategyExifSubject))
 
 					got, gotMeta := seq.Apply(t.Context(), src, meta)
+
+					assert.Equal(t, ortho.Identity, gotMeta.PendingExifOp,
+						"crop should have consumed the deferred operation")
 
 					manifest = append(manifest, fmt.Sprintf("%-34s bounds=%dx%d subject=(%d,%d) angle=%.0f",
 						name,
@@ -83,6 +88,54 @@ func TestPreSeqGolden(t *testing.T) {
 	}
 
 	assertGoldenText(t, "manifest.txt", strings.Join(manifest, "\n")+"\n")
+}
+
+// TestPreSeqGolden_DeferredMatchesImmediate checks that folding the EXIF
+// normalisation into crop's own rotation produces exactly what performing them
+// one after the other does.
+//
+// This is the whole claim behind the deferred form. It holds because the eight
+// operations are closed under composition, but "closed under composition" is
+// not something a reader can check by looking at the pixels, so it is checked
+// here across every case the golden test covers.
+func TestPreSeqGolden_DeferredMatchesImmediate(t *testing.T) {
+	for _, aspect := range goldenAspects {
+		for _, installed := range goldenInstallations {
+			for exifOrientation := 1; exifOrientation <= 8; exifOrientation++ {
+				name := fmt.Sprintf("exif%d_%s_%s", exifOrientation, aspect.name, installed.name)
+
+				t.Run(name, func(t *testing.T) {
+					newMeta := func() *model.ImgMeta {
+						return &model.ImgMeta{
+							ExifOrientation:    model.ExifOrientation(exifOrientation),
+							HasExifSubjectArea: true,
+							ExifSubjectArea:    image.Point{X: aspect.w / 4, Y: aspect.h / 8},
+						}
+					}
+					cropper := func() improc.ImageProcessor {
+						return crop.NewImageCropper(goldenDisplay{installed: installed.orientation}, config.CropStrategyExifSubject)
+					}
+
+					immediate := improc.NewSequencer()
+					immediate.Push(exif_rotation.NewExifRotation())
+					immediate.Push(cropper())
+					wantImg, wantMeta := immediate.Apply(t.Context(), newGoldenFixture(aspect.w, aspect.h), newMeta())
+
+					deferred := improc.NewSequencer()
+					deferred.Push(exif_rotation.NewDeferredExifRotation())
+					deferred.Push(cropper())
+					gotImg, gotMeta := deferred.Apply(t.Context(), newGoldenFixture(aspect.w, aspect.h), newMeta())
+
+					if _, _, ok := firstPixelDifference(wantImg, gotImg); !ok {
+						t.Fatal("deferring the EXIF normalisation changed the pixels")
+					}
+					assert.Equal(t, wantMeta.ExifSubjectArea, gotMeta.ExifSubjectArea, "subject point")
+					assert.Equal(t, wantMeta.ImageOrientation, gotMeta.ImageOrientation, "image orientation")
+					assert.Equal(t, wantMeta.RequiredCorrectionAngle, gotMeta.RequiredCorrectionAngle, "correction angle")
+				})
+			}
+		}
+	}
 }
 
 // goldenAspects covers a landscape and a portrait source, so that the

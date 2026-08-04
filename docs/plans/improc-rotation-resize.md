@@ -133,16 +133,33 @@
 ## 4. 検証計画(全フェーズ共通)
 
 1. **ゴールデンテスト**(P0作成): 8 EXIF向き × 2設置向き × 2画像アスペクトの32ケースでピクセル一致。再祝福は P1(無補間化)と P4(フィルタ変更)の2回だけ許可し、それぞれ目視確認を挟む
+   - 実体: `api/app/domain/improc/pipeline_golden_test.go`、期待値は `api/app/domain/improc/testdata/golden/`
+   - 再祝福: `go test ./app/domain/improc/ -run Golden -update`
+   - `manifest.txt` は出力寸法・変換後の被写体点・`RequiredCorrectionAngle` を固定する。**画像と違い、これは全フェーズを通じて無変更であるべき**
 2. **ベンチマーク**: 下表を各フェーズ末に更新
+   - 実行: `go test ./app/domain/improc/ ./app/domain/improc/crop/ -run '^$' -bench . -count=3`
+   - 値は3回計測の中央値。12MP = 4000×3000、パネルは WS7in3E(800×480)
 
-| 計測点 | P0基準 | P1後 | P2後 | P4後 |
+| 計測点(RGBA / YCbCr 入力) | P0基準 | P1後 | P2後 | P4後 |
 |---|---|---|---|---|
-| exif_rotation(12MP, EXIF6) | | | | |
-| exif_rotation(12MP, EXIF5=2パス) | | | | |
-| crop 内回転(12MP, ±90°) | | | | |
-| resize(12MP→800×480) | | | | |
-| timestamp(800×480) | | | | |
-| パイプライン合計(random.bin 1リクエスト) | | | | |
+| exif_rotation EXIF1(無変換) | 20 ns | | | |
+| exif_rotation EXIF3(180°) | 82 / 107 ms | | | |
+| exif_rotation EXIF5(2パス) | 110 / 136 ms | | | |
+| exif_rotation EXIF6(90°) | 108 / 136 ms | | | |
+| crop 内 回転+クロップ 0° | 2.0 / 28.9 ms | | | |
+| crop 内 回転+クロップ −90° | 118 / 143 ms | | | |
+| crop 内 回転+クロップ +90° | 105 / 130 ms | | | |
+| resize 4000×2400→800×480(Lanczos) | 14.1 ms | | | |
+| timestamp 800×480(角度0 / ±90) | 1.15 / 8.21 ms | | | |
+| rotation 180° 800×480(Flip) | 4.07 ms | | | |
+| **パイプライン合計**(12MP YCbCr, EXIF6, 縦設置, dither+timestamp+flip) | **293 ms / 50.7M allocs** | | | |
+
+P0 計測から読み取れたこと(計画時の想定との差分):
+
+- **回転1パスあたり 24,000,000 allocs**(=1画素2回)。`bild` の内側ループが `dst.Set()` に `color.RGBA64` を渡すため、画素ごとにヒープ確保が起きている。速度差の主因は三角関数よりこちらの可能性が高い
+- **`crop` の 0° 経路は YCbCr 入力で 28.9 ms**(RGBA 入力の 2.0 ms に対し14倍)。§2 で予測したとおり、`bild` の早期returnが RGBA 変換の後ろにあるため、回転しない場合でも全画素変換が走っている
+- **resize は 14.1 ms しかなく、パイプライン合計 293 ms の 5% 未満**。「P1/P2 適用後に残る最大のコスト」という P4 の前提は P0 時点では成立していない。P1/P2 後に再評価する
+- timestamp は角度ありで 8.21 ms(角度0の7倍)。1,536,060 allocs が計上されており、これも画素ごと確保
 
 3. **実機確認**: `make up` → 実ディスプレイで代表写真(縦横・EXIF回転あり・被写体クロップあり・timestamp あり)を表示。特に P4 はこれを合格条件とする
 4. **回帰範囲**: `go test ./...`、golangci-lint、CLI `image` コマンド(同じプロセッサを共有しているため自動的に検証される)

@@ -121,13 +121,47 @@ func (cu *catalogUseCase) Scan(workers int) error {
 	// and since a row keeps its value the same photographs stay favoured and
 	// the same ones stay unreachable. Doing it here rather than per row keeps
 	// the delivery path free of writes.
-	if err := cu.imgr.ReshuffleRandom(); err != nil {
+	if err := cu.imgr.ReshuffleRandom(reshuffleProgressLogger()); err != nil {
 		// The scan itself succeeded; an uneven spread is the state the
 		// catalogue was already in, so it is not worth failing over.
 		slog.Error("scan: failed to even out the random ordering", "err", err)
 	}
 
 	return nil
+}
+
+// reshuffleLogInterval is how many rows pass between progress lines. The
+// statements themselves are logged at error level — several hundred of them,
+// each carrying five hundred WHEN clauses, would bury everything else — so
+// this is the only sign the pass is running, and a catalogue of a couple of
+// hundred thousand should report a handful of times rather than once.
+const reshuffleLogInterval = 25000
+
+// reshuffleProgressLogger reports how far the even-spreading has got, and how
+// much longer it looks like taking. The estimate is simply the rate so far
+// carried forward, which is close enough: every batch does the same amount of
+// work as the last.
+func reshuffleProgressLogger() func(done, total int) {
+	started := time.Now()
+	lastLogged := 0
+
+	return func(done, total int) {
+		switch {
+		case done == 0:
+			slog.Info("scan: evening out the random ordering", "images", total)
+		case done == total:
+			slog.Info("scan: evened out the random ordering",
+				"images", total, "elapsed", time.Since(started).Round(time.Second))
+		case done-lastLogged >= reshuffleLogInterval:
+			lastLogged = done
+			elapsed := time.Since(started)
+			remaining := time.Duration(float64(elapsed) / float64(done) * float64(total-done))
+			slog.Info("scan: evening out the random ordering",
+				"done", done, "total", total,
+				"elapsed", elapsed.Round(time.Second),
+				"remaining", remaining.Round(time.Second))
+		}
+	}
 }
 
 // scanConcurrency resolves the number of parallel image-processing goroutines.

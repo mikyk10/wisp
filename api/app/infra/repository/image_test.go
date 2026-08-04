@@ -348,7 +348,7 @@ func TestReshuffleRandom_SpacesValuesEvenly(t *testing.T) {
 		}
 	}
 
-	if err := repo.ReshuffleRandom(); err != nil {
+	if err := repo.ReshuffleRandom(nil); err != nil {
 		t.Fatalf("ReshuffleRandom: %v", err)
 	}
 
@@ -404,7 +404,7 @@ func TestReshuffleRandom_LeavesNoUnreachableRows(t *testing.T) {
 		t.Skip("random assignment happened to leave no narrow gaps this run")
 	}
 
-	if err := repo.ReshuffleRandom(); err != nil {
+	if err := repo.ReshuffleRandom(nil); err != nil {
 		t.Fatalf("ReshuffleRandom: %v", err)
 	}
 
@@ -440,7 +440,7 @@ func TestReshuffleRandom_SurvivesACatalogueBeingLeftOut(t *testing.T) {
 		}
 	}
 
-	if err := repo.ReshuffleRandom(); err != nil {
+	if err := repo.ReshuffleRandom(nil); err != nil {
 		t.Fatalf("ReshuffleRandom: %v", err)
 	}
 
@@ -483,7 +483,7 @@ func TestReshuffleRandom_SurvivesACatalogueBeingLeftOut(t *testing.T) {
 func TestReshuffleRandom_EmptyTable(t *testing.T) {
 	repo, _ := setupRepo(t)
 
-	if err := repo.ReshuffleRandom(); err != nil {
+	if err := repo.ReshuffleRandom(nil); err != nil {
 		t.Errorf("ReshuffleRandom on an empty table should not error, got: %v", err)
 	}
 }
@@ -510,7 +510,7 @@ func TestReshuffleRandom_CoversSoftDeletedRows(t *testing.T) {
 		t.Fatalf("ToggleDeletedAt: %v", err)
 	}
 
-	if err := repo.ReshuffleRandom(); err != nil {
+	if err := repo.ReshuffleRandom(nil); err != nil {
 		t.Fatalf("ReshuffleRandom: %v", err)
 	}
 

@@ -47,5 +47,9 @@ type ImageRepository interface {
 	// row is only ever assigned one at insert, the same rows stay favoured and
 	// the same rows stay all but unreachable for as long as the catalogue
 	// lives. Spacing the values evenly makes every gap the same width.
-	ReshuffleRandom() error
+	//
+	// progress, when not nil, is called once before any work with (0, total)
+	// and again after each batch with how many rows now hold a value. A large
+	// catalogue takes long enough that a caller will want to say so.
+	ReshuffleRandom(progress func(done, total int)) error
 }

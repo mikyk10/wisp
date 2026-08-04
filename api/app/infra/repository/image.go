@@ -216,7 +216,7 @@ func (p *imageRepositoryImpl) EvictOldestImages(catalogKey string, count int) er
 // evaluating the CASE overtakes the round trip it saves.
 const reshuffleBatchSize = 500
 
-func (p *imageRepositoryImpl) ReshuffleRandom() error {
+func (p *imageRepositoryImpl) ReshuffleRandom(progress func(done, total int)) error {
 	var ids []model.PrimaryKey
 	if err := p.conn.Unscoped().Model(&model.Image{}).Order("id").Pluck("id", &ids).Error; err != nil {
 		return err
@@ -225,6 +225,15 @@ func (p *imageRepositoryImpl) ReshuffleRandom() error {
 		return nil
 	}
 	total := float64(len(ids))
+
+	if progress == nil {
+		progress = func(int, int) {}
+	}
+	// Reported before any work, so a caller can say what is about to happen
+	// and how much of it there is. On a large catalogue this pass takes long
+	// enough that an unexplained silence in the log is worse than the noise it
+	// replaced.
+	progress(0, len(ids))
 
 	// Which row gets which value is decided at random, and that matters more
 	// than it looks. A scan registers one catalogue at a time, so ids arrive in
@@ -279,6 +288,8 @@ func (p *imageRepositoryImpl) ReshuffleRandom() error {
 		if err := db.Exec(sb.String(), args...).Error; err != nil {
 			return err
 		}
+
+		progress(end, len(ids))
 	}
 
 	return nil

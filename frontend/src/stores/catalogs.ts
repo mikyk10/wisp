@@ -12,9 +12,8 @@ export const useCatalogsStore = defineStore('catalogs', () => {
 
   // ── Private helpers ──────────────────────────────────────────────────────
   async function _loadCatalog(catalogKey: string) {
-    const photosStore = usePhotosStore()
-    photosStore.resetPhotos()
-    await photosStore.loadPhotosStream(catalogKey)
+    // loadPhotosStream resets photo state itself (single reset/abort/start path).
+    await usePhotosStore().loadPhotosStream(catalogKey)
   }
 
   // ── Actions ──────────────────────────────────────────────────────────────

@@ -13,6 +13,11 @@ export default defineConfig({
     baseURL: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
     trace: 'on-first-retry',
     headless: true,
+    // Sandboxed environments provide a pre-installed Chromium whose build number
+    // may not match the pinned @playwright/test version; allow overriding the binary.
+    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+      ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } }
+      : {}),
   },
   projects: [
     {

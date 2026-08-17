@@ -18,8 +18,50 @@
       </div>
     </v-overlay>
 
+    <!-- Load error -->
+    <div
+      v-if="error"
+      class="grid-state d-flex flex-column align-center justify-center"
+    >
+      <v-alert
+        type="error"
+        variant="tonal"
+        class="grid-error-alert"
+        title="Failed to load photos"
+        :text="error"
+      />
+      <v-btn
+        color="primary"
+        variant="outlined"
+        class="mt-4"
+        prepend-icon="mdi-refresh"
+        @click="retry"
+      >
+        Retry
+      </v-btn>
+    </div>
+
+    <!-- Empty catalog (streamCompleted guards against a flash before the first load starts) -->
+    <div
+      v-else-if="!loading && streamCompleted && photos.length === 0"
+      class="grid-state d-flex flex-column align-center justify-center text-center"
+    >
+      <v-icon
+        icon="mdi-image-off-outline"
+        size="64"
+        class="empty-icon"
+      />
+      <div class="mt-4 text-h6">
+        No photos in this catalog
+      </div>
+      <div class="mt-1 empty-hint">
+        Photos will appear here once they are uploaded.
+      </div>
+    </div>
+
     <!-- Photo grid -->
     <v-container
+      v-else
       fluid
       class="photo-grid-content"
     >
@@ -36,7 +78,7 @@
           <PhotoItem :photo="item" />
         </template>
       </RecycleScroller>
-      
+
       <!-- Streaming loading indicator -->
       <div
         v-if="loading && photos.length > 0"
@@ -57,6 +99,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { usePhotosStore } from '@/stores/photos'
+import { useCatalogsStore } from '@/stores/catalogs'
 import PhotoItem from './PhotoItem.vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
 
@@ -68,6 +111,7 @@ interface Photo {
 }
 
 const photosStore = usePhotosStore()
+const catalogsStore = useCatalogsStore()
 const scrollTimeout = ref<number | null>(null)
 
 const photos = computed((): Photo[] => {
@@ -92,8 +136,18 @@ const loading = computed(() => {
   return photosStore.loading
 })
 
-// Calculate the index of the first visible item from scroll position and update the timeline
-const updateActiveTimeline = () => {
+const error = computed(() => photosStore.error)
+const streamCompleted = computed(() => photosStore.streamCompleted)
+
+const retry = () => {
+  if (catalogsStore.currentCatalog) {
+    catalogsStore.setCurrentCatalog(catalogsStore.currentCatalog)
+  }
+}
+
+// Report the index of the first visible item to the store, which owns the
+// active-timeline-month state shared with TimelineScrollbar.
+const reportViewport = () => {
   const el = scrollerRef.value?.$el
   if (!el || photos.value.length === 0) return
 
@@ -101,15 +155,7 @@ const updateActiveTimeline = () => {
   const firstVisibleRow = Math.floor(scrollTop / itemSize.value)
   const firstVisibleIndex = Math.min(firstVisibleRow * columns.value, photos.value.length - 1)
 
-  const photo = photos.value[firstVisibleIndex]
-  if (!photo) return
-
-  const date = new Date(photo.timestamp)
-  const year = date.getFullYear()
-  const month = date.getMonth() + 1
-  const key = `${year}-${month.toString().padStart(2, '0')}`
-
-  window.dispatchEvent(new CustomEvent('viewport-timeline-update', { detail: { key } }))
+  photosStore.reportViewport(firstVisibleIndex)
 }
 
 // Scroll event handler
@@ -119,9 +165,19 @@ const handleScroll = () => {
   }
 
   scrollTimeout.value = window.setTimeout(() => {
-    updateActiveTimeline()
+    reportViewport()
   }, 150)
 }
+
+// Timeline clicks land in the store as a scroll request; execute it here.
+watch(
+  () => photosStore.scrollRequest,
+  (req) => {
+    if (req) {
+      scrollerRef.value?.scrollToItem(req.index)
+    }
+  },
+)
 
 // When photos are added via the stream, RecycleScroller may not re-render visible items (black gap bug).
 // Force an internal recalculation by nudging the scroll position by 1px.
@@ -138,6 +194,8 @@ watch(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(scrollerRef.value as any)?.updateVisibleItems?.(false)
       })
+      // The scroller is v-if-mounted with the first batch: (re)attach the scroll listener.
+      attachScrollListener()
       return
     }
 
@@ -149,35 +207,36 @@ watch(
   },
 )
 
+let listeningEl: HTMLElement | null = null
+
+// Register the scroll event on the RecycleScroller element itself
+// (scroll occurs on the overflow-y: auto element, not on window)
+const attachScrollListener = () => {
+  nextTick(() => {
+    const el = scrollerRef.value?.$el
+    if (el && el !== listeningEl) {
+      listeningEl?.removeEventListener('scroll', handleScroll)
+      el.addEventListener('scroll', handleScroll)
+      listeningEl = el
+      reportViewport()
+    }
+  })
+}
+
 onMounted(() => {
   updateColumns()
   window.addEventListener('resize', updateColumns)
-
-  // Register the scroll event on the RecycleScroller element itself
-  // (scroll occurs on the overflow-y: auto element, not on window)
-  nextTick(() => {
-    const el = scrollerRef.value?.$el
-    if (el) {
-      el.addEventListener('scroll', handleScroll)
-      updateActiveTimeline()
-    }
-  })
+  attachScrollListener()
 })
 
 onUnmounted(() => {
-  const el = scrollerRef.value?.$el
-  if (el) {
-    el.removeEventListener('scroll', handleScroll)
-  }
+  listeningEl?.removeEventListener('scroll', handleScroll)
+  listeningEl = null
   window.removeEventListener('resize', updateColumns)
 
   if (scrollTimeout.value) {
     clearTimeout(scrollTimeout.value)
   }
-})
-
-defineExpose({
-  scrollToIndex: (index: number) => scrollerRef.value?.scrollToItem(index)
 })
 </script>
 
@@ -209,6 +268,25 @@ defineExpose({
 .photo-grid :deep(.vue-recycle-scroller__item-wrapper) {
   padding: 2px;
   box-sizing: border-box;
+}
+
+.grid-state {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 24px;
+}
+
+.grid-error-alert {
+  max-width: 480px;
+}
+
+.empty-icon {
+  opacity: 0.35;
+}
+
+.empty-hint {
+  font-size: 0.85rem;
+  opacity: 0.5;
 }
 
 .stream-loading {

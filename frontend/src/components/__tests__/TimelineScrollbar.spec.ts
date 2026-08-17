@@ -20,12 +20,8 @@ vi.mock('@/config', async (importOriginal) => {
   }
 })
 
-function mountScrollbar(
-  pinia: ReturnType<typeof createPinia>,
-  gridRef: { scrollToIndex: (i: number) => void } | null = null
-) {
+function mountScrollbar(pinia: ReturnType<typeof createPinia>) {
   return mount(TimelineScrollbar, {
-    props: { gridRef },
     global: { plugins: [pinia, vuetify] },
     attachTo: document.body,
   })
@@ -67,21 +63,21 @@ describe('TimelineScrollbar', () => {
     wrapper.unmount()
   })
 
-  it('calls gridRef.scrollToIndex with the entry startIndex on click', async () => {
+  it('puts a scroll request into the store on click', async () => {
     const photosStore = usePhotosStore(pinia)
     photosStore.timeline['2024-06'] = { year: 2024, month: 6, startIndex: 42, count: 3 }
 
-    const scrollToIndex = vi.fn()
-    const wrapper = mountScrollbar(pinia, { scrollToIndex })
+    const wrapper = mountScrollbar(pinia)
     await wrapper.vm.$nextTick()
 
     await wrapper.find('.timeline-entry').trigger('click')
 
-    expect(scrollToIndex).toHaveBeenCalledWith(42)
+    expect(photosStore.scrollRequest).toEqual({ index: 42, key: '2024-06' })
+    expect(photosStore.activeTimelineKey).toBe('2024-06')
     wrapper.unmount()
   })
 
-  it('marks the entry active when a viewport-timeline-update event fires', async () => {
+  it('marks the entry active when the store activeTimelineKey changes', async () => {
     const photosStore = usePhotosStore(pinia)
     photosStore.timeline['2024-06'] = { year: 2024, month: 6, startIndex: 0, count: 3 }
     photosStore.timeline['2023-01'] = { year: 2023, month: 1, startIndex: 3, count: 2 }
@@ -92,9 +88,7 @@ describe('TimelineScrollbar', () => {
     // No active entry initially
     expect(wrapper.find('.timeline-entry--active').exists()).toBe(false)
 
-    window.dispatchEvent(
-      new CustomEvent('viewport-timeline-update', { detail: { key: '2024-06' } })
-    )
+    photosStore.activeTimelineKey = '2024-06'
     await wrapper.vm.$nextTick()
 
     const active = wrapper.find('.timeline-entry--active')

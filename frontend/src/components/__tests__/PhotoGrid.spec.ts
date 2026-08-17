@@ -11,9 +11,14 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import PhotoGrid from '../PhotoGrid.vue'
 import { usePhotosStore } from '@/stores/photos'
+import { useCatalogsStore } from '@/stores/catalogs'
 
 vi.mock('@/api/photos', () => ({
   photosApi: { toggleVisibility: vi.fn().mockResolvedValue(undefined) },
+}))
+
+vi.mock('@/api/catalogs', () => ({
+  catalogsApi: { fetchAll: vi.fn().mockResolvedValue([]) },
 }))
 
 vi.mock('@/config', async (importOriginal) => {
@@ -38,7 +43,16 @@ const stubs = {
   },
   VContainer: { template: '<div><slot /></div>', props: ['fluid'] },
   VProgressCircular: { template: '<div />', props: ['indeterminate', 'size', 'color'] },
-  VIcon: { template: '<i />', props: ['icon'] },
+  VIcon: { template: '<i />', props: ['icon', 'size'] },
+  VAlert: {
+    template: '<div class="v-alert-stub">{{ title }} {{ text }}<slot /></div>',
+    props: ['type', 'variant', 'title', 'text'],
+  },
+  VBtn: {
+    template: '<button class="v-btn-stub" @click="$emit(\'click\')"><slot /></button>',
+    props: ['color', 'variant', 'prependIcon'],
+    emits: ['click'],
+  },
   RecycleScroller: {
     template: '<div class="recycle-scroller-stub" />',
     props: ['items', 'itemHeight', 'itemSize', 'gridItems', 'buffer'],
@@ -99,13 +113,54 @@ describe('PhotoGrid', () => {
     wrapper.unmount()
   })
 
-  it('scrollToIndex delegates to RecycleScroller.scrollToItem', async () => {
+  it('a store scroll request triggers RecycleScroller.scrollToItem', async () => {
+    const photosStore = usePhotosStore(pinia)
     const wrapper = mountGrid(pinia)
     await wrapper.vm.$nextTick()
 
-    wrapper.vm.scrollToIndex(42)
+    photosStore.requestTimelineScroll({ key: '2024-06', startIndex: 42 })
+    await wrapper.vm.$nextTick()
 
     expect(scrollToItemSpy).toHaveBeenCalledWith(42)
+    wrapper.unmount()
+  })
+
+  it('shows the error state with a Retry button when the store has an error', async () => {
+    const photosStore = usePhotosStore(pinia)
+    photosStore.error = 'network exploded'
+
+    const wrapper = mountGrid(pinia)
+
+    expect(wrapper.text()).toContain('Failed to load photos')
+    expect(wrapper.text()).toContain('network exploded')
+    expect(wrapper.find('.recycle-scroller-stub').exists()).toBe(false)
+
+    const catalogsStore = useCatalogsStore(pinia)
+    catalogsStore.currentCatalog = 'album-a'
+    const spy = vi.spyOn(catalogsStore, 'setCurrentCatalog').mockImplementation(() => {})
+
+    await wrapper.find('.v-btn-stub').trigger('click')
+
+    expect(spy).toHaveBeenCalledWith('album-a')
+    wrapper.unmount()
+  })
+
+  it('shows the empty state after a completed stream with zero photos', () => {
+    const photosStore = usePhotosStore(pinia)
+    photosStore.streamCompleted = true
+
+    const wrapper = mountGrid(pinia)
+
+    expect(wrapper.text()).toContain('No photos in this catalog')
+    expect(wrapper.find('.recycle-scroller-stub').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('does not show the empty state before the first load has completed', () => {
+    const wrapper = mountGrid(pinia)
+
+    expect(wrapper.text()).not.toContain('No photos in this catalog')
+    expect(wrapper.find('.recycle-scroller-stub').exists()).toBe(true)
     wrapper.unmount()
   })
 })

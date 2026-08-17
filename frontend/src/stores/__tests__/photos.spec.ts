@@ -63,12 +63,71 @@ describe('usePhotosStore', () => {
       const store = usePhotosStore()
       store.items.push(makePhoto(1))
       store.streamCompleted = true
+      store.requestTimelineScroll({ key: '2024-01', startIndex: 0 })
 
       store.resetPhotos()
 
       expect(store.items).toHaveLength(0)
       expect(store.streamCompleted).toBe(false)
       expect(store.totalPhotos).toBe(0)
+      expect(store.activeTimelineKey).toBe('')
+      expect(store.scrollRequest).toBeNull()
+    })
+  })
+
+  describe('timeline sync (grid ⇔ timeline scrollbar)', () => {
+    // items 0–3: 2024-06, items 4–7: 2024-05
+    function seedTwoMonths() {
+      const store = usePhotosStore()
+      for (let i = 0; i < 4; i++)
+        store.items.push(makePhoto(i, { timestamp: '2024-06-15T00:00:00Z' }))
+      for (let i = 4; i < 8; i++)
+        store.items.push(makePhoto(i, { timestamp: '2024-05-15T00:00:00Z' }))
+      return store
+    }
+
+    it('requestTimelineScroll sets the active key and a scroll request', () => {
+      const store = usePhotosStore()
+      store.requestTimelineScroll({ key: '2024-05', startIndex: 4 })
+
+      expect(store.activeTimelineKey).toBe('2024-05')
+      expect(store.scrollRequest).toEqual({ index: 4, key: '2024-05' })
+    })
+
+    it('reportViewport updates the active key from the first visible photo', () => {
+      const store = seedTwoMonths()
+      store.reportViewport(5)
+      expect(store.activeTimelineKey).toBe('2024-05')
+    })
+
+    it('the first report after a click is consumed and does not snap the highlight back', () => {
+      const store = seedTwoMonths()
+      store.requestTimelineScroll({ key: '2024-05', startIndex: 4 })
+
+      // The programmatic scroll landed short of the target (row snapping /
+      // tail-of-list): the reported index still belongs to June.
+      store.reportViewport(2)
+
+      expect(store.activeTimelineKey).toBe('2024-05')
+      expect(store.scrollRequest).toBeNull()
+    })
+
+    it('reports after the pending request is consumed win (genuine user scroll)', () => {
+      const store = seedTwoMonths()
+      store.requestTimelineScroll({ key: '2024-05', startIndex: 4 })
+
+      store.reportViewport(4) // programmatic scroll arrival — consumed
+      store.reportViewport(0) // user scrolled back to the top
+
+      expect(store.activeTimelineKey).toBe('2024-06')
+      expect(store.scrollRequest).toBeNull()
+    })
+
+    it('reportViewport ignores out-of-range indices', () => {
+      const store = seedTwoMonths()
+      store.activeTimelineKey = '2024-06'
+      store.reportViewport(99)
+      expect(store.activeTimelineKey).toBe('2024-06')
     })
   })
 

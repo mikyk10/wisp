@@ -23,31 +23,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { usePhotosStore } from '@/stores/photos'
-import type PhotoGrid from './PhotoGrid.vue'
-
-interface Props {
-  gridRef: InstanceType<typeof PhotoGrid> | null
-}
-
-const props = defineProps<Props>()
-
-interface TimelineEntry {
-  key: string
-  label: string
-  year: number
-  month: number
-  startIndex: number
-  count: number
-}
+import type { TimelineEntry } from '@/types'
 
 const photosStore = usePhotosStore()
-const activeEntry = ref<string>('')
 const scrollbarEl = ref<HTMLElement | null>(null)
-// Flag to prevent the scroll event from overwriting activeEntry after a programmatic scroll triggered by a click.
-// Released after 300ms, longer than the 150ms debounce.
-let ignoreNextScrollUpdate = false
+
+// The active month lives in the photos store; grid scroll reports and
+// timeline clicks both funnel through it (no window events, no timer flags).
+const activeEntry = computed(() => photosStore.activeTimelineKey)
 
 watch(activeEntry, async () => {
   await nextTick()
@@ -59,34 +44,8 @@ const timelineEntries = computed((): TimelineEntry[] => {
 })
 
 const scrollToEntry = (entry: TimelineEntry) => {
-  activeEntry.value = entry.key
-  // Use RecycleScroller's scrollToItem directly.
-  // Double-scrolling via DOM queries or timeline-scroll events causes a "snap back to latest" bug.
-  props.gridRef?.scrollToIndex(entry.startIndex)
-  // Prevent scroll events triggered by the programmatic scroll from overwriting activeEntry with a different month.
-  // scrollToItem snaps to column boundaries, so firstVisibleIndex can be off by one.
-  ignoreNextScrollUpdate = true
-  setTimeout(() => {
-    ignoreNextScrollUpdate = false
-  }, 300)
+  photosStore.requestTimelineScroll(entry)
 }
-
-// Handler for viewport update events
-const handleViewportUpdate = (event: CustomEvent) => {
-  if (ignoreNextScrollUpdate) return
-  const { key } = event.detail
-  activeEntry.value = key
-}
-
-onMounted(() => {
-  // Add listener for viewport update events
-  window.addEventListener('viewport-timeline-update', handleViewportUpdate as EventListener)
-})
-
-onUnmounted(() => {
-  // Remove event listener
-  window.removeEventListener('viewport-timeline-update', handleViewportUpdate as EventListener)
-})
 </script>
 
 <style scoped>

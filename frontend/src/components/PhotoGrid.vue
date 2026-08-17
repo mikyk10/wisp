@@ -65,22 +65,35 @@
       fluid
       class="photo-grid-content"
     >
-      <RecycleScroller
-        ref="scrollerRef"
+      <div
+        ref="scrollParentRef"
         class="photo-grid"
         role="listbox"
         aria-label="Photos"
         aria-multiselectable="true"
-        :items="photos"
-        :item-height="itemSize"
-        :item-size="itemSize"
-        :grid-items="columns"
-        :buffer="buffer"
+        @scroll="handleScroll"
       >
-        <template #default="{ item }">
-          <PhotoItem :photo="item" />
-        </template>
-      </RecycleScroller>
+        <div
+          class="photo-grid-spacer"
+          :style="{ height: `${totalSize}px` }"
+        >
+          <div
+            v-for="row in virtualRows"
+            :key="row.index"
+            class="photo-grid-row"
+            :style="{ transform: `translateY(${row.start}px)`, height: `${row.size}px` }"
+          >
+            <div
+              v-for="photo in rowPhotos(row.index)"
+              :key="photo.id"
+              class="photo-cell"
+              :style="{ width: `${itemSize}px`, height: `${itemSize}px` }"
+            >
+              <PhotoItem :photo="photo" />
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Streaming loading indicator -->
       <div
@@ -100,7 +113,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useVirtualizer } from '@tanstack/vue-virtual'
 import { usePhotosStore } from '@/stores/photos'
 import { useCatalogsStore } from '@/stores/catalogs'
 import {
@@ -111,7 +125,6 @@ import {
 } from '@/constants'
 import type { Photo } from '@/types'
 import PhotoItem from './PhotoItem.vue'
-import { RecycleScroller } from 'vue-virtual-scroller'
 
 const photosStore = usePhotosStore()
 const catalogsStore = useCatalogsStore()
@@ -121,9 +134,8 @@ const photos = computed((): Photo[] => {
   return photosStore.items
 })
 
-const scrollerRef = ref<InstanceType<typeof RecycleScroller> | null>(null)
+const scrollParentRef = ref<HTMLElement | null>(null)
 const itemSize = ref<number>(GRID_ITEM_SIZE.desktop)
-const buffer = 200
 const columns = ref(1)
 
 const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`)
@@ -136,6 +148,28 @@ const updateColumns = () => {
   columns.value = Math.max(1, Math.floor(available / itemSize.value))
 }
 
+// The grid virtualizes whole rows; each row holds `columns` photos.
+const rowCount = computed(() => Math.ceil(photos.value.length / columns.value))
+
+const virtualizer = useVirtualizer(
+  computed(() => ({
+    count: rowCount.value,
+    getScrollElement: () => scrollParentRef.value,
+    estimateSize: () => itemSize.value,
+    overscan: 2,
+  })),
+)
+
+const virtualRows = computed(() => virtualizer.value.getVirtualItems())
+const totalSize = computed(() => virtualizer.value.getTotalSize())
+
+const rowPhotos = (rowIndex: number): Photo[] => {
+  const start = rowIndex * columns.value
+  return photos.value.slice(start, start + columns.value)
+}
+
+// Row height is uniform; re-measure when it changes (mobile ⇄ desktop).
+watch(itemSize, () => virtualizer.value.measure())
 
 const loading = computed(() => {
   return photosStore.loading
@@ -153,17 +187,16 @@ const retry = () => {
 // Report the index of the first visible item to the store, which owns the
 // active-timeline-month state shared with TimelineScrollbar.
 const reportViewport = () => {
-  const el = scrollerRef.value?.$el
+  const el = scrollParentRef.value
   if (!el || photos.value.length === 0) return
 
-  const scrollTop = el.scrollTop
-  const firstVisibleRow = Math.floor(scrollTop / itemSize.value)
+  const firstVisibleRow = Math.floor(el.scrollTop / itemSize.value)
   const firstVisibleIndex = Math.min(firstVisibleRow * columns.value, photos.value.length - 1)
 
   photosStore.reportViewport(firstVisibleIndex)
 }
 
-// Scroll event handler
+// Debounced scroll handler
 const handleScroll = () => {
   if (scrollTimeout.value) {
     clearTimeout(scrollTimeout.value)
@@ -179,64 +212,18 @@ watch(
   () => photosStore.scrollRequest,
   (req) => {
     if (req) {
-      scrollerRef.value?.scrollToItem(req.index)
+      virtualizer.value.scrollToIndex(Math.floor(req.index / columns.value), { align: 'start' })
     }
   },
 )
-
-// When photos are added via the stream, RecycleScroller may not re-render visible items (black gap bug).
-// Force an internal recalculation by nudging the scroll position by 1px.
-watch(
-  () => photos.value.length,
-  async (newLen, oldLen) => {
-    await nextTick()
-
-    if (oldLen === 0 && newLen > 0) {
-      // On first load: updateVisibleItems(true) called on items change
-      // involves removeAndRecycleAllViews() which may not work correctly in beta.
-      // Work around it by calling updateVisibleItems(false) after rAF, same as on resize.
-      requestAnimationFrame(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(scrollerRef.value as any)?.updateVisibleItems?.(false)
-      })
-      // The scroller is v-if-mounted with the first batch: (re)attach the scroll listener.
-      attachScrollListener()
-      return
-    }
-
-    const el = scrollerRef.value?.$el
-    if (!el) return
-    const saved = el.scrollTop
-    el.scrollTop = saved + 1
-    el.scrollTop = saved
-  },
-)
-
-let listeningEl: HTMLElement | null = null
-
-// Register the scroll event on the RecycleScroller element itself
-// (scroll occurs on the overflow-y: auto element, not on window)
-const attachScrollListener = () => {
-  nextTick(() => {
-    const el = scrollerRef.value?.$el
-    if (el && el !== listeningEl) {
-      listeningEl?.removeEventListener('scroll', handleScroll)
-      el.addEventListener('scroll', handleScroll)
-      listeningEl = el
-      reportViewport()
-    }
-  })
-}
 
 onMounted(() => {
   updateColumns()
   window.addEventListener('resize', updateColumns)
-  attachScrollListener()
+  reportViewport()
 })
 
 onUnmounted(() => {
-  listeningEl?.removeEventListener('scroll', handleScroll)
-  listeningEl = null
   window.removeEventListener('resize', updateColumns)
 
   if (scrollTimeout.value) {
@@ -270,9 +257,23 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 
-.photo-grid :deep(.vue-recycle-scroller__item-wrapper) {
+.photo-grid-spacer {
+  position: relative;
+  width: 100%;
+}
+
+.photo-grid-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+}
+
+.photo-cell {
   padding: 2px;
   box-sizing: border-box;
+  flex: 0 0 auto;
 }
 
 .grid-state {

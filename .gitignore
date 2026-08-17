@@ -22,3 +22,6 @@ AGENT.md
 
 # Claude Code (local settings, not for sharing)
 .claude/settings.local.json
+
+# Dependencies / tool caches
+node_modules/

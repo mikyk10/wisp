@@ -103,15 +103,15 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { usePhotosStore } from '@/stores/photos'
 import { useCatalogsStore } from '@/stores/catalogs'
+import {
+  GRID_HORIZONTAL_PADDING,
+  GRID_ITEM_SIZE,
+  MOBILE_BREAKPOINT,
+  TIMELINE_WIDTH,
+} from '@/constants'
+import type { Photo } from '@/types'
 import PhotoItem from './PhotoItem.vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
-
-interface Photo {
-  id: number
-  url: string
-  enabled: boolean
-  timestamp: string
-}
 
 const photosStore = usePhotosStore()
 const catalogsStore = useCatalogsStore()
@@ -122,15 +122,17 @@ const photos = computed((): Photo[] => {
 })
 
 const scrollerRef = ref<InstanceType<typeof RecycleScroller> | null>(null)
-const itemSize = ref(256)
+const itemSize = ref<number>(GRID_ITEM_SIZE.desktop)
 const buffer = 200
 const columns = ref(1)
 
+const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`)
+
 const updateColumns = () => {
-  const isMobile = window.innerWidth <= 768
-  itemSize.value = isMobile ? 130 : 256
-  const timelineWidth = isMobile ? 80 : 120
-  const available = window.innerWidth - timelineWidth - 32
+  const isMobile = mobileQuery.matches
+  itemSize.value = isMobile ? GRID_ITEM_SIZE.mobile : GRID_ITEM_SIZE.desktop
+  const timelineWidth = isMobile ? TIMELINE_WIDTH.mobile : TIMELINE_WIDTH.desktop
+  const available = window.innerWidth - timelineWidth - GRID_HORIZONTAL_PADDING
   columns.value = Math.max(1, Math.floor(available / itemSize.value))
 }
 
@@ -250,8 +252,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding-right: 120px;
-  background: #0f1117;
+  padding-right: var(--wisp-timeline-width);
+  background: rgb(var(--v-theme-background));
 }
 
 .photo-grid-content {
@@ -293,20 +295,13 @@ onUnmounted(() => {
 }
 
 .stream-loading {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(var(--v-theme-on-surface), 0.4);
   font-size: 0.8rem;
 }
 
 .stream-loading-text {
   letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-/* Mobile support */
-@media (max-width: 768px) {
-  .photo-grid-container {
-    padding-right: 80px;
-  }
+  color: rgba(var(--v-theme-on-surface), 0.4);
 }
 
 /* Bottom margin in selection mode */

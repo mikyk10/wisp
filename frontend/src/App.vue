@@ -124,17 +124,33 @@ onMounted(() => {
 </script>
 
 <style>
+/* Layout constants — JS twin lives in src/constants.ts (keep in sync).
+   The 768px breakpoint is repeated in the @media query below because CSS
+   media queries cannot read custom properties.
+   --wisp-bg mirrors the vuetify.ts background color for the pre-mount
+   flash; everything inside <v-app> uses Vuetify's --v-theme-* variables. */
+:root {
+  --wisp-bg: #0f1117;
+  --wisp-timeline-width: 120px;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --wisp-timeline-width: 80px;
+  }
+}
+
 /* Global styles */
 html,
 body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
-  background: #0f1117;
+  background: var(--wisp-bg);
 }
 
 .fancy-app-bar {
-  border-bottom: 1px solid rgba(0, 210, 168, 0.15) !important;
+  border-bottom: 1px solid rgba(var(--v-theme-primary), 0.15) !important;
 }
 
 .app-error {
@@ -160,7 +176,7 @@ body {
   letter-spacing: 3px;
   text-transform: uppercase;
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(var(--v-theme-on-surface), 0.9);
 }
 
 /* Use !important to prioritise Poppins regardless of bundle order */
@@ -174,16 +190,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f1117;
+  background: var(--wisp-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 210, 168, 0.25);
+  background: rgba(var(--v-theme-primary), 0.25);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 210, 168, 0.5);
+  background: rgba(var(--v-theme-primary), 0.5);
 }
 
 /* Animations */

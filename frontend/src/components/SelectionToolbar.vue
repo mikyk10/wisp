@@ -95,8 +95,8 @@ const toggleStatus = async () => {
   right: 0;
   z-index: 1000;
   border-radius: 0;
-  background: #1a1d27;
-  border-top: 1px solid rgba(0, 210, 168, 0.3);
+  background: rgb(var(--v-theme-surface));
+  border-top: 1px solid rgba(var(--v-theme-primary), 0.3);
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
 }
 

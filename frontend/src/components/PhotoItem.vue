@@ -74,19 +74,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useSelectionStore } from '@/stores/selection'
+import type { Photo } from '@/types'
 
 // TODO(lightbox): a zoom/lightbox view needs an endpoint that serves the
 // source-resolution image; only thumbnails are exposed today. Once that
 // exists, plain click should open the lightbox and selection should move to
 // a dedicated checkbox (long-press on touch). handleSelect is already the
 // single entry point selection will keep.
-
-interface Photo {
-  id: number
-  url: string
-  enabled: boolean
-  timestamp: string
-}
 
 interface Props {
   photo: Photo
@@ -120,7 +114,7 @@ const handleClick = (event: MouseEvent) => {
   overflow: hidden;
   width: 100%;
   min-width: 0;
-  background: #0f1117;
+  background: rgb(var(--v-theme-background));
   /* Shift+click must extend the selection, not the browser text selection */
   user-select: none;
 }
@@ -196,8 +190,8 @@ const handleClick = (event: MouseEvent) => {
 
   .photo-item:hover {
     box-shadow:
-      0 0 20px rgba(0, 210, 168, 0.2),
-      0 0 6px rgba(0, 210, 168, 0.1);
+      0 0 20px rgba(var(--v-theme-primary), 0.2),
+      0 0 6px rgba(var(--v-theme-primary), 0.1);
     z-index: 1;
   }
 }

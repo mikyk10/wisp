@@ -57,9 +57,9 @@ const scrollToEntry = (entry: TimelineEntry) => {
   right: 0;
   top: var(--v-layout-top, 0px);
   bottom: 0;
-  width: 120px;
-  background: #1a1d27;
-  border-left: 1px solid rgba(0, 210, 168, 0.12);
+  width: var(--wisp-timeline-width);
+  background: rgb(var(--v-theme-surface));
+  border-left: 1px solid rgba(var(--v-theme-primary), 0.12);
   z-index: 100;
   overflow-y: auto;
 }
@@ -89,20 +89,20 @@ const scrollToEntry = (entry: TimelineEntry) => {
 
 @media (hover: hover) {
   .timeline-entry:hover {
-    background-color: rgba(0, 210, 168, 0.06);
-    border-left-color: rgba(0, 210, 168, 0.4);
+    background-color: rgba(var(--v-theme-primary), 0.06);
+    border-left-color: rgba(var(--v-theme-primary), 0.4);
   }
 }
 
 .timeline-entry:focus-visible {
-  outline: 1px solid rgba(0, 210, 168, 0.6);
+  outline: 1px solid rgba(var(--v-theme-primary), 0.6);
   outline-offset: -1px;
 }
 
 .timeline-entry--active {
-  background-color: rgba(0, 210, 168, 0.1);
-  border-left-color: #00d2a8;
-  color: #00d2a8;
+  background-color: rgba(var(--v-theme-primary), 0.1);
+  border-left-color: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-primary));
 }
 
 .timeline-label {
@@ -122,12 +122,8 @@ const scrollToEntry = (entry: TimelineEntry) => {
   opacity: 0.75;
 }
 
-/* Mobile support */
+/* Mobile support (width follows --wisp-timeline-width automatically) */
 @media (max-width: 768px) {
-  .timeline-scrollbar {
-    width: 80px;
-  }
-
   .timeline-entry {
     padding: 6px 8px;
   }
@@ -151,11 +147,11 @@ const scrollToEntry = (entry: TimelineEntry) => {
 }
 
 .timeline-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 210, 168, 0.2);
+  background: rgba(var(--v-theme-primary), 0.2);
   border-radius: 0;
 }
 
 .timeline-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 210, 168, 0.4);
+  background: rgba(var(--v-theme-primary), 0.4);
 }
 </style>

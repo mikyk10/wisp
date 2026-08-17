@@ -68,6 +68,9 @@
       <RecycleScroller
         ref="scrollerRef"
         class="photo-grid"
+        role="listbox"
+        aria-label="Photos"
+        aria-multiselectable="true"
         :items="photos"
         :item-height="itemSize"
         :item-size="itemSize"

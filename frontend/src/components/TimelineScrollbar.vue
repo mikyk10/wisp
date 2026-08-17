@@ -1,14 +1,17 @@
 <template>
-  <div
+  <nav
     ref="scrollbarEl"
     class="timeline-scrollbar"
+    aria-label="Photo timeline"
   >
     <div class="timeline-content">
-      <div
+      <button
         v-for="entry in timelineEntries"
         :key="entry.key"
+        type="button"
         class="timeline-entry"
         :class="{ 'timeline-entry--active': entry.key === activeEntry }"
+        :aria-current="entry.key === activeEntry ? 'true' : undefined"
         @click="scrollToEntry(entry)"
       >
         <div class="timeline-label">
@@ -17,9 +20,9 @@
         <div class="timeline-count">
           {{ entry.count }} photos
         </div>
-      </div>
+      </button>
     </div>
-  </div>
+  </nav>
 </template>
 
 <script setup lang="ts">
@@ -66,6 +69,14 @@ const scrollToEntry = (entry: TimelineEntry) => {
 }
 
 .timeline-entry {
+  /* Native <button> reset: inherit the sidebar's typography and colors */
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
   padding: 8px 10px;
   margin-bottom: 2px;
   border-radius: 0;
@@ -76,9 +87,16 @@ const scrollToEntry = (entry: TimelineEntry) => {
   border-left: 2px solid transparent;
 }
 
-.timeline-entry:hover {
-  background-color: rgba(0, 210, 168, 0.06);
-  border-left-color: rgba(0, 210, 168, 0.4);
+@media (hover: hover) {
+  .timeline-entry:hover {
+    background-color: rgba(0, 210, 168, 0.06);
+    border-left-color: rgba(0, 210, 168, 0.4);
+  }
+}
+
+.timeline-entry:focus-visible {
+  outline: 1px solid rgba(0, 210, 168, 0.6);
+  outline-offset: -1px;
 }
 
 .timeline-entry--active {

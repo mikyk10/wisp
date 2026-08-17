@@ -78,6 +78,31 @@ describe('SelectionToolbar', () => {
     wrapper.unmount()
   })
 
+  it('clears the selection when Escape is pressed', async () => {
+    const wrapper = mountToolbar(pinia)
+    const selectionStore = useSelectionStore(pinia)
+    selectionStore.togglePhotoSelection(1)
+    await wrapper.vm.$nextTick()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+
+    expect(selectionStore.isSelectionMode).toBe(false)
+    expect(wrapper.find('.selection-toolbar').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('ignores Escape when nothing is selected', async () => {
+    const wrapper = mountToolbar(pinia)
+    const selectionStore = useSelectionStore(pinia)
+    const clearSpy = vi.spyOn(selectionStore, 'clearSelection')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+
+    expect(clearSpy).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('calls toggleSelectedPhotosStatus when the status button is clicked', async () => {
     const wrapper = mountToolbar(pinia)
     const photosStore = usePhotosStore(pinia)

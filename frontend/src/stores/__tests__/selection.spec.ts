@@ -26,9 +26,10 @@ describe('useSelectionStore', () => {
   describe('initial state', () => {
     it('starts with no selections', () => {
       const store = useSelectionStore()
-      expect(store.selectedIds).toHaveLength(0)
+      expect(store.selectedIds.size).toBe(0)
       expect(store.isSelectionMode).toBe(false)
       expect(store.selectedCount).toBe(0)
+      expect(store.lastSelectedId).toBeNull()
     })
   })
 
@@ -36,15 +37,16 @@ describe('useSelectionStore', () => {
     it('adds a photo id on first toggle', () => {
       const store = useSelectionStore()
       store.togglePhotoSelection(1)
-      expect(store.selectedIds).toContain(1)
+      expect(store.isPhotoSelected(1)).toBe(true)
       expect(store.isSelectionMode).toBe(true)
+      expect(store.lastSelectedId).toBe(1)
     })
 
     it('removes a photo id on second toggle (deselect)', () => {
       const store = useSelectionStore()
       store.togglePhotoSelection(1)
       store.togglePhotoSelection(1)
-      expect(store.selectedIds).not.toContain(1)
+      expect(store.isPhotoSelected(1)).toBe(false)
       expect(store.isSelectionMode).toBe(false)
     })
 
@@ -54,6 +56,55 @@ describe('useSelectionStore', () => {
       store.togglePhotoSelection(2)
       store.togglePhotoSelection(3)
       expect(store.selectedCount).toBe(3)
+    })
+  })
+
+  describe('selectRangeTo (Shift+click)', () => {
+    function seedPhotos(ids: number[]) {
+      const photosStore = usePhotosStore()
+      for (const id of ids) {
+        photosStore.items.push({ id, url: '', enabled: true, timestamp: '' })
+      }
+    }
+
+    it('selects every photo between the anchor and the target in display order', () => {
+      seedPhotos([10, 20, 30, 40, 50])
+      const store = useSelectionStore()
+
+      store.togglePhotoSelection(20) // anchor
+      store.selectRangeTo(40)
+
+      expect([...store.selectedIds].sort()).toEqual([20, 30, 40])
+    })
+
+    it('works when the target comes before the anchor', () => {
+      seedPhotos([10, 20, 30, 40, 50])
+      const store = useSelectionStore()
+
+      store.togglePhotoSelection(40) // anchor
+      store.selectRangeTo(20)
+
+      expect([...store.selectedIds].sort()).toEqual([20, 30, 40])
+    })
+
+    it('keeps the anchor so repeated Shift+clicks extend from the same origin', () => {
+      seedPhotos([10, 20, 30, 40, 50])
+      const store = useSelectionStore()
+
+      store.togglePhotoSelection(10)
+      store.selectRangeTo(30)
+      store.selectRangeTo(50)
+
+      expect(store.selectedCount).toBe(5)
+    })
+
+    it('falls back to a plain toggle without an anchor', () => {
+      seedPhotos([10, 20, 30])
+      const store = useSelectionStore()
+
+      store.selectRangeTo(20)
+
+      expect([...store.selectedIds]).toEqual([20])
     })
   })
 
@@ -71,13 +122,14 @@ describe('useSelectionStore', () => {
   })
 
   describe('clearSelection', () => {
-    it('empties selectedIds and exits selection mode', () => {
+    it('empties selectedIds, resets the anchor and exits selection mode', () => {
       const store = useSelectionStore()
       store.togglePhotoSelection(1)
       store.togglePhotoSelection(2)
       store.clearSelection()
-      expect(store.selectedIds).toHaveLength(0)
+      expect(store.selectedIds.size).toBe(0)
       expect(store.isSelectionMode).toBe(false)
+      expect(store.lastSelectedId).toBeNull()
     })
   })
 
@@ -113,7 +165,7 @@ describe('useSelectionStore', () => {
       store.togglePhotoSelection(1)
       await store.toggleSelectedPhotosStatus()
 
-      expect(store.selectedIds).toHaveLength(0)
+      expect(store.selectedIds.size).toBe(0)
       expect(store.isSelectionMode).toBe(false)
     })
 

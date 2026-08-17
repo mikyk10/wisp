@@ -58,10 +58,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useSelectionStore } from '@/stores/selection'
 
 const selectionStore = useSelectionStore()
+
+// Esc anywhere exits selection mode.
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && selectionStore.isSelectionMode) {
+    selectionStore.clearSelection()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', handleKeydown))
+onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 
 const isSelectionMode = computed(() => selectionStore.isSelectionMode)
 const selectedCount = computed(() => selectionStore.selectedCount)

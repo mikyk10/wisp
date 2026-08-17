@@ -2,9 +2,13 @@
   <v-card
     class="photo-item"
     :class="{ 'photo-item--selected': isSelected, 'photo-item--disabled': !photo.enabled }"
+    role="option"
+    tabindex="0"
+    :aria-selected="isSelected"
+    :aria-label="`Photo ${photo.id}`"
     @click="handleClick"
-    @mouseenter="isHovered = true"
-    @mouseleave="isHovered = false"
+    @keydown.enter.prevent="handleSelect(false)"
+    @keydown.space.prevent="handleSelect(false)"
   >
     <div class="photo-container">
       <v-img
@@ -13,7 +17,6 @@
         aspect-ratio="1"
         cover
         class="photo-image"
-        :class="{ 'photo-image--hovered': isHovered }"
       >
         <template #placeholder>
           <div class="d-flex align-center justify-center fill-height">
@@ -69,8 +72,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useSelectionStore } from '@/stores/selection'
+
+// TODO(lightbox): a zoom/lightbox view needs an endpoint that serves the
+// source-resolution image; only thumbnails are exposed today. Once that
+// exists, plain click should open the lightbox and selection should move to
+// a dedicated checkbox (long-press on touch). handleSelect is already the
+// single entry point selection will keep.
 
 interface Photo {
   id: number
@@ -85,12 +94,19 @@ interface Props {
 
 const props = defineProps<Props>()
 const selectionStore = useSelectionStore()
-const isHovered = ref(false)
 
 const isSelected = computed(() => selectionStore.isPhotoSelected(props.photo.id))
 
-const handleClick = () => {
-  selectionStore.togglePhotoSelection(props.photo.id)
+const handleSelect = (extendRange: boolean) => {
+  if (extendRange) {
+    selectionStore.selectRangeTo(props.photo.id)
+  } else {
+    selectionStore.togglePhotoSelection(props.photo.id)
+  }
+}
+
+const handleClick = (event: MouseEvent) => {
+  handleSelect(event.shiftKey)
 }
 </script>
 
@@ -105,9 +121,16 @@ const handleClick = () => {
   width: 100%;
   min-width: 0;
   background: #0f1117;
+  /* Shift+click must extend the selection, not the browser text selection */
+  user-select: none;
 }
 
 .photo-item--selected {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -2px;
+}
+
+.photo-item:focus-visible {
   outline: 2px solid rgb(var(--v-theme-primary));
   outline-offset: -2px;
 }
@@ -133,10 +156,6 @@ const handleClick = () => {
   transition: transform 0.3s ease;
   width: 100%;
   height: 100%;
-}
-
-.photo-image--hovered {
-  transform: scale(1.06);
 }
 
 .disabled-overlay {
@@ -168,11 +187,18 @@ const handleClick = () => {
   justify-content: center;
 }
 
-.photo-item:hover {
-  box-shadow:
-    0 0 20px rgba(0, 210, 168, 0.2),
-    0 0 6px rgba(0, 210, 168, 0.1);
-  z-index: 1;
-}
+/* Hover affordances only on devices that actually hover — touch screens
+   otherwise replay them on tap ("sticky hover"). */
+@media (hover: hover) {
+  .photo-item:hover .photo-image {
+    transform: scale(1.06);
+  }
 
+  .photo-item:hover {
+    box-shadow:
+      0 0 20px rgba(0, 210, 168, 0.2),
+      0 0 6px rgba(0, 210, 168, 0.1);
+    z-index: 1;
+  }
+}
 </style>

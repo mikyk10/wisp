@@ -1,14 +1,17 @@
 <template>
-  <div
+  <nav
     ref="scrollbarEl"
     class="timeline-scrollbar"
+    aria-label="Photo timeline"
   >
     <div class="timeline-content">
-      <div
+      <button
         v-for="entry in timelineEntries"
         :key="entry.key"
+        type="button"
         class="timeline-entry"
         :class="{ 'timeline-entry--active': entry.key === activeEntry }"
+        :aria-current="entry.key === activeEntry ? 'true' : undefined"
         @click="scrollToEntry(entry)"
       >
         <div class="timeline-label">
@@ -17,37 +20,22 @@
         <div class="timeline-count">
           {{ entry.count }} photos
         </div>
-      </div>
+      </button>
     </div>
-  </div>
+  </nav>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { usePhotosStore } from '@/stores/photos'
-import type PhotoGrid from './PhotoGrid.vue'
-
-interface Props {
-  gridRef: InstanceType<typeof PhotoGrid> | null
-}
-
-const props = defineProps<Props>()
-
-interface TimelineEntry {
-  key: string
-  label: string
-  year: number
-  month: number
-  startIndex: number
-  count: number
-}
+import type { TimelineEntry } from '@/types'
 
 const photosStore = usePhotosStore()
-const activeEntry = ref<string>('')
 const scrollbarEl = ref<HTMLElement | null>(null)
-// Flag to prevent the scroll event from overwriting activeEntry after a programmatic scroll triggered by a click.
-// Released after 300ms, longer than the 150ms debounce.
-let ignoreNextScrollUpdate = false
+
+// The active month lives in the photos store; grid scroll reports and
+// timeline clicks both funnel through it (no window events, no timer flags).
+const activeEntry = computed(() => photosStore.activeTimelineKey)
 
 watch(activeEntry, async () => {
   await nextTick()
@@ -59,34 +47,8 @@ const timelineEntries = computed((): TimelineEntry[] => {
 })
 
 const scrollToEntry = (entry: TimelineEntry) => {
-  activeEntry.value = entry.key
-  // Use RecycleScroller's scrollToItem directly.
-  // Double-scrolling via DOM queries or timeline-scroll events causes a "snap back to latest" bug.
-  props.gridRef?.scrollToIndex(entry.startIndex)
-  // Prevent scroll events triggered by the programmatic scroll from overwriting activeEntry with a different month.
-  // scrollToItem snaps to column boundaries, so firstVisibleIndex can be off by one.
-  ignoreNextScrollUpdate = true
-  setTimeout(() => {
-    ignoreNextScrollUpdate = false
-  }, 300)
+  photosStore.requestTimelineScroll(entry)
 }
-
-// Handler for viewport update events
-const handleViewportUpdate = (event: CustomEvent) => {
-  if (ignoreNextScrollUpdate) return
-  const { key } = event.detail
-  activeEntry.value = key
-}
-
-onMounted(() => {
-  // Add listener for viewport update events
-  window.addEventListener('viewport-timeline-update', handleViewportUpdate as EventListener)
-})
-
-onUnmounted(() => {
-  // Remove event listener
-  window.removeEventListener('viewport-timeline-update', handleViewportUpdate as EventListener)
-})
 </script>
 
 <style scoped>
@@ -95,9 +57,9 @@ onUnmounted(() => {
   right: 0;
   top: var(--v-layout-top, 0px);
   bottom: 0;
-  width: 120px;
-  background: #1a1d27;
-  border-left: 1px solid rgba(0, 210, 168, 0.12);
+  width: var(--wisp-timeline-width);
+  background: rgb(var(--v-theme-surface));
+  border-left: 1px solid rgba(var(--v-theme-primary), 0.12);
   z-index: 100;
   overflow-y: auto;
 }
@@ -107,6 +69,14 @@ onUnmounted(() => {
 }
 
 .timeline-entry {
+  /* Native <button> reset: inherit the sidebar's typography and colors */
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
   padding: 8px 10px;
   margin-bottom: 2px;
   border-radius: 0;
@@ -117,15 +87,22 @@ onUnmounted(() => {
   border-left: 2px solid transparent;
 }
 
-.timeline-entry:hover {
-  background-color: rgba(0, 210, 168, 0.06);
-  border-left-color: rgba(0, 210, 168, 0.4);
+@media (hover: hover) {
+  .timeline-entry:hover {
+    background-color: rgba(var(--v-theme-primary), 0.06);
+    border-left-color: rgba(var(--v-theme-primary), 0.4);
+  }
+}
+
+.timeline-entry:focus-visible {
+  outline: 1px solid rgba(var(--v-theme-primary), 0.6);
+  outline-offset: -1px;
 }
 
 .timeline-entry--active {
-  background-color: rgba(0, 210, 168, 0.1);
-  border-left-color: #00d2a8;
-  color: #00d2a8;
+  background-color: rgba(var(--v-theme-primary), 0.1);
+  border-left-color: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-primary));
 }
 
 .timeline-label {
@@ -145,12 +122,8 @@ onUnmounted(() => {
   opacity: 0.75;
 }
 
-/* Mobile support */
+/* Mobile support (width follows --wisp-timeline-width automatically) */
 @media (max-width: 768px) {
-  .timeline-scrollbar {
-    width: 80px;
-  }
-
   .timeline-entry {
     padding: 6px 8px;
   }
@@ -174,11 +147,11 @@ onUnmounted(() => {
 }
 
 .timeline-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 210, 168, 0.2);
+  background: rgba(var(--v-theme-primary), 0.2);
   border-radius: 0;
 }
 
 .timeline-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 210, 168, 0.4);
+  background: rgba(var(--v-theme-primary), 0.4);
 }
 </style>

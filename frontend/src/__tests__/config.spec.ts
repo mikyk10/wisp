@@ -19,33 +19,6 @@ function setWindowEnv(url: string | undefined) {
   }
 }
 
-// ---------- buildApiUrl ----------
-
-describe('buildApiUrl', () => {
-  beforeEach(() => vi.resetModules())
-  afterEach(() => setWindowEnv(undefined))
-
-  it('builds a URL from base + path', async () => {
-    setWindowEnv('http://api.example.com')
-    const { buildApiUrl } = await import('../config')
-    expect(buildApiUrl('catalogs')).toBe('http://api.example.com/catalogs')
-  })
-
-  it('strips trailing slash from base and leading slash from path', async () => {
-    setWindowEnv('http://api.example.com/')
-    const { buildApiUrl } = await import('../config')
-    expect(buildApiUrl('/catalog/foo/images')).toBe(
-      'http://api.example.com/catalog/foo/images'
-    )
-  })
-
-  it('throws when API_BASE_URL is empty', async () => {
-    setWindowEnv('')
-    const { buildApiUrl } = await import('../config')
-    expect(() => buildApiUrl('catalogs')).toThrow('API base URL is not set')
-  })
-})
-
 // ---------- buildImageUrl ----------
 
 describe('buildImageUrl', () => {
@@ -60,12 +33,12 @@ describe('buildImageUrl', () => {
     )
   })
 
-  it('returns a picsum placeholder in mock mode', async () => {
+  it('returns a deterministic local placeholder in mock mode', async () => {
     setWindowEnv('')
     const { buildImageUrl } = await import('../config')
-    const url = buildImageUrl('mycat', 7)
-    expect(url).toContain('picsum.photos')
-    expect(url).toContain('7')
+    expect(buildImageUrl('mycat', 7)).toBe('/mock-data/images/photo-7.svg')
+    // ids map onto the fixed placeholder set
+    expect(buildImageUrl('mycat', 19)).toBe('/mock-data/images/photo-7.svg')
   })
 })
 

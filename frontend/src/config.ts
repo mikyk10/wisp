@@ -6,6 +6,8 @@
  *   2. import.meta.env.VITE_API_BASE_URL — injected by Vite dev server (local dev via compose)
  *   3. '' — mock mode
  */
+import { MOCK_IMAGE_COUNT } from '@/constants'
+
 function resolveApiBaseUrl(): string {
   return window.__env__?.API_BASE_URL ?? import.meta.env.VITE_API_BASE_URL ?? ''
 }
@@ -14,13 +16,6 @@ export const API_BASE_URL: string = resolveApiBaseUrl()
 
 /** Returns true when a backend API is configured. */
 export const isApiMode = (): boolean => API_BASE_URL.trim() !== ''
-
-/** Build an absolute URL from a relative API path. Throws if API mode is not active. */
-export function buildApiUrl(path: string): string {
-  if (!isApiMode()) throw new Error('API base URL is not set')
-  const cleanPath = path.startsWith('/') ? path.slice(1) : path
-  return `${API_BASE_URL.replace(/\/$/, '')}/${cleanPath}`
-}
 
 /** Canonical API path segments. */
 export const API_PATHS = {
@@ -31,13 +26,13 @@ export const API_PATHS = {
 /**
  * Returns the URL for an individual photo image.
  * In API mode: fetched from the backend.
- * In mock mode: a deterministic picsum.photos placeholder.
+ * In mock mode: a deterministic local placeholder (works offline).
  */
 export function buildImageUrl(catalogKey: string, id: number): string {
   if (isApiMode()) {
     return `${API_BASE_URL.replace(/\/$/, '')}/api/catalog/${catalogKey}/image/${id}.jpg`
   }
-  return `https://picsum.photos/240/240?random=${id}`
+  return `/mock-data/images/photo-${id % MOCK_IMAGE_COUNT}.svg`
 }
 
 /**

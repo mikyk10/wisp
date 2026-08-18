@@ -58,10 +58,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useSelectionStore } from '@/stores/selection'
 
 const selectionStore = useSelectionStore()
+
+// Esc anywhere exits selection mode.
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && selectionStore.isSelectionMode) {
+    selectionStore.clearSelection()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', handleKeydown))
+onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 
 const isSelectionMode = computed(() => selectionStore.isSelectionMode)
 const selectedCount = computed(() => selectionStore.selectedCount)
@@ -85,8 +95,8 @@ const toggleStatus = async () => {
   right: 0;
   z-index: 1000;
   border-radius: 0;
-  background: #1a1d27;
-  border-top: 1px solid rgba(0, 210, 168, 0.3);
+  background: rgb(var(--v-theme-surface));
+  border-top: 1px solid rgba(var(--v-theme-primary), 0.3);
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
 }
 

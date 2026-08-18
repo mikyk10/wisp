@@ -1,7 +1,7 @@
 /**
  * Unit tests for PhotoGrid.vue.
  *
- * RecycleScroller (vue-virtual-scroller) is stubbed because it relies on real
+ * The virtualizer (@tanstack/vue-virtual) is mocked because it relies on real
  * DOM dimensions for virtual scroll calculations that jsdom cannot provide.
  * Vuetify layout components are also stubbed to avoid CSS-variable issues.
  * Full DOM rendering is covered by the Playwright E2E suite.
@@ -11,9 +11,14 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import PhotoGrid from '../PhotoGrid.vue'
 import { usePhotosStore } from '@/stores/photos'
+import { useCatalogsStore } from '@/stores/catalogs'
 
 vi.mock('@/api/photos', () => ({
   photosApi: { toggleVisibility: vi.fn().mockResolvedValue(undefined) },
+}))
+
+vi.mock('@/api/catalogs', () => ({
+  catalogsApi: { fetchAll: vi.fn().mockResolvedValue([]) },
 }))
 
 vi.mock('@/config', async (importOriginal) => {
@@ -22,14 +27,27 @@ vi.mock('@/config', async (importOriginal) => {
     ...actual,
     API_BASE_URL: '',
     isApiMode: () => false,
-    buildImageUrl: (_: string, id: number) => `https://picsum.photos/240/240?random=${id}`,
+    buildImageUrl: (_: string, id: number) => `/mock-data/images/photo-${id % 12}.svg`,
     getDataSourceUrl: (p: string) => `/mock-data/${p}`,
   }
 })
 
-// ---------- stubs ----------
+// ---------- virtualizer mock ----------
 
-const scrollToItemSpy = vi.fn()
+const scrollToIndexSpy = vi.fn()
+
+vi.mock('@tanstack/vue-virtual', () => ({
+  useVirtualizer: () => ({
+    value: {
+      getVirtualItems: () => [],
+      getTotalSize: () => 0,
+      scrollToIndex: scrollToIndexSpy,
+      measure: vi.fn(),
+    },
+  }),
+}))
+
+// ---------- stubs ----------
 
 const stubs = {
   VOverlay: {
@@ -38,13 +56,15 @@ const stubs = {
   },
   VContainer: { template: '<div><slot /></div>', props: ['fluid'] },
   VProgressCircular: { template: '<div />', props: ['indeterminate', 'size', 'color'] },
-  VIcon: { template: '<i />', props: ['icon'] },
-  RecycleScroller: {
-    template: '<div class="recycle-scroller-stub" />',
-    props: ['items', 'itemHeight', 'itemSize', 'gridItems', 'buffer'],
-    setup() {
-      return { scrollToItem: scrollToItemSpy }
-    },
+  VIcon: { template: '<i />', props: ['icon', 'size'] },
+  VAlert: {
+    template: '<div class="v-alert-stub">{{ title }} {{ text }}<slot /></div>',
+    props: ['type', 'variant', 'title', 'text'],
+  },
+  VBtn: {
+    template: '<button class="v-btn-stub" @click="$emit(\'click\')"><slot /></button>',
+    props: ['color', 'variant', 'prependIcon'],
+    emits: ['click'],
   },
   PhotoItem: { template: '<div class="photo-item-stub" />', props: ['photo'] },
 }
@@ -63,7 +83,7 @@ describe('PhotoGrid', () => {
   beforeEach(() => {
     pinia = createPinia()
     setActivePinia(pinia)
-    scrollToItemSpy.mockClear()
+    scrollToIndexSpy.mockClear()
   })
 
   it('shows the loading overlay when loading with no items', () => {
@@ -99,13 +119,56 @@ describe('PhotoGrid', () => {
     wrapper.unmount()
   })
 
-  it('scrollToIndex delegates to RecycleScroller.scrollToItem', async () => {
+  it('a store scroll request scrolls the virtualizer to the target row', async () => {
+    // jsdom innerWidth is 1024: desktop layout → 3 columns of 256px
+    // (1024 - 120 timeline - 32 padding = 872; floor(872 / 256) = 3).
+    const photosStore = usePhotosStore(pinia)
     const wrapper = mountGrid(pinia)
     await wrapper.vm.$nextTick()
 
-    wrapper.vm.scrollToIndex(42)
+    photosStore.requestTimelineScroll({ key: '2024-06', startIndex: 42 })
+    await wrapper.vm.$nextTick()
 
-    expect(scrollToItemSpy).toHaveBeenCalledWith(42)
+    expect(scrollToIndexSpy).toHaveBeenCalledWith(14, { align: 'start' })
+    wrapper.unmount()
+  })
+
+  it('shows the error state with a Retry button when the store has an error', async () => {
+    const photosStore = usePhotosStore(pinia)
+    photosStore.error = 'network exploded'
+
+    const wrapper = mountGrid(pinia)
+
+    expect(wrapper.text()).toContain('Failed to load photos')
+    expect(wrapper.text()).toContain('network exploded')
+    expect(wrapper.find('.photo-grid').exists()).toBe(false)
+
+    const catalogsStore = useCatalogsStore(pinia)
+    catalogsStore.currentCatalog = 'album-a'
+    const spy = vi.spyOn(catalogsStore, 'setCurrentCatalog').mockImplementation(() => {})
+
+    await wrapper.find('.v-btn-stub').trigger('click')
+
+    expect(spy).toHaveBeenCalledWith('album-a')
+    wrapper.unmount()
+  })
+
+  it('shows the empty state after a completed stream with zero photos', () => {
+    const photosStore = usePhotosStore(pinia)
+    photosStore.streamCompleted = true
+
+    const wrapper = mountGrid(pinia)
+
+    expect(wrapper.text()).toContain('No photos in this catalog')
+    expect(wrapper.find('.photo-grid').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('does not show the empty state before the first load has completed', () => {
+    const wrapper = mountGrid(pinia)
+
+    expect(wrapper.text()).not.toContain('No photos in this catalog')
+    expect(wrapper.find('.photo-grid').exists()).toBe(true)
     wrapper.unmount()
   })
 })

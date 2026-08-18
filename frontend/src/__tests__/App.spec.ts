@@ -58,18 +58,20 @@ const vuetifyStubs = {
     props: ['modelValue', 'items', 'density', 'hideDetails', 'variant', 'color', 'itemColor'],
     emits: ['update:modelValue'],
   },
-  VIcon: { template: '<i />', props: ['icon', 'start'] },
+  VIcon: { template: '<i />', props: ['icon', 'start', 'size'] },
   VSpacer: { template: '<div />' },
   VOverlay: { template: '<div />' },
+  VBtn: {
+    template: '<button class="v-btn-stub" @click="$emit(\'click\')"><slot /></button>',
+    props: ['color', 'variant', 'prependIcon'],
+    emits: ['click'],
+  },
 }
 
 // Own heavy components stubbed to avoid their internal complexity.
 const componentStubs = {
-  PhotoGrid: {
-    template: '<div class="photo-grid-stub" />',
-    setup: () => ({ scrollToIndex: () => {} }),
-  },
-  TimelineScrollbar: { template: '<div />', props: ['gridRef'] },
+  PhotoGrid: { template: '<div class="photo-grid-stub" />' },
+  TimelineScrollbar: { template: '<div />' },
   SelectionToolbar: { template: '<div />' },
 }
 
@@ -134,6 +136,25 @@ describe('App', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.text()).toContain('1 photos')
+    wrapper.unmount()
+  })
+
+  it('replaces the main view with an error state when the catalog fetch failed', async () => {
+    const catalogsStore = useCatalogsStore(pinia)
+    const initSpy = vi.spyOn(catalogsStore, 'initCatalogs').mockResolvedValue(undefined)
+
+    const wrapper = mountApp(pinia)
+    catalogsStore.error = 'backend unreachable'
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Failed to load catalogs')
+    expect(wrapper.text()).toContain('backend unreachable')
+    expect(wrapper.find('.photo-grid-stub').exists()).toBe(false)
+
+    // Retry button re-runs initCatalogs
+    initSpy.mockClear()
+    await wrapper.find('.v-btn-stub').trigger('click')
+    expect(initSpy).toHaveBeenCalledOnce()
     wrapper.unmount()
   })
 

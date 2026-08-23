@@ -7,5 +7,6 @@ func AllModels() []any {
 		&Image{},
 		&Tag{},
 		&ImageTag{},
+		&DeliveryHistory{},
 	}
 }

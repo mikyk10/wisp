@@ -532,3 +532,57 @@ func TestReshuffleRandom_CoversSoftDeletedRows(t *testing.T) {
 		prev = v
 	}
 }
+
+// --- ListByCatalog ---------------------------------------------------------
+
+// TestListByCatalogOrdersUndatedPhotosLast is one half of a pair. SQLite sorts
+// NULL below every value, so a photograph whose file carried no EXIF date sits
+// at the end of the listing — and therefore at the end of the photo grid the
+// SPA draws from it.
+//
+// PostgreSQL sorts NULL the other way, which moves that photograph to the
+// front. That is the one visible difference a migration produces, it is
+// promised in docs/postgres-migration.md, and the other half of the pair is
+// TestPostgres_ListByCatalog_PutsUndatedPhotosFirst. Neither engine is being
+// corrected here: what matters is that the difference is exactly this and that
+// the dated photographs keep their order relative to one another.
+func TestListByCatalogOrdersUndatedPhotosLast(t *testing.T) {
+	repo, _ := setupRepo(t)
+
+	newest := dummyImage("cat")
+	newest.TakenAt.Time = time.Date(2023, 7, 15, 17, 45, 0, 0, time.UTC)
+	middle := dummyImage("cat")
+	middle.TakenAt.Time = time.Date(2021, 11, 20, 8, 30, 0, 0, time.UTC)
+	oldest := dummyImage("cat")
+	oldest.TakenAt.Time = time.Date(2019, 5, 4, 10, 0, 0, 0, time.UTC)
+	undated := dummyImage("cat")
+	undated.TakenAt.Valid = false
+
+	// Inserted in an order that is neither the stored one nor the expected one,
+	// so a listing that happened to come back in insertion order would fail.
+	for _, rec := range []*model.Image{middle, undated, oldest, newest} {
+		if err := repo.UpsertActiveImage(rec); err != nil {
+			t.Fatalf("UpsertActiveImage: %v", err)
+		}
+	}
+
+	var listed []string
+	if err := repo.ListByCatalog("cat", func(img *model.Image) error {
+		listed = append(listed, img.Src)
+		return nil
+	}); err != nil {
+		t.Fatalf("ListByCatalog: %v", err)
+	}
+
+	want := []string{newest.Src, middle.Src, oldest.Src, undated.Src}
+	if len(listed) != len(want) {
+		t.Fatalf("listed %d images, want %d", len(listed), len(want))
+	}
+	for i := range want {
+		if listed[i] != want[i] {
+			t.Fatalf("position %d holds %q, want %q — the listing is not "+
+				"taken_at desc with the undated photograph last:\ngot  %v\nwant %v",
+				i, listed[i], want[i], listed, want)
+		}
+	}
+}

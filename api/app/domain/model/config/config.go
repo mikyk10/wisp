@@ -44,7 +44,36 @@ type GlobalConfig struct {
 			}
 		}
 	}
-	Tagging TaggingConfig `yaml:"tagging"`
+	Tagging         TaggingConfig         `yaml:"tagging"`
+	DeliveryHistory DeliveryHistoryConfig `yaml:"delivery_history"`
+}
+
+// DefaultDeliveryHistorySize is how many deliveries each display keeps when the
+// configuration does not say.
+const DefaultDeliveryHistorySize = 20
+
+// MaxDeliveryHistorySize is the largest ring a display may be given.
+//
+// The bound exists because the ring size is the only thing keeping the table
+// finite, and it is multiplied by the number of displays. A limit an operator
+// can overshoot by a typo is not a limit.
+const MaxDeliveryHistorySize = 1000
+
+// DeliveryHistoryConfig controls the per-display record of what was shown.
+//
+// The switch is Disabled rather than Enabled on purpose. GlobalConfig is
+// unmarshalled straight from YAML with no defaulting pass, so a key absent from
+// the file takes Go's zero value — and every configuration written before this
+// feature existed is missing the key. Spelled as Enabled, the feature would
+// arrive switched off everywhere and stay that way until each installation
+// edited its config; spelled as Disabled, it arrives on, which is what it is
+// for.
+type DeliveryHistoryConfig struct {
+	Disabled bool `yaml:"disabled"`
+
+	// Size is how many deliveries each display keeps. LoadConfig resolves 0 to
+	// DefaultDeliveryHistorySize, so everything downstream sees a plain count.
+	Size int `yaml:"size"`
 }
 
 // TaggingConfig holds settings for the external tagging service.

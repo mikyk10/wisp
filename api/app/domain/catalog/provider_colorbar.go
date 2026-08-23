@@ -19,12 +19,6 @@ type imageColorbarProvider struct {
 }
 
 func (i *imageColorbarProvider) Resolve() (ImageLoader, error) {
-	ilp := &imageLocalFilePointer{
-		imageLoader: &imageLoader{},
-		epd:         i.epd,
-		path:        "generated",
-	}
-
 	width := i.epd.Width()
 	height := i.epd.Height()
 
@@ -59,11 +53,8 @@ func (i *imageColorbarProvider) Resolve() (ImageLoader, error) {
 	}
 
 	meta := &model.ImgMeta{}
-	meta.ImageSourcePath = "generated"
+	meta.ImageSourcePath = colorbarSource
 	meta.FileModifiedAt = time.Time{}
 
-	ilp.img = img
-	ilp.meta = meta
-
-	return ilp, nil
+	return newColorbarLoader(img, meta, i.epd), nil
 }

@@ -14,8 +14,10 @@ import (
 // Associates each URL to a controller action
 func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 
-	if err := ctn.Invoke(func(h handler.CatalogHandler) { //nolint:contextcheck
-		// Management API — requires authentication
+	if err := ctn.Invoke(func(h handler.CatalogHandler, d handler.DeviceHandler) { //nolint:contextcheck
+		// Management API — served to the operator's browser. Nothing here is
+		// authenticated: Middlewares() installs no check on the caller, so
+		// anything that can reach the port can call all of it.
 		api := e.Group("/api")
 		{
 			// /api/catalogs
@@ -28,7 +30,10 @@ func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 			api.GET("/catalog/:catalogKey/image/:imgid", h.ImgManagement)
 
 			// /api/devices
-			api.GET("/devices", h.List)
+			api.GET("/devices", d.ListDevices)
+
+			// /api/device/{display key}/deliveries
+			api.GET("/device/:displayKey/deliveries", d.ListDeliveries)
 
 			// /api/catalog/selected/_toggle-visibility
 			api.POST("/catalog/selected/_toggle-visibility", h.ToggleVisibility)

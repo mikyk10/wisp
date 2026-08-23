@@ -12,14 +12,17 @@ import (
 const (
 	thumbWidth     = 256
 	thumbMaxHeight = 1024
-	// ThumbJPG is stored in a BLOB column, which MariaDB caps at 65535 bytes.
+	// thumb_jpg is a blob, a longblob or a bytea depending on the database, and
+	// none of them imposes a ceiling worth defending against. This cap is ours:
+	// thumbnails are read back in bulk by the catalogue listing, so an
+	// unbounded one is paid for on every page.
 	thumbMaxBytes = 60000
 )
 
 // encodeThumbnail resizes img and encodes it as a JPEG small enough for model.Image.ThumbJPG.
 //
 // Sizing by width alone leaves the height unbounded, so a tall enough source (a long
-// screenshot, a vertical panorama) produces a thumbnail that overflows the column. Cap the
+// screenshot, a vertical panorama) produces a thumbnail that overflows the cap. Cap the
 // height for those, and step the quality down if the encoded result is still too large.
 func encodeThumbnail(img image.Image) ([]byte, error) {
 	opt := imgconv.ResizeOption{Width: thumbWidth}

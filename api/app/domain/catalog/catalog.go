@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 	"github.com/mikyk10/wisp/app/domain/display/epaper"
+	"github.com/mikyk10/wisp/app/domain/model"
 	"github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/mikyk10/wisp/app/domain/repository"
 
@@ -29,8 +30,8 @@ type PickResult struct {
 }
 
 func PickImageProvider(now time.Time, epd epaper.DisplayMetadata, repo repository.ImageRepository, imageProviderConfigs ...*config.AssociatedImageProviders) PickResult {
-	errProvider := func(msg string) PickResult {
-		return PickResult{Locator: &imageErrorMessageProvider{epd, &config.ImageErrorMessageProviderConfig{Message: msg}, nil}}
+	errProvider := func(msg string, reason model.DeliveryReason) PickResult {
+		return PickResult{Locator: newErrorMessageProvider(epd, msg, nil, reason, "")}
 	}
 
 	// Prefer providers matched by a cron expression; fall back to those with no cron if none match.
@@ -43,7 +44,7 @@ func PickImageProvider(now time.Time, epd epaper.DisplayMetadata, repo repositor
 	}
 
 	if len(subject) == 0 {
-		return errProvider("No catalog active at this time (check cron settings)")
+		return errProvider("No catalog active at this time (check cron settings)", model.DeliveryReasonNoCatalog)
 	}
 
 	// File providers are weighted by the number of images in the DB.
@@ -73,7 +74,7 @@ func PickImageProvider(now time.Time, epd epaper.DisplayMetadata, repo repositor
 	}
 
 	if len(candidates) == 0 {
-		return errProvider("No images indexed/fetched. Try running: wisp catalog scan")
+		return errProvider("No images indexed/fetched. Try running: wisp catalog scan", model.DeliveryReasonNoImages)
 	}
 
 	// Weighted random selection
@@ -99,8 +100,8 @@ func PickImageProvider(now time.Time, epd epaper.DisplayMetadata, repo repositor
 
 // newLocatorFromConfig is a factory that creates an ImageLocator based on the type of ImageProviderConfig.
 func newLocatorFromConfig(now time.Time, epd epaper.DisplayMetadata, repo repository.ImageRepository, cfg *config.ImageProviderConfig) ImageLocator {
-	errProvider := func(msg string) ImageLocator {
-		return &imageErrorMessageProvider{epd, &config.ImageErrorMessageProviderConfig{Message: msg}, nil}
+	errProvider := func(msg string, reason model.DeliveryReason) ImageLocator {
+		return newErrorMessageProvider(epd, msg, nil, reason, cfg.Key)
 	}
 	switch provConf := cfg.Config.(type) {
 	case config.ImageFileProviderConfig:
@@ -110,7 +111,7 @@ func newLocatorFromConfig(now time.Time, epd epaper.DisplayMetadata, repo reposi
 	case config.ImageColorbarProviderConfig:
 		return NewColorbarProvider(epd)
 	}
-	return errProvider("Image Provider not found")
+	return errProvider("Image Provider not found", model.DeliveryReasonNoProvider)
 }
 
 func NewErrorMessageImageProviderConfig(msg string) *config.ImageProviderConfig {

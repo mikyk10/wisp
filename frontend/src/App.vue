@@ -18,6 +18,16 @@
 
       <v-spacer />
 
+      <v-btn
+        class="device-drawer-trigger mr-2"
+        icon="mdi-image-frame"
+        variant="text"
+        size="small"
+        aria-label="Displays"
+        title="Displays"
+        @click="deviceDrawerOpen = true"
+      />
+
       <div class="d-flex align-center">
         <v-select
           v-model="currentCatalog"
@@ -59,6 +69,8 @@
       </div>
     </v-app-bar>
 
+    <DeviceDrawer v-model="deviceDrawerOpen" />
+
     <v-main>
       <!-- Catalog list fetch failure: nothing can be shown, so take over the whole view -->
       <div
@@ -77,9 +89,9 @@
           {{ catalogsError }}
         </div>
         <v-btn
+          class="catalog-retry mt-6"
           color="primary"
           variant="outlined"
-          class="mt-6"
           prepend-icon="mdi-refresh"
           @click="catalogsStore.initCatalogs()"
         >
@@ -96,18 +108,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useCatalogsStore } from '@/stores/catalogs'
 import { usePhotosStore } from '@/stores/photos'
 import { useSelectionStore } from '@/stores/selection'
 import PhotoGrid from './components/PhotoGrid.vue'
 import TimelineScrollbar from './components/TimelineScrollbar.vue'
 import SelectionToolbar from './components/SelectionToolbar.vue'
+import DeviceDrawer from './components/DeviceDrawer.vue'
 import WispLogo from './components/WispLogo.vue'
 
 const catalogsStore = useCatalogsStore()
 const photosStore = usePhotosStore()
 const selectionStore = useSelectionStore()
+
+/** Right-hand device drawer; see DeviceDrawer.vue for why it is `temporary`. */
+const deviceDrawerOpen = ref(false)
 
 const catalogs = computed(() => catalogsStore.catalogs)
 const catalogsError = computed(() => catalogsStore.error)

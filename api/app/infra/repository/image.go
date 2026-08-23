@@ -261,7 +261,7 @@ func (p *imageRepositoryImpl) ReshuffleRandom(progress func(done, total int)) er
 	// left partly evenly spaced and partly as it was, which is no worse than
 	// before and is put right by the next run.
 	//
-	// One statement shape serves both SQLite and MariaDB on purpose. The
+	// One statement shape serves SQLite, MariaDB and PostgreSQL on purpose. The
 	// obvious alternative — a single UPDATE driven by ROW_NUMBER() — has to be
 	// written once per dialect, since SQLite wants UPDATE ... FROM and MariaDB
 	// wants UPDATE ... JOIN. Worse, MariaDB divides integers into a DECIMAL
@@ -282,7 +282,26 @@ func (p *imageRepositoryImpl) ReshuffleRandom(progress func(done, total int)) er
 		}
 		// ids are ascending, so bounding by the batch's own range keeps the
 		// statement off every row it has no value for.
-		sb.WriteString("END WHERE id BETWEEN ? AND ?")
+		//
+		// ELSE rnd is what makes the statement run on PostgreSQL. A placeholder
+		// carries no type of its own, and PostgreSQL resolves an untyped one
+		// inside a CASE arm to text, then refuses to put text in rnd:
+		//
+		//	column "rnd" is of type double precision but expression is of type text
+		//
+		// Naming the column in the ELSE arm gives the CASE a known type, and
+		// the placeholders are resolved to that type rather than to text. A
+		// cast would do the same job but cannot be spelled portably: PostgreSQL
+		// has no CAST(? AS DOUBLE), MariaDB no CAST(? AS DOUBLE PRECISION), and
+		// the spellings both accept — DECIMAL, FLOAT — round or narrow the
+		// value. SQLite and MariaDB read this arm as it is written and are
+		// unaffected.
+		//
+		// It also closes a gap that was there before: a row inserted into the
+		// batch's id range between the SELECT above and this UPDATE is not
+		// named by any WHEN, and used to be handed the CASE's implicit NULL
+		// against a NOT NULL column. It now keeps the value it has.
+		sb.WriteString("ELSE rnd END WHERE id BETWEEN ? AND ?")
 		args = append(args, ids[start], ids[end-1])
 
 		if err := db.Exec(sb.String(), args...).Error; err != nil {

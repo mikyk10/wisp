@@ -1,6 +1,8 @@
 package config
 
 import (
+	"maps"
+	"slices"
 	"testing"
 	domainConfig "github.com/mikyk10/wisp/app/domain/model/config"
 	"github.com/mikyk10/wisp/app/domain/finder/fs"
@@ -22,6 +24,16 @@ func TestLoadConfig_HappyPath(t *testing.T) {
 	}
 	if len(svc.Displays) == 0 {
 		t.Error("expected at least one display entry")
+	}
+
+	// Name the key rather than counting entries. Displays are filed under
+	// mac_address, which is the :displayKey in /pf/{displayKey}/image/random.bin,
+	// and a fixture that spells the field anything else still loads — it just
+	// files the display under the empty string. A count would not notice.
+	const displayKey = "entrance-01"
+	if _, ok := svc.Displays[displayKey]; !ok {
+		t.Errorf("loaded displays are keyed %v, want one keyed by the fixture's mac_address %q",
+			slices.Sorted(maps.Keys(svc.Displays)), displayKey)
 	}
 }
 
@@ -96,9 +108,10 @@ func TestValidateGlobalConfig(t *testing.T) {
 	}{
 		{"sqlite is valid", "sqlite", false},
 		{"mysql is valid", "mysql", false},
+		{"postgres is valid", "postgres", false},
 		{"empty driver is invalid", "", true},
 		{"sqlite3 is invalid", "sqlite3", true},
-		{"postgres is invalid", "postgres", true},
+		{"postgresql is invalid", "postgresql", true},
 	}
 
 	for _, tt := range tests {

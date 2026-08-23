@@ -36,7 +36,7 @@ func (i *imageHttpProvider) Resolve() (ImageLoader, error) {
 
 // resolveRealtime returns a loader that fetches from the URL on demand (existing behavior).
 func (i *imageHttpProvider) resolveRealtime() (ImageLoader, error) {
-	return &imageURLLoader{url: i.config.URL}, nil
+	return newRealtimeHTTPLoader(i.config.URL, i.catalogKey), nil
 }
 
 // resolveBackground selects a random cached image from the DB (like file provider).
@@ -48,9 +48,5 @@ func (i *imageHttpProvider) resolveBackground() (ImageLoader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &imageDBLoader{
-		id:   img.ID,
-		url:  img.Src,
-		repo: i.repo,
-	}, nil
+	return newCachedHTTPLoader(img, i.catalogKey, i.repo), nil
 }

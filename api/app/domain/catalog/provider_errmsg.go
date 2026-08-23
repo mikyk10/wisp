@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/color"
 	"image/draw"
@@ -24,13 +25,35 @@ import (
 //go:embed error-icon.png
 var errorPng []byte
 
+// NewErrorMessageProviderFactory builds the error card the handler falls back to
+// when it cannot serve a picture at all.
+//
+// The reason is read off err because that is the only thing separating the two
+// places the handler calls this from: a display key that is not configured, and
+// a picture that was chosen but would not load.
 func NewErrorMessageProviderFactory(epd epaper.DisplayMetadata, msg string, err error) ImageLocator {
+	reason := model.DeliveryReasonLoadFailed
+	var notFound *DisplayNotFoundError
+	if errors.As(err, &notFound) {
+		reason = model.DeliveryReasonUnknownDisplay
+	}
+	return newErrorMessageProvider(epd, msg, err, reason, "")
+}
+
+// newErrorMessageProvider builds an error card provider that states why it exists.
+//
+// The reason has to be passed in: classifyError below only runs when err is
+// non-nil, and every provider that gives up on its own passes nil, so there is
+// nothing left to recover the reason from once the card is drawn.
+func newErrorMessageProvider(epd epaper.DisplayMetadata, msg string, err error, reason model.DeliveryReason, catalogKey string) ImageLocator {
 	return &imageErrorMessageProvider{
 		epd: epd,
 		providerConfig: &config.ImageErrorMessageProviderConfig{
 			Message: msg,
 		},
-		err: err,
+		err:        err,
+		reason:     reason,
+		catalogKey: catalogKey,
 	}
 }
 
@@ -38,6 +61,8 @@ type imageErrorMessageProvider struct {
 	epd            epaper.DisplayMetadata
 	providerConfig *config.ImageErrorMessageProviderConfig
 	err            error
+	reason         model.DeliveryReason
+	catalogKey     string
 }
 
 func (ip *imageErrorMessageProvider) Resolve() (ImageLoader, error) {
@@ -104,13 +129,10 @@ func (ip *imageErrorMessageProvider) Resolve() (ImageLoader, error) {
 		d.DrawString(line)
 	}
 
-	return &imageLoader{
-		img: fgcanvas,
-		meta: &model.ImgMeta{
-			ImageSourcePath:  "NOT_FOUND",
-			ImageOrientation: ip.epd.NativeOrientation(),
-		},
-	}, nil
+	return newErrorCardLoader(fgcanvas, &model.ImgMeta{
+		ImageSourcePath:  "NOT_FOUND",
+		ImageOrientation: ip.epd.NativeOrientation(),
+	}, ip.reason, ip.catalogKey), nil
 }
 
 // classifyError analyzes an error and returns a user-friendly message for the error image.

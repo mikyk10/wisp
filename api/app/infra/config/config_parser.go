@@ -46,6 +46,8 @@ func (ldr *defaultConfigLoader) LoadConfig() (*config.GlobalConfig, *config.Serv
 		return nil, nil, err
 	}
 
+	applyGlobalDefaults(conf)
+
 	svcConfig := &config.ServiceConfig{}
 	svcConfig.Catalog = make(map[string]*config.ImageProviderConfig)
 
@@ -228,13 +230,35 @@ func validateDisplay(gron *gronx.Gronx, v raw.Display) error {
 	return nil
 }
 
+// applyGlobalDefaults fills in the settings a config file is allowed to leave
+// out, so that every reader downstream sees a plain value and nobody has to
+// remember which zero means "unset" — the same job the SleepDurationSeconds
+// default does for a display.
+//
+// It lives outside LoadConfig only because that function is already at the
+// complexity limit the linter allows.
+func applyGlobalDefaults(conf *config.GlobalConfig) {
+	if conf.DeliveryHistory.Size == 0 {
+		conf.DeliveryHistory.Size = config.DefaultDeliveryHistorySize
+	}
+}
+
 func validateGlobalConfig(conf *config.GlobalConfig) error {
 	switch conf.Database.Driver {
-	case "sqlite", "mysql":
+	case "sqlite", "mysql", "postgres":
 		// valid
 	default:
-		return fmt.Errorf("invalid database driver: %q (must be sqlite or mysql)", conf.Database.Driver)
+		return fmt.Errorf("invalid database driver: %q (must be sqlite, mysql or postgres)", conf.Database.Driver)
 	}
+
+	// 0 is left alone: LoadConfig reads it as "unset" and fills in the default.
+	// Anything past the upper bound is refused rather than clamped, because the
+	// ring size is the only thing bounding the table and it is paid once per
+	// display.
+	if s := conf.DeliveryHistory.Size; s < 0 || s > config.MaxDeliveryHistorySize {
+		return fmt.Errorf("invalid delivery_history.size: %d (must be between 0 and %d)", s, config.MaxDeliveryHistorySize)
+	}
+
 	return nil
 }
 

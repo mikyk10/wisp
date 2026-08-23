@@ -37,11 +37,13 @@ type imageIndexedFileProvider struct {
 	fileProviderConfig config.ImageFileProviderConfig
 }
 
+// Resolve reports success on every path, including the three below where it
+// gives up and hands back an error card instead of a photo. That is why the
+// loader carries its own Provenance: nothing about the returned value says which
+// of the four happened.
 func (i *imageIndexedFileProvider) Resolve() (ImageLoader, error) {
-	nfProviderFunc := func(msg string) ImageLocator {
-		return &imageErrorMessageProvider{i.epd, &config.ImageErrorMessageProviderConfig{
-			Message: msg,
-		}, nil}
+	nfProviderFunc := func(msg string, reason model.DeliveryReason) ImageLocator {
+		return newErrorMessageProvider(i.epd, msg, nil, reason, i.catalogKey)
 	}
 
 	selectedImage, err := i.repo.FindByRandom(model.ImageFilter{
@@ -50,10 +52,10 @@ func (i *imageIndexedFileProvider) Resolve() (ImageLoader, error) {
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nfProviderFunc("No images indexed").Resolve()
+			return nfProviderFunc("No images indexed", model.DeliveryReasonNoImages).Resolve()
 		}
 		slog.Error("FindByRandom failed", "catalog", i.catalogKey, "err", err)
-		return nfProviderFunc("DB error").Resolve()
+		return nfProviderFunc("DB error", model.DeliveryReasonDBError).Resolve()
 	}
 
 	//TODO: repository access
@@ -63,14 +65,10 @@ func (i *imageIndexedFileProvider) Resolve() (ImageLoader, error) {
 
 	if _, err := os.Stat(selectedImage.Src); err != nil {
 		slog.Error("file not found", "path", selectedImage.Src, "err", err)
-		return nfProviderFunc("Image unavailable").Resolve()
+		return nfProviderFunc("Image unavailable", model.DeliveryReasonFileMissing).Resolve()
 	}
 
-	return &imageLocalFilePointer{
-		&imageLoader{},
-		selectedImage.Src,
-		i.epd,
-	}, nil
+	return newIndexedPhotoLoader(selectedImage, i.catalogKey, i.epd), nil
 }
 
 func (i *imageIndexedFileProvider) EnumerateImages(ctx context.Context, found chan<- ImageLoader, excluded chan<- ImageLoader) {
@@ -92,7 +90,7 @@ func (s *singleFileLocator) Resolve() (ImageLoader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &imageLocalFilePointer{&imageLoader{img: img, meta: meta}, s.path, nil}, nil
+	return newLocalPhotoLoader(s.path, img, meta, nil), nil
 }
 
 func NewImageLocalFileProviderFactory(now time.Time, conf config.ImageFileProviderConfig) func(path string) BatchImageSource {
@@ -115,25 +113,19 @@ type imageLocalFileProvider struct {
 
 func (i *imageLocalFileProvider) Resolve() (ImageLoader, error) {
 
-	nfProviderFunc := func(msg string) ImageLocator {
-		return &imageErrorMessageProvider{i.epd, &config.ImageErrorMessageProviderConfig{
-			Message: msg,
-		}, nil}
+	nfProviderFunc := func(msg string, reason model.DeliveryReason) ImageLocator {
+		return newErrorMessageProvider(i.epd, msg, nil, reason, "")
 	}
 
 	img, meta, err := load(i.targetPath)
 	if err != nil {
-		return nfProviderFunc(err.Error()).Resolve()
+		// The path was named directly, so it is not missing from an index — load
+		// covers both a file that is not there and one that will not decode, and
+		// only the loader knows which.
+		return nfProviderFunc(err.Error(), model.DeliveryReasonLoadFailed).Resolve()
 	}
 
-	return &imageLocalFilePointer{
-		&imageLoader{
-			img:  img,
-			meta: meta,
-		},
-		i.targetPath,
-		i.epd,
-	}, nil
+	return newLocalPhotoLoader(i.targetPath, img, meta, i.epd), nil
 }
 
 //nolint:cyclop // TODO: refactor
@@ -167,11 +159,7 @@ func (i *imageLocalFileProvider) EnumerateImages(ctx context.Context, found chan
 
 			provider, included := func(path string) (ImageLoader, bool) {
 
-				imgPtr := &imageLocalFilePointer{
-					&imageLoader{},
-					path,
-					i.epd,
-				}
+				imgPtr := newLocalPhotoLoader(path, nil, nil, i.epd)
 				meta, err := loadMeta(path)
 				if err != nil {
 					slog.ErrorContext(ctx, "failed to load image", "path", path, "error", err)

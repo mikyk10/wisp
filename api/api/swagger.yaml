@@ -10,7 +10,7 @@ info:
   version: "2025-03-01"
 
 servers:
-  - url: 'http://localhost:9002/'
+  - url: 'http://localhost:9002'
     description: Local development
 
 tags:
@@ -20,6 +20,10 @@ tags:
     description: Catalog and image management
   - name: device
     description: Image delivery endpoints for ESP32 devices
+  - name: devices
+    description: |
+      Operator-facing views of the configured displays and what has been delivered to them.
+      Distinct from `device`, which is what the ESP32 itself calls.
 
 paths:
 
@@ -51,7 +55,7 @@ paths:
                 type: string
                 example: "v1.2.3 (abc1234) built 2025-03-01T00:00:00"
 
-  /catalogs:
+  /api/catalogs:
     get:
       tags:
         - catalogs
@@ -72,7 +76,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /catalog/{catalogKey}/images:
+  /api/catalog/{catalogKey}/images:
     get:
       tags:
         - catalogs
@@ -92,7 +96,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /catalog/{catalogKey}/image/{imgid}:
+  /api/catalog/{catalogKey}/image/{imgid}:
     get:
       tags:
         - catalogs
@@ -130,7 +134,7 @@ paths:
                 type: string
                 format: binary
 
-  /catalog/selected/_toggle-visibility:
+  /api/catalog/selected/_toggle-visibility:
     post:
       tags:
         - catalogs
@@ -162,6 +166,66 @@ paths:
       responses:
         '200':
           description: Visibility toggled successfully
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/devices:
+    get:
+      tags:
+        - devices
+      summary: List every configured display
+      description: |
+        Returns one entry per display named in `service.yaml`, ordered by key, whether or not
+        that display has ever been heard from. The list is built from the configuration and
+        never from the delivery history, so a frame that has never once phoned home is present
+        and visibly silent rather than missing.
+
+        `last_delivered_at` is the only thing the server can honestly report about a panel: it
+        wrote the bytes out. Whether the device was awake to receive them, or able to render
+        them, is not knowable here.
+      responses:
+        '200':
+          description: The configured displays
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceList'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/device/{displayKey}/deliveries:
+    get:
+      tags:
+        - devices
+      summary: List a display's recent deliveries
+      description: |
+        Returns what was handed to the display, newest first. The store is a fixed-size ring
+        per display — see `delivery_history.size` in `config.yaml` — so this is the recent past
+        and not a full log; the oldest entry is overwritten rather than kept.
+
+        A configured display that has never been delivered to answers with an empty list. A
+        display key that is not in `service.yaml` is a 404.
+      parameters:
+        - $ref: '#/components/parameters/DisplayKey'
+        - in: query
+          name: limit
+          required: false
+          description: |
+            How many deliveries to return. Clamped to the configured ring size, which is also
+            the default and what a value of zero or less asks for.
+          schema:
+            type: integer
+            minimum: 1
+            example: 20
+      responses:
+        '200':
+          description: The display's recent deliveries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryList'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -322,6 +386,180 @@ components:
           type: string
           description: EXIF shooting date in UTC (ISO 8601), or empty string if not available
           example: "2024-06-15T10:30:00Z"
+
+    DeviceList:
+      type: object
+      properties:
+        recording_enabled:
+          type: boolean
+          description: |
+            Whether deliveries are being written down right now — false when
+            `delivery_history.disabled` is set, or when the ring has no room in it.
+
+            It qualifies everything below. With recording off the counts stop moving while
+            `recent_window` goes on reading like a live setting, and frozen numbers presented as
+            current would say "this frame stopped" when what stopped was the bookkeeping. The
+            counts are still reported as they stand — the stored deliveries are real facts about
+            the past — this only lets a reader know they are the past.
+          example: true
+        recent_window:
+          type: integer
+          description: |
+            How many deliveries each display keeps. The bound on `recent_delivery_count` and
+            `recent_error_count` below, and on the length of a `/api/device/{displayKey}/deliveries`
+            result.
+          example: 20
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+
+    Device:
+      type: object
+      description: One configured display, and what the delivery history says about it
+      properties:
+        key:
+          type: string
+          description: Display identifier as defined in `service.yaml` — the ESP32 MAC address, or `dev`
+          example: a1b2c3d4e5f6
+        name:
+          type: string
+          example: living-room
+        model:
+          type: string
+          description: e-Paper display model
+          example: ws7in3e
+        width:
+          type: integer
+          description: Panel width in pixels, from the display model rather than the configuration
+          example: 800
+        height:
+          type: integer
+          description: Panel height in pixels, from the display model rather than the configuration
+          example: 480
+        orientation:
+          type: string
+          description: How the panel is installed
+          enum: [landscape, portrait]
+          example: landscape
+        catalog_keys:
+          type: array
+          description: Catalogs assigned to this display. Empty array, never null.
+          items:
+            type: string
+          example: ["photos"]
+        sleep_duration_seconds:
+          type: integer
+          description: The display's configured sleep interval, used when no wake schedule applies
+          example: 300
+        wake_schedule:
+          type: array
+          description: Cron expressions naming when this panel should be awake. Empty array, never null.
+          items:
+            type: string
+          example: ["*/30 7-16 * * *"]
+        last_delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When this display was last handed a picture, in UTC, or `null` when it never has
+            been. Null and not an empty string: "never delivered to" is the most useful thing
+            this endpoint says about a frame, and it must not read as a formatting slip.
+          example: "2026-08-19T12:30:00Z"
+        recent_delivery_count:
+          type: integer
+          description: |
+            Deliveries still held for this display, bounded by `recent_window`. Not a lifetime
+            total — the ring overwrites its oldest entry and keeps no count of what it dropped.
+          example: 20
+        recent_error_count:
+          type: integer
+          description: How many of those deliveries were error cards rather than pictures
+          example: 3
+
+    DeliveryList:
+      type: object
+      properties:
+        device_key:
+          type: string
+          example: a1b2c3d4e5f6
+        deliveries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Delivery'
+
+    Delivery:
+      type: object
+      description: |
+        One picture handed to one display. Handed over is all it says: the record is written
+        after the body has gone out and nothing can be added to it afterwards.
+      properties:
+        delivered_at:
+          type: string
+          format: date-time
+          description: When the server wrote this picture out, in UTC
+          example: "2026-08-19T12:30:00Z"
+        kind:
+          type: string
+          description: Which delivery path produced the picture
+          enum: [photo, http, colorbar, error]
+          example: photo
+        reason:
+          type: string
+          nullable: true
+          description: |
+            Why an error card was shown, as a code. `null` for every other kind.
+
+            This is the only place the distinction survives: the provider decides it at the
+            moment it gives up, and nothing downstream can work it out afterwards — the file
+            provider reports success either way. Rendering the code for a reader is the client's
+            job, so the wording can change without a server release.
+
+            `load_failed` and `encode_failed` are not interchangeable and must not be collapsed:
+            the first means the picture would not load, and sends an operator to look at the
+            file; the second means it loaded fine and then would not convert to this panel's
+            format, and sends them to look at the display model. Treat the list as open — a
+            client should render a code it does not recognise rather than blanking it.
+          enum: [no_images, db_error, file_missing, no_catalog, no_provider, unknown_display, load_failed, encode_failed]
+          example: no_images
+        image_id:
+          type: integer
+          nullable: true
+          description: |
+            The `images` row this came from, or `null` when the picture did not come from the
+            catalog — a color bar, an error card, or a live HTTP fetch.
+          example: 4821
+        catalog_key:
+          type: string
+          nullable: true
+          description: |
+            Catalog the picture was drawn from, or `null` when nothing consulted one — a color
+            bar, or an error raised before a catalog had been chosen.
+
+            Null means "no catalog was involved", not "this went wrong": an error card from a
+            provider that did have a catalog still names it, which is what says where to go
+            looking.
+          example: photos
+        source:
+          type: string
+          nullable: true
+          description: Path or URL the picture came from, or `null` for a delivery that names no file
+          example: /mnt/photos/IMG_0421.jpg
+        requested_sleep_seconds:
+          type: integer
+          description: |
+            The `X-Sleep-Seconds` this response carried — what the server asked for, not an
+            interval the device is known to have kept. A panel that never received the response
+            fell back to its own.
+          example: 300
+        image_available:
+          type: boolean
+          description: |
+            Whether the `images` row named above is still there. False for a delivery that
+            never had one, and false once the photograph has been purged; a photograph merely
+            hidden by the user is still there, so it stays true.
+          example: true
 
     ErrorModel:
       type: object

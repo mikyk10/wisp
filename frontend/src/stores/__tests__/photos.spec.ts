@@ -150,6 +150,20 @@ describe('usePhotosStore', () => {
       store.items.push(makePhoto(1))
       await expect(store.togglePhotoStatus([])).resolves.toBeUndefined()
     })
+
+    it('reaches the API only when one is configured', async () => {
+      // isApiMode() is false here, so the request is never made. That gate is
+      // also why API_PATHS entries may safely omit a leading slash: the path
+      // is only ever resolved against a non-empty axios baseURL, where a
+      // leading slash makes no difference to the resulting URL.
+      const { photosApi } = await import('@/api/photos')
+      const store = usePhotosStore()
+      store.items.push(makePhoto(1))
+
+      await store.togglePhotoStatus([1])
+
+      expect(photosApi.toggleVisibility).not.toHaveBeenCalled()
+    })
   })
 
   describe('totalPhotos getter', () => {

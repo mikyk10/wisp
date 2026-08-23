@@ -17,10 +17,21 @@ export const API_BASE_URL: string = resolveApiBaseUrl()
 /** Returns true when a backend API is configured. */
 export const isApiMode = (): boolean => API_BASE_URL.trim() !== ''
 
-/** Canonical API path segments. */
+/**
+ * Canonical API path segments.
+ *
+ * Written without a leading slash on purpose. These are handed either to
+ * `apiClient`, which joins them onto its configured `baseURL`, or to
+ * `getDataSourceUrl`, which re-roots them under /mock-data — and both treat
+ * the value as a path relative to a base, never as one anchored at the site
+ * root.
+ */
 export const API_PATHS = {
   catalogs: (): string => 'api/catalogs',
   catalogImages: (catalogKey: string): string => `api/catalog/${catalogKey}/images`,
+  catalogToggleVisibility: (): string => 'api/catalog/selected/_toggle-visibility',
+  devices: (): string => 'api/devices',
+  deviceDeliveries: (displayKey: string): string => `api/device/${displayKey}/deliveries`,
 }
 
 /**

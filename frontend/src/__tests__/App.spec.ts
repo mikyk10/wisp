@@ -61,9 +61,14 @@ const vuetifyStubs = {
   VIcon: { template: '<i />', props: ['icon', 'start', 'size'] },
   VSpacer: { template: '<div />' },
   VOverlay: { template: '<div />' },
+  VNavigationDrawer: {
+    template: '<div><slot /></div>',
+    props: ['modelValue', 'location', 'temporary', 'width'],
+    emits: ['update:modelValue'],
+  },
   VBtn: {
     template: '<button class="v-btn-stub" @click="$emit(\'click\')"><slot /></button>',
-    props: ['color', 'variant', 'prependIcon'],
+    props: ['color', 'variant', 'prependIcon', 'icon', 'size'],
     emits: ['click'],
   },
 }
@@ -73,6 +78,11 @@ const componentStubs = {
   PhotoGrid: { template: '<div class="photo-grid-stub" />' },
   TimelineScrollbar: { template: '<div />' },
   SelectionToolbar: { template: '<div />' },
+  DeviceDrawer: {
+    template: '<div class="device-drawer-stub" :class="{ \'device-drawer-stub--open\': modelValue }" />',
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+  },
 }
 
 function mountApp(pinia: ReturnType<typeof createPinia>) {
@@ -151,10 +161,25 @@ describe('App', () => {
     expect(wrapper.text()).toContain('backend unreachable')
     expect(wrapper.find('.photo-grid-stub').exists()).toBe(false)
 
-    // Retry button re-runs initCatalogs
+    // Retry button re-runs initCatalogs. The button is addressed by its own
+    // class rather than by position: find() returns the first match, and the
+    // app bar also renders a button (the device drawer trigger).
     initSpy.mockClear()
-    await wrapper.find('.v-btn-stub').trigger('click')
+    await wrapper.find('.catalog-retry').trigger('click')
     expect(initSpy).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  it('opens the device drawer from the app bar trigger', async () => {
+    const catalogsStore = useCatalogsStore(pinia)
+    vi.spyOn(catalogsStore, 'initCatalogs').mockResolvedValue(undefined)
+
+    const wrapper = mountApp(pinia)
+    expect(wrapper.find('.device-drawer-stub--open').exists()).toBe(false)
+
+    await wrapper.find('.device-drawer-trigger').trigger('click')
+
+    expect(wrapper.find('.device-drawer-stub--open').exists()).toBe(true)
     wrapper.unmount()
   })
 

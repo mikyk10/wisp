@@ -66,9 +66,23 @@ func TestHTTPProvider_Background_ReturnsDBLoader(t *testing.T) {
 		t.Fatalf("Resolve() error: %v", err)
 	}
 
-	// The loader's GetSourcePath() should return the DB record's URL, not the API URL.
-	if loader.GetSourcePath() != rec.Src {
-		t.Errorf("expected source path %q (from DB record), got %q", rec.Src, loader.GetSourcePath())
+	// The loader's provenance should name the DB record's URL, not the API URL,
+	// and point at the row the picture was read back from.
+	prov := loader.Provenance()
+	if prov.Source != rec.Src {
+		t.Errorf("expected source %q (from DB record), got %q", rec.Src, prov.Source)
+	}
+	if prov.Kind != model.DeliveryKindHTTP {
+		t.Errorf("expected kind %q, got %q", model.DeliveryKindHTTP, prov.Kind)
+	}
+	if prov.ImageID != rec.ID {
+		t.Errorf("expected image id %d, got %d", rec.ID, prov.ImageID)
+	}
+	if prov.CatalogKey != "bg-http" {
+		t.Errorf("expected catalog key %q, got %q", "bg-http", prov.CatalogKey)
+	}
+	if prov.Reason != model.DeliveryReasonNone {
+		t.Errorf("expected no reason on a successful delivery, got %q", prov.Reason)
 	}
 }
 
@@ -105,9 +119,20 @@ func TestHTTPProvider_Realtime_ReturnsURLLoader(t *testing.T) {
 		t.Fatalf("Resolve() error: %v", err)
 	}
 
-	// Realtime loader should have the config URL as its source path.
-	if loader.GetSourcePath() != apiURL {
-		t.Errorf("expected source path %q (config URL), got %q", apiURL, loader.GetSourcePath())
+	// Realtime loader should name the config URL as its source. Nothing is
+	// stored for it, so there is no images row to point at.
+	prov := loader.Provenance()
+	if prov.Source != apiURL {
+		t.Errorf("expected source %q (config URL), got %q", apiURL, prov.Source)
+	}
+	if prov.Kind != model.DeliveryKindHTTP {
+		t.Errorf("expected kind %q, got %q", model.DeliveryKindHTTP, prov.Kind)
+	}
+	if prov.ImageID != 0 {
+		t.Errorf("expected image id 0 for a live fetch, got %d", prov.ImageID)
+	}
+	if prov.CatalogKey != "rt-http" {
+		t.Errorf("expected catalog key %q, got %q", "rt-http", prov.CatalogKey)
 	}
 }
 

@@ -72,17 +72,26 @@ type CatalogUsecase interface {
 
 	//
 	Pick(displayKey string) (catalog.ImageLoader, epaper.DisplayMetadata, improc.SequencerGroup, error)
+
+	// RecordDelivery files one picture handed to one display. It reports
+	// nothing back: see the implementation for why no caller may be given
+	// something to fail on.
+	RecordDelivery(displayKey string, prov catalog.Provenance, sleepSeconds int)
 }
 
 type catalogUseCase struct {
+	globalConfig  *config.GlobalConfig
 	serviceConfig *config.ServiceConfig
 	imgr          repository.ImageRepository
+	dhr           repository.DeliveryHistoryRepository
 }
 
-func NewCatalogUseCase(serviceConfig *config.ServiceConfig, imgr repository.ImageRepository) CatalogUsecase {
+func NewCatalogUseCase(globalConfig *config.GlobalConfig, serviceConfig *config.ServiceConfig, imgr repository.ImageRepository, dhr repository.DeliveryHistoryRepository) CatalogUsecase {
 	return &catalogUseCase{
+		globalConfig:  globalConfig,
 		serviceConfig: serviceConfig,
 		imgr:          imgr,
+		dhr:           dhr,
 	}
 }
 
@@ -234,7 +243,7 @@ loop:
 				continue
 			}
 			//nolint:gosec // sha1 is cryptographically weak, but is used here only as a hash to avoid collisions
-			srcHash := sha1.Sum([]byte(info.GetSourcePath()))
+			srcHash := sha1.Sum([]byte(info.Provenance().Source))
 			wg.Add(1)
 			sem <- struct{}{}
 			go func(h [20]byte, ldr catalog.ImageLoader) {
@@ -252,7 +261,7 @@ loop:
 				continue
 			}
 			//nolint:gosec // sha1 is cryptographically weak, but is used here only as a hash to avoid collisions
-			srcHash := sha1.Sum([]byte(info.GetSourcePath()))
+			srcHash := sha1.Sum([]byte(info.Provenance().Source))
 			wg.Add(1)
 			sem <- struct{}{}
 			go func(h [20]byte, ldr catalog.ImageLoader) {
@@ -278,32 +287,34 @@ func (cu *catalogUseCase) processIncludedFile(ctx context.Context, catalogKey st
 	ctx2, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	stat, err := os.Stat(info.GetSourcePath())
+	src := info.Provenance().Source
+
+	stat, err := os.Stat(src)
 	if err != nil {
-		slog.Error("scan: failed to stat file", "path", info.GetSourcePath(), "err", err)
+		slog.Error("scan: failed to stat file", "path", src, "err", err)
 		return
 	}
 	if stat.Size() == 0 {
-		slog.Warn("scan: skipping empty file", "path", info.GetSourcePath())
+		slog.Warn("scan: skipping empty file", "path", src)
 		return
 	}
 
 	fileModifiedAt := stat.ModTime().UTC().Truncate(time.Second)
 	existing, err := cu.imgr.FindByHash(catalogKey, fmt.Sprintf("%x", srcHash))
 	if err != nil {
-		slog.Error("scan: failed to query existing image", "path", info.GetSourcePath(), "err", err)
+		slog.Error("scan: failed to query existing image", "path", src, "err", err)
 		return
 	}
 	if existing != nil && existing.FileModifiedAt.Valid {
 		if existing.FileModifiedAt.Time.UTC().Truncate(time.Second).Equal(fileModifiedAt) {
-			slog.Debug("scan: skipped unchanged", "path", info.GetSourcePath())
+			slog.Debug("scan: skipped unchanged", "path", src)
 			return
 		}
 	}
 
 	img, meta, err := info.Load()
 	if err != nil {
-		slog.Error("scan: failed to load image", "path", info.GetSourcePath(), "err", err)
+		slog.Error("scan: failed to load image", "path", src, "err", err)
 		return
 	}
 
@@ -315,7 +326,7 @@ func (cu *catalogUseCase) processIncludedFile(ctx context.Context, catalogKey st
 	thumb, err := encodeThumbnail(img)
 	img = nil //nolint:ineffassign // intentionally cleared to encourage GC (OOM mitigation)
 	if err != nil {
-		slog.Error("scan: failed to encode thumbnail", "path", info.GetSourcePath(), "err", err)
+		slog.Error("scan: failed to encode thumbnail", "path", src, "err", err)
 		return
 	}
 
@@ -362,10 +373,11 @@ func (cu *catalogUseCase) processIncludedFile(ctx context.Context, catalogKey st
 // processExcludedFile registers a file received from excludedFileCh as logically deleted in the DB.
 // Because RDBMS has no native negative index, we insert data that is logically deleted from the start.
 func (cu *catalogUseCase) processExcludedFile(catalogKey string, srcHash [20]byte, info catalog.ImageLoader) {
-	if err := cu.imgr.UpsertInactiveImage(catalogKey, fmt.Sprintf("%x", srcHash), info.GetSourcePath()); err != nil {
-		slog.Error("scan: failed to upsert inactive image", "path", info.GetSourcePath(), "err", err)
+	src := info.Provenance().Source
+	if err := cu.imgr.UpsertInactiveImage(catalogKey, fmt.Sprintf("%x", srcHash), src); err != nil {
+		slog.Error("scan: failed to upsert inactive image", "path", src, "err", err)
 	}
-	slog.Debug("scan: excluded", "path", info.GetSourcePath())
+	slog.Debug("scan: excluded", "path", src)
 }
 
 func (uc *catalogUseCase) PurgeOrphans() error {
@@ -515,6 +527,54 @@ func (uc *catalogUseCase) Pick(displayKey string) (catalog.ImageLoader, epaper.D
 	}
 
 	return imgPtr, display, imseqGroup, nil
+}
+
+// RecordDelivery files one picture handed to one display.
+//
+// It reports nothing back, deliberately. This runs on the request that hands a
+// picture to a panel, after the picture has gone down the wire, and a delivery
+// that was made is not undone by failing to write it down — the same reasoning
+// as runOnNewFileHook below, where a failing hook must not affect the scan.
+// Failures are logged at warn and go no further.
+//
+// prov comes from the loader that produced the picture and is used as it
+// stands. A provider that gives up hands back an error card and still reports
+// success, so a kind inferred from the fact that this was called at all would
+// record exactly those failures as photographs.
+func (uc *catalogUseCase) RecordDelivery(displayKey string, prov catalog.Provenance, sleepSeconds int) {
+	if uc.dhr == nil || uc.globalConfig == nil || uc.globalConfig.DeliveryHistory.Disabled {
+		return
+	}
+
+	// Only a display named in service.yaml may leave a row behind. The device
+	// API is unauthenticated, so the key is whatever the requester put in the
+	// path, and recording all of them would let anything on the network fill
+	// the table with displays that do not exist.
+	//
+	// The check has to be on the key as it arrived. The handler falls back to a
+	// default display for a key it does not know, so anything derived from the
+	// resolved display would file an unregistered panel under that default.
+	if _, ok := uc.serviceConfig.Displays[displayKey]; !ok {
+		slog.Warn("delivery history: ignoring a delivery to an unconfigured display", "display", displayKey)
+		return
+	}
+
+	rec := &model.DeliveryHistory{
+		DisplayKey:   displayKey,
+		DeliveredAt:  time.Now(),
+		Kind:         prov.Kind,
+		ImageID:      prov.ImageID,
+		CatalogKey:   prov.CatalogKey,
+		Source:       prov.Source,
+		Reason:       prov.Reason,
+		SleepSeconds: sleepSeconds,
+	}
+
+	// Record swallows its own storage failures and always answers nil; the
+	// branch is here because the interface still returns an error.
+	if err := uc.dhr.Record(rec, uc.globalConfig.DeliveryHistory.Size); err != nil {
+		slog.Warn("delivery history: record failed", "display", displayKey, "err", err)
+	}
 }
 
 // runOnNewFileHook executes the on_new_file hook command for a newly registered file.

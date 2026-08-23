@@ -9,34 +9,39 @@ database:
   # driver: mysql
   # dsn: "user:pass@tcp(localhost:3306)/wspf?charset=utf8mb4&parseTime=True&loc=Local"
 
+  # PostgreSQL
+  # driver: postgres
+  # dsn: "host=localhost port=5432 user=wisp password=pass dbname=wisp sslmode=disable TimeZone=UTC"
+
   log: true
 
-# AI pipeline configuration
-# Required for `catalog tagging run` and `catalog generate run`.
-ai:
-  providers:
-    # Local Ollama instance (used by default tagging prompts)
-    ollama_local:
-      endpoint: http://localhost:11434/v1
-      api_key: ""
-    # OpenAI API (used by default generation prompts)
-    # openai:
-    #   endpoint: https://api.openai.com/v1
-    #   api_key: ${OPENAI_API_KEY}
+# Image tagging, by POSTing each thumbnail to an external AI service. Only
+# `catalog tagging run` reads this — the server never calls out on its own —
+# and that command exits with "tagging.endpoint is not configured" if the
+# section is absent, which is why it ships commented out.
+# tagging:
+#   # Where to POST the JPEG. No default; the whole section exists for this.
+#   endpoint: http://wisp-ai:8082/pipeline/tag
+#
+#   # Per-request timeout in seconds. Unset or <= 0 means 180.
+#   timeout_sec: 180
+#
+#   # Sent to the service as a `max_tags` query parameter. Left off entirely
+#   # when unset, so the service picks — this does not cap anything locally.
+#   max_tags: 10
+#
+# Worker count is a flag rather than a setting: `catalog tagging run --workers`.
 
-  request_timeout_sec: 90    # Per-request timeout for LLM calls
-  max_retries: 3             # Retry count on transient failures
+# Per-display record of the pictures handed to each e-paper display.
+# Read back via GET /api/devices and GET /api/device/{display key}/deliveries.
+delivery_history:
+  # The switch is negative on purpose. This file is unmarshalled straight into
+  # the config struct with no defaulting pass, so an absent `enabled:` would
+  # take Go's zero value and silently switch the feature off in every config
+  # written before it existed. Set to true to stop recording.
+  disabled: false
 
-  # Tagging pipeline settings
-  tagging:
-    max_tags: 10             # Maximum tags per image
-    workers: 2               # Parallel workers (override with --workers flag)
-    pipeline:
-      stages:
-        - name: descriptor
-          output: text
-          image_input: _source   # Thumbnail of the image being tagged
-          # prompt:              # Omit to use built-in descriptor.md
-        - name: tagger
-          output: text
-          # prompt:              # Omit to use built-in tagger.md
+  # Deliveries kept per display (default: 20, accepted: 0-1000, 0 = default).
+  # This is both the depth of the history and the whole of its storage cost:
+  # the table holds exactly this many rows per display and never grows.
+  size: 20

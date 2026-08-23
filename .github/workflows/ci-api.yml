@@ -22,6 +22,22 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    # The steps run on the runner rather than in a container, so the service is
+    # reached through the published port on 127.0.0.1, not by its label.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: wisp
+          POSTGRES_PASSWORD: wisp
+          POSTGRES_DB: wisp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wisp -d wisp"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -31,6 +47,8 @@ jobs:
         run: cd api && go build -v ./...
       - name: Test
         run: cd api && go test -v ./...
+        env:
+          WISP_TEST_PG_DSN: host=127.0.0.1 port=5432 user=wisp password=wisp dbname=wisp sslmode=disable TimeZone=UTC
 
   lint:
     name: Lint

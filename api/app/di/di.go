@@ -52,6 +52,8 @@ func (d *digBuilder) WithDatabase(globalConfig *config.GlobalConfig, migrate boo
 			conn, err = infra.NewSqliteConnection(dsn, false)
 		case "mysql":
 			conn, err = infra.NewMysqlConnection(dsn, false)
+		case "postgres":
+			conn, err = infra.NewPostgresConnection(dsn, false)
 		default:
 			return nil, fmt.Errorf("unsupported database driver: %s", globalConfig.Database.Driver)
 		}
@@ -95,10 +97,13 @@ func setupDefaultDependency(d *digBuilder) {
 	d.mustProvide(repository.NewImageRepositoryImpl)
 	d.mustProvide(repository.NewSystemRepositoryImpl)
 	d.mustProvide(repository.NewTagRepositoryImpl)
+	d.mustProvide(repository.NewDeliveryHistoryRepositoryImpl)
 	d.mustProvide(usecase.NewSystemUsecase)
 	d.mustProvide(usecase.NewCatalogUseCase)
 	d.mustProvide(usecase.NewTaggingUsecase)
+	d.mustProvide(usecase.NewDeviceUsecase)
 	d.mustProvide(handler.NewCatalogHandler)
+	d.mustProvide(handler.NewDeviceHandler)
 }
 
 //nolint:unparam

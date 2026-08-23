@@ -23,7 +23,7 @@ catalog:
     url: https://foo.bar.test/image.jpg
 
 displays:
-  - key: entrance-01
+  - mac_address: entrance-01
     api_version: 2025-03-01 
     model: ws7in3e
     orientation: landscape

@@ -64,7 +64,7 @@ func setupFetchUseCase(t *testing.T, svc *config.ServiceConfig) (usecase.Catalog
 		t.Fatalf("AutoMigrate failed: %v", err)
 	}
 	repo := infraRepo.NewImageRepositoryImpl(conn)
-	return usecase.NewCatalogUseCase(svc, repo), repo
+	return usecase.NewCatalogUseCase(&config.GlobalConfig{}, svc, repo, nil), repo
 }
 
 // insertImage is a convenience helper that inserts a single Image record via the repository.

@@ -254,7 +254,10 @@ const handleClick = (event: MouseEvent) => {
   display: none;
   flex-wrap: wrap;
   gap: 3px;
-  padding: 20px 6px 6px;
+  /* Right padding keeps the names clear of the badge, which stays put while
+     the overlay is up: hiding it on hover made it unclickable with a mouse —
+     approaching it is what made it disappear. */
+  padding: 20px 44px 6px 6px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
   /* The card underneath still has to take the click. */
   pointer-events: none;
@@ -276,11 +279,6 @@ const handleClick = (event: MouseEvent) => {
     display: flex;
   }
 
-  /* The overlay says the same thing in full, so the badge stands down while
-     it is up rather than sitting on top of it. */
-  .photo-item:hover .tag-badge {
-    display: none;
-  }
 
   .photo-item:hover .photo-image {
     transform: scale(1.06);

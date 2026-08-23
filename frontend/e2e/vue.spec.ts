@@ -19,12 +19,16 @@ test.describe('App startup', () => {
     await expect(select).toBeVisible()
   })
 
-  test('loads photos and shows the photo count chip', async ({ page }) => {
+  test('loads photos and shows the count in the filter bar', async ({ page }) => {
     await page.goto('/')
 
-    // Wait for the streaming to start and at least one photo to appear
-    const countChip = page.locator('.v-chip').filter({ hasText: 'photos' }).first()
-    await expect(countChip).toBeVisible({ timeout: 15_000 })
+    // The count used to be a chip in the app bar. It moved into the filter bar
+    // because the bar has no width to spare on a narrow screen — see
+    // TagFilterBar — so this is where "N photos" is now.
+    const bar = page.locator('.tag-filter-bar')
+    await expect(bar).toBeVisible({ timeout: 15_000 })
+    await expect(bar).toContainText('photos')
+    await expect(bar).not.toHaveText('0 photos')
   })
 })
 
@@ -84,5 +88,34 @@ test.describe('Photo selection', () => {
     // At least one month entry should appear once photos are loaded
     const entry = page.locator('.timeline-entry').first()
     await expect(entry).toBeVisible({ timeout: 15_000 })
+  })
+})
+
+test.describe('Tags', () => {
+  test('a tagged photo carries a badge that opens its tags', async ({ page }) => {
+    await page.goto('/')
+
+    // The badge is the only route to a photo's tags on a touch screen, so it
+    // has to be there without hovering anything.
+    const badge = page.locator('.tag-badge').first()
+    await expect(badge).toBeVisible({ timeout: 15_000 })
+
+    await badge.click()
+
+    const sheet = page.locator('.photo-tags-sheet')
+    await expect(sheet).toBeVisible()
+    await expect(sheet).toContainText('tag')
+
+    // Tapping the badge must not also select the photo — the card does that.
+    await expect(page.locator('.selection-toolbar')).not.toBeVisible()
+  })
+
+  test('the filter picker opens from the app bar', async ({ page }) => {
+    await page.goto('/')
+
+    await page.locator('#tag-filter-activator').click()
+
+    await expect(page.locator('.tag-picker')).toBeVisible()
+    await expect(page.locator('.tag-picker-search')).toBeVisible()
   })
 })

@@ -291,5 +291,38 @@ func (ldr *defaultConfigLoader) loadRawConfig() (*config.GlobalConfig, *raw.Serv
 		return nil, nil, err
 	}
 
+	applyLegacyEnvAliases(&conf)
+
 	return &conf, &rawServiceConfig, nil
+}
+
+// legacyDSNEnv is the name the DSN override shipped under before it was paired
+// with a driver override and both were renamed.
+const legacyDSNEnv = "DB_DEFAULT_DSN"
+
+// applyLegacyEnvAliases keeps an environment written for the old variable names
+// working.
+//
+// A deployment that sets the DSN from the environment does so because the file
+// inside its image cannot be edited, which is exactly the deployment that would
+// be hardest to fix if the rename silently dropped its database and sent it back
+// to whatever the file says — a working server pointed at the wrong catalog is
+// worse than one that refuses to start. So the old name is still read, and says
+// so on the way past.
+//
+// "Set but empty" counts as unset here, the same rule env.Parse applies to the
+// current names, so that a half-filled compose file behaves the same either way.
+func applyLegacyEnvAliases(conf *config.GlobalConfig) {
+	legacyDSN := os.Getenv(legacyDSNEnv)
+	if legacyDSN == "" {
+		return
+	}
+
+	if os.Getenv("DB_DSN") != "" {
+		slog.Warn("config: "+legacyDSNEnv+" is deprecated and was ignored because DB_DSN is set", "use", "DB_DSN")
+		return
+	}
+
+	slog.Warn("config: "+legacyDSNEnv+" is deprecated, rename it to DB_DSN", "use", "DB_DSN")
+	conf.Database.DSN = legacyDSN
 }

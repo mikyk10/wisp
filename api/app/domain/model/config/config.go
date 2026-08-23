@@ -37,8 +37,18 @@ type GlobalConfig struct {
 	Port     int        `yaml:"port"`
 	Env      string     `env:"ENV"`
 	Database struct {
-		Driver        string `yaml:"driver"`
-		DSN           string `yaml:"dsn" env:"DB_DEFAULT_DSN"`
+		// Driver and DSN both take an environment override, and the environment
+		// has the last word: it is applied after the file is read and nothing
+		// downstream writes either field. They are meant to be set as a pair,
+		// because a DSN written for one dialect means nothing to another — an
+		// installation moving between databases has to be able to say both
+		// things from the same place, without editing a file inside an image.
+		//
+		// An override that is set but empty counts as unset and leaves the file
+		// value standing, so a `DB_DSN=` left unfilled in a compose file does
+		// not take the database away.
+		Driver        string `yaml:"driver" env:"DB_DRIVER"`
+		DSN           string `yaml:"dsn" env:"DB_DSN"`
 		DriverOptions struct {
 			Sqlite3 struct {
 			}

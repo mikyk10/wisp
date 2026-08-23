@@ -113,9 +113,10 @@ For PostgreSQL, set `driver: postgres` and a DSN such as:
 host=localhost port=5432 user=wisp password=password dbname=wisp sslmode=disable TimeZone=UTC
 ```
 
-The URL form (`postgres://user:password@host:5432/dbname?sslmode=disable`) works too. The DSN
-can also be supplied through the `DB_DEFAULT_DSN` environment variable, which overrides the
-file. To move an existing MySQL or MariaDB catalog to PostgreSQL, see
+The URL form (`postgres://user:password@host:5432/dbname?sslmode=disable`) works too. Both
+settings can also be supplied through the environment — `DB_DRIVER` and `DB_DSN` — and the
+environment has the last word over the file. Set them together: a DSN written for one dialect
+means nothing to another. To move an existing MySQL or MariaDB catalog to PostgreSQL, see
 [Migrating from MySQL / MariaDB to PostgreSQL](docs/postgres-migration.md).
 
 ### `config/service.yaml`
@@ -151,11 +152,15 @@ displays:
 ### Environment variables
 
 Set on the API container — `environment:` in [`compose.yaml`](../compose.yaml). All are optional.
+Where a variable overrides a `config.yaml` setting, the variable wins; one that is set but empty
+counts as unset and leaves the file's value alone.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `ALLOWED_ORIGINS` | `*` — every origin | Comma-separated list of origins allowed to make cross-origin requests. See [Access control](#access-control) |
-| `DB_DEFAULT_DSN` | `database.dsn` from `config.yaml` | Overrides the DSN, so credentials need not be written to a file |
+| `DB_DRIVER` | `database.driver` from `config.yaml` | Overrides the driver (`sqlite`, `mysql` or `postgres`); an unknown name is refused at startup. Set it with `DB_DSN` |
+| `DB_DSN` | `database.dsn` from `config.yaml` | Overrides the DSN, so credentials need not be written to a file |
+| `DB_DEFAULT_DSN` | — | Deprecated former name of `DB_DSN`. Still read, and logs a warning; `DB_DSN` wins where both are set |
 | `WISP_AUTO_MIGRATE` | unset | `1` runs AutoMigrate on startup — needed once after a schema change, see [Delivery history](#delivery-history) |
 | `WISP_SCAN_CONCURRENCY` | `min(GOMAXPROCS, 4)` | Images decoded in parallel by `catalog scan`. Lower it on a memory-constrained host |
 | `ENV` | unset | Recorded as `env` on the server's log lines; changes no behaviour |

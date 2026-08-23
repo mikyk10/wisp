@@ -84,7 +84,7 @@
       v-model:open="tagPickerOpen"
       :model-value="filterTags"
       :catalog-key="currentCatalog"
-      activator="#tag-filter-activator"
+      anchor="#tag-filter-activator"
       @update:model-value="applyTags"
     />
 

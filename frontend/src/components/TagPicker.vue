@@ -126,11 +126,21 @@ import type { TagUsage } from '@/types'
 interface Props {
   modelValue: string[]
   catalogKey: string
-  /** Anchor for the desktop menu; ignored by the bottom sheet. */
-  activator?: string
+  /**
+   * Selector the desktop menu positions itself against; ignored by the bottom
+   * sheet.
+   *
+   * A target, not an activator. Handing VMenu an activator makes it bind its
+   * own click handler to that element, which then toggles the menu a second
+   * time on the same click that opened it — the picker appears and vanishes
+   * again before it can be read. Opening is the parent's business here,
+   * because the two surfaces cannot share one activator: the bottom sheet has
+   * none to bind to.
+   */
+  anchor?: string
 }
 
-const props = withDefaults(defineProps<Props>(), { activator: undefined })
+const props = withDefaults(defineProps<Props>(), { anchor: undefined })
 const emit = defineEmits<{
   'update:modelValue': [tags: string[]]
   'update:open': [open: boolean]
@@ -154,7 +164,7 @@ const surface = computed(() => (isNarrow.value ? VBottomSheet : VMenu))
 const surfaceProps = computed(() =>
   isNarrow.value
     ? {}
-    : { activator: props.activator, closeOnContentClick: false, location: 'bottom end' as const },
+    : { target: props.anchor, closeOnContentClick: false, location: 'bottom end' as const },
 )
 
 const visible = computed(() => {

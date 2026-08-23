@@ -110,12 +110,20 @@ test.describe('Tags', () => {
     await expect(page.locator('.selection-toolbar')).not.toBeVisible()
   })
 
-  test('the filter picker opens from the app bar', async ({ page }) => {
+  test('the filter picker opens from the app bar and stays open', async ({ page }) => {
     await page.goto('/')
 
     await page.locator('#tag-filter-activator').click()
 
-    await expect(page.locator('.tag-picker')).toBeVisible()
+    const picker = page.locator('.tag-picker')
+    await expect(picker).toBeVisible()
     await expect(page.locator('.tag-picker-search')).toBeVisible()
+
+    // Still open a moment later. Asserting visibility alone passes on a picker
+    // that opens and closes again within the same click — which is what an
+    // overlay does when the click that opened it also reaches the handler that
+    // closes it on an outside click.
+    await page.waitForTimeout(500)
+    await expect(picker).toBeVisible()
   })
 })

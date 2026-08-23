@@ -29,6 +29,22 @@ export const usePhotosStore = defineStore('photos', () => {
   // ── Timeline sync state (grid ⇔ timeline scrollbar) ──────────────────────
   /** Month key of the entry highlighted in the timeline sidebar. */
   const activeTimelineKey = ref('')
+
+  /**
+   * Tags the grid is narrowed to. Every one of them, not any: adding a tag
+   * narrows, which is what the click that added it is asking for.
+   */
+  const filterTags = ref<string[]>([])
+
+  /**
+   * The photo whose tags are being shown, if any.
+   *
+   * It lives here rather than travelling up as an event because the card that
+   * opens it sits inside a virtual scroller: the component that raised it may
+   * be recycled onto a different photo before the sheet closes, so the sheet
+   * has to hold the photo itself and not a route back to a card.
+   */
+  const tagSheetPhoto = ref<Photo | null>(null)
   /**
    * Pending programmatic scroll requested by a timeline click.
    * PhotoGrid watches this and scrolls the virtual grid to `index`.
@@ -89,6 +105,7 @@ export const usePhotosStore = defineStore('photos', () => {
 
   function _resetState() {
     items.value = []
+    tagSheetPhoto.value = null
     loading.value = false
     timeline.value = {}
     streamCompleted.value = false
@@ -126,7 +143,8 @@ export const usePhotosStore = defineStore('photos', () => {
     activeTimelineKey.value = key
   }
 
-  async function loadPhotosStream(catalogKey: string) {
+  async function loadPhotosStream(catalogKey: string, tags: string[] = filterTags.value) {
+    filterTags.value = tags
     // Invalidate any in-flight stream, then reset and start a new one.
     const gen = ++generation
     abortController?.abort()
@@ -143,12 +161,14 @@ export const usePhotosStore = defineStore('photos', () => {
       let batch: Photo[] = []
       const batchSize = 50
 
-      const resource = isApiMode() ? API_PATHS.catalogImages(catalogKey) : 'photos.ndjson'
+      const resource = isApiMode() ? API_PATHS.catalogImages(catalogKey, tags) : 'photos.ndjson'
 
       for await (const rec of reader.readStream(resource, signal)) {
         if (gen !== generation) return
         const url = buildImageUrl(catalogKey, rec.id)
-        batch.push({ ...rec, url })
+        // A server that predates tags on the listing sends no field at all;
+        // an empty array keeps every reader downstream from having to check.
+        batch.push({ ...rec, url, tags: rec.tags ?? [] })
 
         if (batch.length >= batchSize) {
           const startOffset = items.value.length
@@ -201,9 +221,38 @@ export const usePhotosStore = defineStore('photos', () => {
     )
   }
 
+  /**
+   * Replace the tag filter and reload.
+   *
+   * Filtering happens on the server: the grid holds one catalogue's worth of
+   * rows and narrowing it here would still have streamed all of them, which is
+   * the cost the filter exists to avoid.
+   *
+   * Switching catalogues clears the filter instead of carrying it over — tags
+   * are per catalogue, so a filter carried across would usually be a filter
+   * that matches nothing, and an empty grid reads as a broken one.
+   */
+  async function setFilterTags(catalogKey: string, tags: string[]) {
+    await loadPhotosStream(catalogKey, tags)
+  }
+
+  function clearFilterTags() {
+    filterTags.value = []
+  }
+
+  function showPhotoTags(photo: Photo) {
+    tagSheetPhoto.value = photo
+  }
+
+  function hidePhotoTags() {
+    tagSheetPhoto.value = null
+  }
+
   return {
     // state
     items,
+    filterTags,
+    tagSheetPhoto,
     loading,
     timeline,
     streamCompleted,
@@ -215,6 +264,10 @@ export const usePhotosStore = defineStore('photos', () => {
     timelineEntries,
     // actions
     loadPhotosStream,
+    setFilterTags,
+    clearFilterTags,
+    showPhotoTags,
+    hidePhotoTags,
     resetPhotos,
     togglePhotoStatus,
     requestTimelineScroll,

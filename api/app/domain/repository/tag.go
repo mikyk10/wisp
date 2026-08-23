@@ -15,4 +15,16 @@ type TagRepository interface {
 
 	// FindImagesWithoutTags returns image IDs in the catalog that have no tags.
 	FindImagesWithoutTags(catalogKey string, limit int) ([]model.PrimaryKey, error)
+
+	// FindTagUsage returns every tag carried by an image in the catalogue,
+	// most used first, with the number of images carrying it.
+	FindTagUsage(catalogKey string) ([]model.TagUsage, error)
+
+	// LoadCatalogImageTags returns the tag names of every tagged image in the
+	// catalogue, keyed by image ID.
+	//
+	// The whole catalogue at once, rather than a lookup per image, because the
+	// caller is the listing: a per-image call would be one query per row of a
+	// stream that is tens of thousands of rows long.
+	LoadCatalogImageTags(catalogKey string) (map[model.PrimaryKey][]string, error)
 }

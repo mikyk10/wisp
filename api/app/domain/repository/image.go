@@ -13,7 +13,9 @@ type ImageRepository interface {
 
 	FindByRandom(filter model.ImageFilter) (*model.Image, error)
 
-	ListByCatalog(catalogKey string, cb func(*model.Image) error) error
+	// ListByCatalog streams the catalogue's images, newest first. tags narrows
+	// the result to images carrying every one of them; empty means no filter.
+	ListByCatalog(catalogKey string, tags []string, cb func(*model.Image) error) error
 
 	// CountByCatalog returns the number of active images matching the given catalog key and orientation.
 	CountByCatalog(catalogKey string, ori model.CanonicalOrientation) (int64, error)

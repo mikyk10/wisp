@@ -66,7 +66,12 @@ jobs:
   build:
     name: Build & Push
     needs: [test, lint]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Also build on a manual run against a branch, not only on a push to main.
+    # A manual run never tags latest (see tags below), so a build made to try
+    # something out cannot become what the cluster is running.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.ref == 'refs/heads/main' && github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -82,7 +87,13 @@ jobs:
         id: meta
         with:
           images: ghcr.io/mikyk10/wisp/api
-          tags: type=raw,value=latest
+          # latest belongs to the default branch alone. Branch name and short
+          # SHA are always tagged, so a deployment made to try a branch out can
+          # pin one of those instead.
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=sha,format=short
       - uses: docker/build-push-action@v6
         with:
           context: api

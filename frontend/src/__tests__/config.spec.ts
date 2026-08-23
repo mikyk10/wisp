@@ -93,3 +93,33 @@ describe('isApiMode', () => {
     expect(isApiMode()).toBe(false)
   })
 })
+
+describe('API_PATHS.catalogImages tag filter', () => {
+  // Filtering happens on the server. The grid holds one catalogue's worth of
+  // rows, so narrowing in the browser would still have streamed all of them —
+  // which is the cost the filter exists to avoid.
+  it('carries the tags as one comma-separated parameter', async () => {
+    const { API_PATHS } = await import('../config')
+    expect(API_PATHS.catalogImages('photos', ['sakura', 'night'])).toBe(
+      'api/catalog/photos/images?tags=sakura%2Cnight'
+    )
+  })
+
+  it('sends no parameter at all when nothing is filtered', async () => {
+    // `?tags=` would reach the server as a filter it has to decide how to read;
+    // sending nothing says "no filter" without relying on that reading.
+    const { API_PATHS } = await import('../config')
+    expect(API_PATHS.catalogImages('photos')).toBe('api/catalog/photos/images')
+    expect(API_PATHS.catalogImages('photos', [])).toBe('api/catalog/photos/images')
+  })
+
+  it('escapes a tag that would otherwise break the query', async () => {
+    const { API_PATHS } = await import('../config')
+    expect(API_PATHS.catalogImages('photos', ['a&b'])).toBe('api/catalog/photos/images?tags=a%26b')
+  })
+
+  it('points at the catalogue tag list', async () => {
+    const { API_PATHS } = await import('../config')
+    expect(API_PATHS.catalogTags('photos')).toBe('api/catalog/photos/tags')
+  })
+})

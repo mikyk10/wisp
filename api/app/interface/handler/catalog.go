@@ -44,6 +44,7 @@ type CatalogHandler interface {
 	List(*echo.Context) error
 	Img(*echo.Context) error
 	ImgManagement(*echo.Context) error
+	ListTags(*echo.Context) error
 	ToggleVisibility(*echo.Context) error
 	RandomImg(*echo.Context) error
 }
@@ -256,6 +257,7 @@ func (uc *catalogHandler) List(c *echo.Context) error {
 	const mime = "application/x-ndjson"
 
 	catalogKey := c.Param("catalogKey")
+	tags := parseTagFilter(c.QueryParam("tags"))
 
 	pr, pw := io.Pipe()
 
@@ -264,7 +266,7 @@ func (uc *catalogHandler) List(c *echo.Context) error {
 		var ferr error
 		defer func() { pw.CloseWithError(ferr) }()
 
-		ferr = uc.imguc.ListImages(catalogKey, func(rec *model.Image) error {
+		ferr = uc.imguc.ListImages(catalogKey, tags, func(rec *model.Image, tagNames []string) error {
 			// EXIF DateTime has no timezone info, so goexif interprets it as UTC.
 			// Return it with a "Z" suffix as UTC time to prevent misinterpretation on the frontend.
 			// Photos without EXIF data (Valid=false) return an empty string.
@@ -272,16 +274,54 @@ func (uc *catalogHandler) List(c *echo.Context) error {
 			if rec.TakenAt.Valid {
 				timestamp = rec.TakenAt.Time.UTC().Format("2006-01-02T15:04:05Z")
 			}
+			if tagNames == nil {
+				tagNames = []string{}
+			}
 			record := &response.Image{
 				ID:        rec.ID,
 				Enabled:   rec.DeletedAt.Time.IsZero(), // deleted_at IS NULL = enabled
 				Timestamp: timestamp,
+				Tags:      tagNames,
 			}
 			return jsonWriter.Add(record)
 		})
 	}
 	go fetcher()
 	return c.Stream(http.StatusOK, mime, pr)
+}
+
+// ListTags serves the tags available in a catalogue, most used first.
+//
+// The counts come with them because the list is long enough to need ordering
+// by something, and "how many photos would this leave me" is the question a
+// reader is actually asking of each entry.
+func (uc *catalogHandler) ListTags(c *echo.Context) error {
+	tags, err := uc.imguc.CatalogTags(c.Param("catalogKey"))
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Error")
+	}
+	if tags == nil {
+		tags = []model.TagUsage{}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"tags": tags})
+}
+
+// parseTagFilter reads the comma-separated `tags` query parameter.
+//
+// Blanks are dropped rather than passed on: a trailing comma, or the empty
+// string a client sends when it has just cleared the last filter, would
+// otherwise become a tag nothing carries and empty the grid.
+func parseTagFilter(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	tags := []string{}
+	for _, part := range strings.Split(raw, ",") {
+		if t := strings.TrimSpace(part); t != "" {
+			tags = append(tags, t)
+		}
+	}
+	return tags
 }
 
 func (uc *catalogHandler) RandomImg(c *echo.Context) error {

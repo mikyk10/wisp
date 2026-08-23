@@ -13,7 +13,14 @@ export const useCatalogsStore = defineStore('catalogs', () => {
   // ── Private helpers ──────────────────────────────────────────────────────
   async function _loadCatalog(catalogKey: string) {
     // loadPhotosStream resets photo state itself (single reset/abort/start path).
-    await usePhotosStore().loadPhotosStream(catalogKey)
+    //
+    // The tag filter is dropped on the way in. Tags belong to a catalogue, so
+    // one carried across from the last catalogue would usually match nothing —
+    // and an empty grid after switching reads as a failure rather than as a
+    // filter still being applied.
+    const photos = usePhotosStore()
+    photos.clearFilterTags()
+    await photos.loadPhotosStream(catalogKey, [])
   }
 
   // ── Actions ──────────────────────────────────────────────────────────────

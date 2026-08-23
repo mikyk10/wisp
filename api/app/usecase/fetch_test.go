@@ -60,11 +60,11 @@ func setupFetchUseCase(t *testing.T, svc *config.ServiceConfig) (usecase.Catalog
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := conn.AutoMigrate(&model.Image{}); err != nil {
+	if err := conn.AutoMigrate(&model.Image{}, &model.Tag{}, &model.ImageTag{}); err != nil {
 		t.Fatalf("AutoMigrate failed: %v", err)
 	}
 	repo := infraRepo.NewImageRepositoryImpl(conn)
-	return usecase.NewCatalogUseCase(&config.GlobalConfig{}, svc, repo, nil), repo
+	return usecase.NewCatalogUseCase(&config.GlobalConfig{}, svc, repo, nil, infraRepo.NewTagRepositoryImpl(conn)), repo
 }
 
 // insertImage is a convenience helper that inserts a single Image record via the repository.

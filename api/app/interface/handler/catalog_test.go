@@ -3,6 +3,7 @@ package handler_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/jpeg"
 	"net/http"
@@ -69,7 +70,9 @@ func newHandler(svc *config.ServiceConfig, historyTable bool) (*echo.Echo, handl
 	if err != nil {
 		panic(err)
 	}
-	conn.AutoMigrate(&model.Image{}) //nolint:errcheck
+	// Tags ride along with the listing, so the tables exist wherever the
+	// listing does.
+	conn.AutoMigrate(&model.Image{}, &model.Tag{}, &model.ImageTag{}) //nolint:errcheck
 	if historyTable {
 		conn.AutoMigrate(&model.DeliveryHistory{}) //nolint:errcheck
 	}
@@ -81,6 +84,7 @@ func newHandler(svc *config.ServiceConfig, historyTable bool) (*echo.Echo, handl
 		gcfg, svc,
 		infraRepo.NewImageRepositoryImpl(conn),
 		infraRepo.NewDeliveryHistoryRepositoryImpl(conn),
+		infraRepo.NewTagRepositoryImpl(conn),
 	)
 
 	h := handler.NewCatalogHandler(svc, uc)
@@ -459,5 +463,156 @@ func TestRandomImg_RecordsEncodeFailureWithProvenance(t *testing.T) {
 		assert.Equal(t, errorSleepSeconds, rows[0].SleepSeconds,
 			"this card came from the handler's error branch, so it carries the handler's interval")
 		assert.NotEqual(t, normalSleepSeconds, rows[0].SleepSeconds)
+	}
+}
+
+// --- tags ------------------------------------------------------------------
+
+// tagImageRows gives an existing image the named tags, straight through SQL so
+// the test says what the database holds rather than going through the code
+// under test to arrange it.
+func tagImageRows(t *testing.T, db *gorm.DB, imageID int, names ...string) {
+	t.Helper()
+	for i, name := range names {
+		tagID := 100 + i
+		if err := db.Exec(`INSERT OR IGNORE INTO tags (id, name_normalized, display_name, created_at, updated_at)
+		         VALUES (?, ?, ?, datetime(), datetime())`, tagID, name, name).Error; err != nil {
+			t.Fatalf("insert tag %q: %v", name, err)
+		}
+		if err := db.Exec(`INSERT INTO image_tags (image_id, tag_id, created_at) VALUES (?, ?, datetime())`,
+			imageID, tagID).Error; err != nil {
+			t.Fatalf("tag image %d with %q: %v", imageID, name, err)
+		}
+	}
+}
+
+// insertListableImage adds one image the listing will return.
+//
+// src and src_hash are derived from the id because (catalog_key, src_hash) is
+// unique: reusing one hash silently drops every row after the first, and a
+// listing test whose second photo was never stored passes for the wrong
+// reason. The error is checked here for the same reason.
+func insertListableImage(t *testing.T, db *gorm.DB, id int, catalogKey string) {
+	t.Helper()
+	err := db.Exec(`INSERT INTO images (id, catalog_key, rnd, src, src_hash, thumb_jpg, image_orientation, excluded, created_at, updated_at)
+	         VALUES (?, ?, 0, ?, ?, 'jpg', 1, false, datetime(), datetime())`,
+		id, catalogKey, fmt.Sprintf("src-%d", id), fmt.Sprintf("hash-%d", id)).Error
+	if err != nil {
+		t.Fatalf("insert image %d: %v", id, err)
+	}
+}
+
+func listBody(t *testing.T, h handler.CatalogHandler, e *echo.Echo, query string) string {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/catalog/cat/images"+query, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/catalog/:catalogKey/images")
+	c.SetPathValues(echo.PathValues{{Name: "catalogKey", Value: "cat"}})
+
+	if err := h.List(c); err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	return rec.Body.String()
+}
+
+// TestList_CarriesTags: the grid shows hundreds of cards at once, so anything
+// it needs per card either rides along with the listing or becomes a request
+// per card. This is the assertion that keeps it riding along.
+func TestList_CarriesTags(t *testing.T) {
+	e, h, db := setupHandler()
+	insertListableImage(t, db, 1, "cat")
+	tagImageRows(t, db, 1, "sky")
+
+	body := listBody(t, h, e, "")
+
+	assert.Contains(t, body, `"tags":["sky"]`)
+}
+
+// TestList_UntaggedPhotoCarriesAnEmptyArray: never null. A client should not
+// have to tell "no tags" apart from a field the server forgot to send.
+func TestList_UntaggedPhotoCarriesAnEmptyArray(t *testing.T) {
+	e, h, db := setupHandler()
+	insertListableImage(t, db, 1, "cat")
+
+	body := listBody(t, h, e, "")
+
+	assert.Contains(t, body, `"tags":[]`)
+	assert.NotContains(t, body, `"tags":null`)
+}
+
+// TestList_FiltersByAllTags: every tag, not any. Adding a second term has to
+// narrow the grid, which is what the reader who clicked it is asking for.
+func TestList_FiltersByAllTags(t *testing.T) {
+	e, h, db := setupHandler()
+	insertListableImage(t, db, 1, "cat") // sky + sea
+	insertListableImage(t, db, 2, "cat") // sky only
+	tagImageRows(t, db, 1, "sky", "sea")
+	db.Exec(`INSERT INTO image_tags (image_id, tag_id, created_at) VALUES (2, 100, datetime())`)
+
+	body := listBody(t, h, e, "?tags=sky,sea")
+
+	assert.Contains(t, body, `"id":1`)
+	assert.NotContains(t, body, `"id":2`, "an image carrying only one of the two tags must not survive the filter")
+}
+
+// TestList_EmptyTagParamShowsEverything: a client that has just cleared its
+// last filter sends an empty value, and the grid must fill back up rather than
+// empty out.
+func TestList_EmptyTagParamShowsEverything(t *testing.T) {
+	e, h, db := setupHandler()
+	insertListableImage(t, db, 1, "cat")
+	insertListableImage(t, db, 2, "cat")
+
+	for _, query := range []string{"", "?tags=", "?tags=,"} {
+		body := listBody(t, h, e, query)
+		assert.Contains(t, body, `"id":1`, "query %q", query)
+		assert.Contains(t, body, `"id":2`, "query %q", query)
+	}
+}
+
+// TestListTags_ReturnsUsageMostUsedFirst: the picker renders this list in the
+// order it arrives, and most-used-first is what makes hundreds of tags usable.
+func TestListTags_ReturnsUsageMostUsedFirst(t *testing.T) {
+	e, h, db := setupHandler()
+	insertListableImage(t, db, 1, "cat")
+	insertListableImage(t, db, 2, "cat")
+	tagImageRows(t, db, 1, "sky", "sea")
+	db.Exec(`INSERT INTO image_tags (image_id, tag_id, created_at) VALUES (2, 100, datetime())`)
+
+	req := httptest.NewRequest(http.MethodGet, "/catalog/cat/tags", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/catalog/:catalogKey/tags")
+	c.SetPathValues(echo.PathValues{{Name: "catalogKey", Value: "cat"}})
+
+	if assert.NoError(t, h.ListTags(c)) {
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body struct {
+			Tags []struct {
+				Name  string `json:"name"`
+				Count int    `json:"count"`
+			} `json:"tags"`
+		}
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Len(t, body.Tags, 2)
+		assert.Equal(t, "sky", body.Tags[0].Name)
+		assert.Equal(t, 2, body.Tags[0].Count)
+		assert.Equal(t, "sea", body.Tags[1].Name)
+	}
+}
+
+// TestListTags_EmptyCatalogIsAnArray: `{"tags":[]}`, not `{"tags":null}`.
+func TestListTags_EmptyCatalogIsAnArray(t *testing.T) {
+	e, h, _ := setupHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/catalog/empty/tags", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/catalog/:catalogKey/tags")
+	c.SetPathValues(echo.PathValues{{Name: "catalogKey", Value: "empty"}})
+
+	if assert.NoError(t, h.ListTags(c)) {
+		assert.Contains(t, rec.Body.String(), `"tags":[]`)
 	}
 }

@@ -4,6 +4,12 @@ export interface Photo {
   url: string
   enabled: boolean
   timestamp: string
+  /**
+   * Always an array. Tags ride along with the listing rather than being asked
+   * for per photo: the grid shows hundreds of cards at once, so anything it
+   * needs per card is either already here or it is a request per card.
+   */
+  tags: string[]
 }
 
 /** Raw record from the NDJSON stream (before the `url` field is added). */
@@ -11,6 +17,13 @@ export interface PhotoRecord {
   id: number
   enabled: boolean
   timestamp: string
+  tags?: string[]
+}
+
+/** One tag and how many photos in the current catalogue carry it. */
+export interface TagUsage {
+  name: string
+  count: number
 }
 
 /** One bucket in the timeline sidebar. */

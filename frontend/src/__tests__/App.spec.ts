@@ -59,6 +59,10 @@ const vuetifyStubs = {
     emits: ['update:modelValue'],
   },
   VIcon: { template: '<i />', props: ['icon', 'start', 'size'] },
+  VBadge: {
+    template: '<span><slot /></span>',
+    props: ['modelValue', 'content', 'color', 'offsetX', 'offsetY'],
+  },
   VSpacer: { template: '<div />' },
   VOverlay: { template: '<div />' },
   VNavigationDrawer: {
@@ -82,6 +86,24 @@ const componentStubs = {
     template: '<div class="device-drawer-stub" :class="{ \'device-drawer-stub--open\': modelValue }" />',
     props: ['modelValue'],
     emits: ['update:modelValue'],
+  },
+  TagFilterBar: {
+    name: 'TagFilterBar',
+    template: '<div class="tag-filter-bar-stub" />',
+    props: ['shown', 'total', 'filterTags'],
+    emits: ['remove', 'clear'],
+  },
+  TagPicker: {
+    name: 'TagPicker',
+    template: '<div class="tag-picker-stub" :class="{ \'tag-picker-stub--open\': open }" />',
+    props: ['open', 'modelValue', 'catalogKey', 'activator'],
+    emits: ['update:open', 'update:modelValue'],
+  },
+  PhotoTagsSheet: {
+    name: 'PhotoTagsSheet',
+    template: '<div class="photo-tags-sheet-stub" />',
+    props: ['modelValue', 'photo'],
+    emits: ['update:modelValue', 'filter'],
   },
 }
 
@@ -137,15 +159,18 @@ describe('App', () => {
     wrapper.unmount()
   })
 
-  it('shows the photo count chip text when photos are present', async () => {
+  // The count used to be a chip in the app bar. It moved into the filter bar
+  // because the bar has no width to spare on a narrow screen — see TagFilterBar
+  // — so what is asserted here is that App still hands it the number.
+  it('hands the photo count to the filter bar', async () => {
     const catalogsStore = useCatalogsStore(pinia)
     vi.spyOn(catalogsStore, 'initCatalogs').mockResolvedValue(undefined)
 
     const wrapper = mountApp(pinia)
-    usePhotosStore(pinia).items.push({ id: 1, url: '', enabled: true, timestamp: '' })
+    usePhotosStore(pinia).items.push({ id: 1, url: '', enabled: true, timestamp: '', tags: [] })
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).toContain('1 photos')
+    expect(wrapper.findComponent({ name: 'TagFilterBar' }).props('shown')).toBe(1)
     wrapper.unmount()
   })
 

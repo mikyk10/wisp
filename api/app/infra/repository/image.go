@@ -116,14 +116,18 @@ func (p *imageRepositoryImpl) UpsertInactiveImage(catalogKey, srcHash, src strin
 	}).Error
 }
 
-func (p *imageRepositoryImpl) ListByCatalog(catalogKey string, cb func(*model.Image) error) error {
-	rows, err := p.conn.Unscoped().Model(&model.Image{}).
+func (p *imageRepositoryImpl) ListByCatalog(catalogKey string, tags []string, cb func(*model.Image) error) error {
+	q := p.conn.Unscoped().Model(&model.Image{}).
 		Select("id", "catalog_key", "src", "taken_at", "created_at", "deleted_at").
 		// excluded = false: completely hide catalog-excluded entries (negative index).
 		// Use Unscoped so that user-hidden images (deleted_at IS NOT NULL) are still included.
-		Where("catalog_key = ? AND excluded = false", catalogKey).
-		Order("taken_at desc").
-		Rows()
+		Where("catalog_key = ? AND excluded = false", catalogKey)
+
+	if sub := p.withAllTags(tags); sub != nil {
+		q = q.Where("id IN (?)", sub)
+	}
+
+	rows, err := q.Order("taken_at desc").Rows()
 	if err != nil {
 		return err
 	}
@@ -138,6 +142,35 @@ func (p *imageRepositoryImpl) ListByCatalog(catalogKey string, cb func(*model.Im
 		}
 	}
 	return nil
+}
+
+// withAllTags builds the subquery for "images carrying every one of these
+// tags", or nil when there is nothing to filter by.
+//
+// A subquery rather than a list of matching IDs read out first: a common tag
+// matches most of the catalogue, and handing tens of thousands of ids back to
+// the database as an IN list is a large statement to build, send and parse for
+// a question the database can answer on its own.
+//
+// Every tag, not any: a filter is read as narrowing. HAVING COUNT(DISTINCT) is
+// what makes it so — a plain IN would keep an image carrying just one of them.
+func (p *imageRepositoryImpl) withAllTags(tags []string) *gorm.DB {
+	normalized := make([]string, 0, len(tags))
+	for _, t := range tags {
+		if n := strings.ToLower(strings.TrimSpace(t)); n != "" {
+			normalized = append(normalized, n)
+		}
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+
+	return p.conn.Table("image_tags").
+		Select("image_tags.image_id").
+		Joins("JOIN tags ON tags.id = image_tags.tag_id").
+		Where("tags.name_normalized IN ?", normalized).
+		Group("image_tags.image_id").
+		Having("COUNT(DISTINCT image_tags.tag_id) = ?", len(normalized))
 }
 
 func (p *imageRepositoryImpl) FindByRandom(filter model.ImageFilter) (*model.Image, error) {

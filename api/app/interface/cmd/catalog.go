@@ -107,7 +107,9 @@ func NewCatalogListImagesCommand(c *dig.Container) *cobra.Command {
 				return errors.New("error: Only file catalog type can list images")
 			}
 
-			return catUc.ListImages(catlName, func(img *model.Image) error {
+			// No tag filter, and the tags themselves go unused: this listing is
+			// a table of ids and paths.
+			return catUc.ListImages(catlName, nil, func(img *model.Image, _ []string) error {
 				takenAt := "-"
 				if img.TakenAt.Valid {
 					takenAt = img.TakenAt.Time.Format("2006-01-02")

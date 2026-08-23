@@ -47,8 +47,19 @@ type GlobalConfig struct {
 		// An override that is set but empty counts as unset and leaves the file
 		// value standing, so a `DB_DSN=` left unfilled in a compose file does
 		// not take the database away.
-		Driver        string `yaml:"driver" env:"DB_DRIVER"`
-		DSN           string `yaml:"dsn" env:"DB_DSN"`
+		Driver string `yaml:"driver" env:"DB_DRIVER"`
+		DSN    string `yaml:"dsn" env:"DB_DSN"`
+
+		// MaxOpenConns and MaxIdleConns bound the connection pool. Zero means
+		// "unset" and LoadConfig fills in the default; it does not mean the
+		// unlimited pool database/sql would otherwise give, which is what a
+		// burst of thumbnail requests turns into a wall of refused connections.
+		//
+		// Both take an environment override so that one image can run the web
+		// server and the scheduled commands with different shares of the same
+		// database, without a config file per workload.
+		MaxOpenConns  int `yaml:"max_open_conns" env:"DB_MAX_OPEN_CONNS"`
+		MaxIdleConns  int `yaml:"max_idle_conns" env:"DB_MAX_IDLE_CONNS"`
 		DriverOptions struct {
 			Sqlite3 struct {
 			}
@@ -61,6 +72,30 @@ type GlobalConfig struct {
 // DefaultDeliveryHistorySize is how many deliveries each display keeps when the
 // configuration does not say.
 const DefaultDeliveryHistorySize = 20
+
+// DefaultMaxOpenConns and DefaultMaxIdleConns bound the connection pool when
+// the configuration does not say.
+//
+// database/sql opens an unbounded number of connections unless told otherwise,
+// and a server answering a photo grid answers a few hundred thumbnail requests
+// at once. Against MySQL that was survivable — a connection there is a thread,
+// and the server's limit is high enough to absorb the burst. PostgreSQL forks a
+// process per connection and ships with a much lower ceiling, so the same burst
+// walks into "sorry, too many clients already" and every request in it fails.
+//
+// The open limit is deliberately far below any server's own. It bounds one
+// process and a deployment runs several — the web server plus whichever
+// scheduled command is running — so the room left over is not spare, it is the
+// other processes' share.
+//
+// The idle limit matches the open one. The database/sql default of 2 closes the
+// rest between bursts, so the next burst pays to open them again — on
+// PostgreSQL, a forked backend per request, which is the cost the pool exists
+// to stop paying.
+const (
+	DefaultMaxOpenConns = 20
+	DefaultMaxIdleConns = 20
+)
 
 // MaxDeliveryHistorySize is the largest ring a display may be given.
 //

@@ -95,6 +95,8 @@ database:
   driver: sqlite       # sqlite | mysql | postgres
   dsn: /data/wisp.db
   log: false           # true logs every GORM query
+  max_open_conns: 20   # connection pool ceiling for this process (default 20)
+  max_idle_conns: 20   # connections kept between bursts (default 20)
 
 delivery_history:      # see Delivery history below
   disabled: false      # negative on purpose — an absent `enabled:` would read as off
@@ -160,10 +162,31 @@ counts as unset and leaves the file's value alone.
 | `ALLOWED_ORIGINS` | `*` — every origin | Comma-separated list of origins allowed to make cross-origin requests. See [Access control](#access-control) |
 | `DB_DRIVER` | `database.driver` from `config.yaml` | Overrides the driver (`sqlite`, `mysql` or `postgres`); an unknown name is refused at startup. Set it with `DB_DSN` |
 | `DB_DSN` | `database.dsn` from `config.yaml` | Overrides the DSN, so credentials need not be written to a file |
+| `DB_MAX_OPEN_CONNS` | `database.max_open_conns`, default `20` | Connection pool ceiling for this process. See [Connection pool](#connection-pool) |
+| `DB_MAX_IDLE_CONNS` | `database.max_idle_conns`, default `20` | Connections kept open between bursts |
 | `DB_DEFAULT_DSN` | — | Deprecated former name of `DB_DSN`. Still read, and logs a warning; `DB_DSN` wins where both are set |
 | `WISP_AUTO_MIGRATE` | unset | `1` runs AutoMigrate on startup — needed once after a schema change, see [Delivery history](#delivery-history) |
 | `WISP_SCAN_CONCURRENCY` | `min(GOMAXPROCS, 4)` | Images decoded in parallel by `catalog scan`. Lower it on a memory-constrained host |
 | `ENV` | unset | Recorded as `env` on the server's log lines; changes no behaviour |
+
+### Connection pool
+
+`database/sql` opens as many connections as there are concurrent requests unless it is given a
+ceiling, and one photo grid asks for a few hundred thumbnails at once. Against MySQL that was
+survivable: a connection there is a thread and the server's own limit is high. PostgreSQL forks
+a process per connection and ships with a much lower ceiling — the shipped default is 100 — so
+the same burst reaches it and the server answers `sorry, too many clients already`. Every
+request in the burst fails, which reads in the browser as thumbnails that will not load.
+
+The pool bounds this: past `max_open_conns`, a request waits for a connection to come free
+instead of opening another. The burst arrives as latency rather than as errors, and since the
+queries behind it are primary-key lookups of at most a thumbnail's worth of bytes, the queue
+drains quickly.
+
+Set it below the database's own limit, and remember the limit is shared: a deployment runs the
+web server and whichever scheduled command is due at the same time, each with its own pool. Use
+`DB_MAX_OPEN_CONNS` to give a `catalog scan` a smaller share than the server, since they run
+from the same image and the same `config.yaml`.
 
 ### Access control
 

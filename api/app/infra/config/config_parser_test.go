@@ -222,3 +222,55 @@ func TestLoadConfig_LegacyDSNEnvLosesToCurrent(t *testing.T) {
 		t.Errorf("dsn = %q, want %q — DB_DSN should win over DB_DEFAULT_DSN", conf.Database.DSN, current)
 	}
 }
+
+// TestLoadConfig_PoolDefaults: a config file written before the pool was
+// bounded says nothing about it, and every deployment has one. Left at zero the
+// pool would be unbounded — the state that turns a burst of thumbnail requests
+// into refused connections — so the absent key has to resolve to the default
+// rather than to Go's zero.
+func TestLoadConfig_PoolDefaults(t *testing.T) {
+	conf, _, err := newLoaderFromDir("testdata").LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig() unexpected error: %v", err)
+	}
+	if conf.Database.MaxOpenConns != domainConfig.DefaultMaxOpenConns {
+		t.Errorf("max_open_conns = %d, want the default %d",
+			conf.Database.MaxOpenConns, domainConfig.DefaultMaxOpenConns)
+	}
+	if conf.Database.MaxIdleConns != domainConfig.DefaultMaxIdleConns {
+		t.Errorf("max_idle_conns = %d, want the default %d",
+			conf.Database.MaxIdleConns, domainConfig.DefaultMaxIdleConns)
+	}
+}
+
+// TestLoadConfig_PoolFromEnv: the pool size has to be settable per workload.
+// One image runs the web server and the scheduled commands against the same
+// database, and they cannot each be given a config file — so the share each one
+// takes is set where the workload is defined.
+func TestLoadConfig_PoolFromEnv(t *testing.T) {
+	t.Setenv("DB_MAX_OPEN_CONNS", "5")
+	t.Setenv("DB_MAX_IDLE_CONNS", "2")
+
+	conf, _, err := newLoaderFromDir("testdata").LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig() unexpected error: %v", err)
+	}
+	if conf.Database.MaxOpenConns != 5 {
+		t.Errorf("max_open_conns = %d, want 5 from DB_MAX_OPEN_CONNS", conf.Database.MaxOpenConns)
+	}
+	if conf.Database.MaxIdleConns != 2 {
+		t.Errorf("max_idle_conns = %d, want 2 from DB_MAX_IDLE_CONNS", conf.Database.MaxIdleConns)
+	}
+}
+
+// TestLoadConfig_NegativePoolSizeRejected: database/sql reads anything at or
+// below zero as "no limit". Zero is the file saying nothing and defaults; a
+// negative is someone saying something that cannot be honoured, and honouring
+// it would mean the unbounded pool.
+func TestLoadConfig_NegativePoolSizeRejected(t *testing.T) {
+	t.Setenv("DB_MAX_OPEN_CONNS", "-1")
+
+	if _, _, err := newLoaderFromDir("testdata").LoadConfig(); err == nil {
+		t.Fatal("LoadConfig() expected error for a negative max_open_conns, got nil")
+	}
+}

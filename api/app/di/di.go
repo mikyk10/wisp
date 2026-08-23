@@ -62,6 +62,15 @@ func (d *digBuilder) WithDatabase(globalConfig *config.GlobalConfig, migrate boo
 			return nil, fmt.Errorf("failed to open database: %w", err)
 		}
 
+		// Bound the pool before anything is allowed to use it. Left unbounded,
+		// a burst of requests opens a connection per request and the database
+		// refuses the ones past its own limit; bounded, the burst waits.
+		if err := infra.ApplyPoolLimits(conn,
+			globalConfig.Database.MaxOpenConns,
+			globalConfig.Database.MaxIdleConns); err != nil {
+			return nil, fmt.Errorf("failed to configure the connection pool: %w", err)
+		}
+
 		if migrate {
 			if err := conn.AutoMigrate(model.AllModels()...); err != nil {
 				return nil, fmt.Errorf("auto-migrate failed: %w", err)

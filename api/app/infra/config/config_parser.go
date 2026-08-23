@@ -241,6 +241,12 @@ func applyGlobalDefaults(conf *config.GlobalConfig) {
 	if conf.DeliveryHistory.Size == 0 {
 		conf.DeliveryHistory.Size = config.DefaultDeliveryHistorySize
 	}
+	if conf.Database.MaxOpenConns == 0 {
+		conf.Database.MaxOpenConns = config.DefaultMaxOpenConns
+	}
+	if conf.Database.MaxIdleConns == 0 {
+		conf.Database.MaxIdleConns = config.DefaultMaxIdleConns
+	}
 }
 
 func validateGlobalConfig(conf *config.GlobalConfig) error {
@@ -249,6 +255,17 @@ func validateGlobalConfig(conf *config.GlobalConfig) error {
 		// valid
 	default:
 		return fmt.Errorf("invalid database driver: %q (must be sqlite, mysql or postgres)", conf.Database.Driver)
+	}
+
+	// Negative is refused rather than defaulted. database/sql reads anything at
+	// or below zero as "no limit", so a stray -1 would restore exactly the
+	// unbounded pool these settings exist to bound — and it would do it
+	// silently, showing up only as refused connections under load.
+	if n := conf.Database.MaxOpenConns; n < 0 {
+		return fmt.Errorf("invalid database.max_open_conns: %d (must be positive)", n)
+	}
+	if n := conf.Database.MaxIdleConns; n < 0 {
+		return fmt.Errorf("invalid database.max_idle_conns: %d (must be positive)", n)
 	}
 
 	// 0 is left alone: LoadConfig reads it as "unset" and fills in the default.

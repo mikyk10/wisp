@@ -15,6 +15,16 @@ database:
 
   log: true
 
+  # Connection pool ceiling for this process. Past it a request waits for a
+  # connection instead of opening another, so a burst of thumbnail requests
+  # arrives as latency rather than as connections the database refuses.
+  # Keep the total across every process sharing the database below its own
+  # limit — PostgreSQL forks a backend per connection and its ceiling is low.
+  # DB_MAX_OPEN_CONNS overrides this per workload, so a scheduled command can
+  # take a smaller share than the server from the same image.
+  max_open_conns: 20
+  max_idle_conns: 20
+
 # Image tagging, by POSTing each thumbnail to an external AI service. Only
 # `catalog tagging run` reads this — the server never calls out on its own —
 # and that command exits with "tagging.endpoint is not configured" if the

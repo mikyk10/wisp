@@ -278,4 +278,107 @@ describe('DeliveryRow', () => {
     expect(wrapper.find('.delivery-stamp').text()).toContain('2026')
     wrapper.unmount()
   })
+
+  describe('hover preview', () => {
+    // The overlay is teleported to the body, so it is outside the wrapper and
+    // has to be looked for in the document.
+    const peek = () => document.querySelector<HTMLImageElement>('.delivery-peek')
+
+    function hover(wrapper: ReturnType<typeof mountRow>, clientX = 100, clientY = 100) {
+      return wrapper.find('.delivery-thumb').trigger('mouseenter', { clientX, clientY })
+    }
+
+    it('shows the same picture the row already loaded, not a second request', async () => {
+      // Reusing the row's URL is what keeps this free: the browser has the
+      // response cached, so hovering costs no fetch and no database read.
+      const wrapper = mountRow()
+
+      expect(peek()).toBeNull()
+      await hover(wrapper)
+
+      expect(peek()?.getAttribute('src')).toBe('/mock-data/photos/4821.jpg')
+      wrapper.unmount()
+    })
+
+    it('takes the preview away again on mouseleave', async () => {
+      const wrapper = mountRow()
+      await hover(wrapper)
+      expect(peek()).not.toBeNull()
+
+      await wrapper.find('.delivery-thumb').trigger('mouseleave')
+
+      expect(peek()).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('places the preview beside the pointer', async () => {
+      const wrapper = mountRow()
+
+      await hover(wrapper, 100, 200)
+
+      // 16px clear of the pointer, on the side with room for it.
+      expect(peek()?.style.left).toBe('116px')
+      expect(peek()?.style.top).toBe('216px')
+      wrapper.unmount()
+    })
+
+    it('flips to the other side of the pointer rather than leaving the screen', async () => {
+      // The drawer is pinned to the right-hand edge, so this is where the
+      // pointer usually is: placed only ever down-and-right, the preview would
+      // spend most of its life off screen.
+      const wrapper = mountRow()
+
+      await hover(wrapper, window.innerWidth - 10, window.innerHeight - 10)
+
+      const left = Number.parseInt(peek()?.style.left ?? '', 10)
+      const top = Number.parseInt(peek()?.style.top ?? '', 10)
+      expect(left + 256).toBeLessThanOrEqual(window.innerWidth)
+      expect(top + 320).toBeLessThanOrEqual(window.innerHeight)
+      wrapper.unmount()
+    })
+
+    it('closes on scroll, which moves the row out from under a still pointer', async () => {
+      const wrapper = mountRow()
+      await hover(wrapper)
+      expect(peek()).not.toBeNull()
+
+      window.dispatchEvent(new Event('scroll'))
+      await wrapper.vm.$nextTick()
+
+      expect(peek()).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('takes its scroll listener with it when unmounted while hovered', async () => {
+      // A panel collapsing or the history refreshing unmounts the row without
+      // any mouseleave ever arriving. Vue removes the teleported element on its
+      // own, so the element going away proves nothing — the listener is what
+      // would be left behind, once per row, for the life of the page.
+      const add = vi.spyOn(window, 'addEventListener')
+      const remove = vi.spyOn(window, 'removeEventListener')
+
+      const wrapper = mountRow()
+      await hover(wrapper)
+
+      const registered = add.mock.calls.find(([type]) => type === 'scroll')
+      expect(registered).toBeDefined()
+
+      wrapper.unmount()
+
+      // Same handler, same capture flag: anything else leaves the original
+      // registration in place.
+      expect(remove).toHaveBeenCalledWith('scroll', registered![1], registered![2])
+      add.mockRestore()
+      remove.mockRestore()
+    })
+
+    it('has no preview to show where there is no thumbnail', async () => {
+      const wrapper = mountRow({ imageAvailable: false })
+
+      await wrapper.find('.delivery-thumb').trigger('mouseenter', { clientX: 10, clientY: 10 })
+
+      expect(peek()).toBeNull()
+      wrapper.unmount()
+    })
+  })
 })

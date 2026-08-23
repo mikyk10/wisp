@@ -8,6 +8,9 @@
       :src="thumbnailUrl"
       :alt="`Image ${delivery.imageId}`"
       loading="lazy"
+      @mouseenter="openPeek"
+      @mousemove="movePeek"
+      @mouseleave="closePeek"
     >
     <div
       v-else
@@ -55,11 +58,30 @@
         {{ sleepPhrase }}
       </div>
     </div>
+
+    <!-- The row's thumbnail is 56×42 and cropped to fill, which is enough to
+         tell a delivery apart from its neighbours and not enough to see what
+         was actually sent. Hovering shows the same picture whole, next to the
+         pointer.
+
+         It is teleported to the body because the drawer it lives in clips its
+         own content and stacks below nothing; drawn in place, the overlay
+         would be cut off at the panel's edge. Nothing is fetched for it: the
+         source is the URL the row already loaded. -->
+    <Teleport to="body">
+      <img
+        v-if="peek.open && thumbnailUrl"
+        class="delivery-peek"
+        :src="thumbnailUrl"
+        :alt="`Image ${delivery.imageId}, enlarged`"
+        :style="peekStyle"
+      >
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, reactive } from 'vue'
 import { buildImageUrl } from '@/config'
 import { presentationFor, reasonTextFor } from '@/utils/deliveries'
 import { formatAbsoluteTime, formatDuration, formatRelativeTime } from '@/utils/time'
@@ -140,6 +162,65 @@ const sleepPhrase = computed(() => {
   const duration = formatDuration(props.delivery.requestedSleepSeconds)
   return duration === '' ? '' : `asked to sleep ${duration}`
 })
+
+/*
+ * Hover preview.
+ *
+ * PEEK_W and PEEK_H are the box the overlay is allowed to occupy, and the CSS
+ * holds the same two numbers. They are duplicated on purpose: the placement
+ * below has to know how big the thing is before it is drawn, and measuring it
+ * afterwards would mean placing it twice — once wrong, once corrected — which
+ * is visible as a jump. The width is the server's own thumbnail cap, so the
+ * picture is never scaled up past what was stored.
+ */
+const PEEK_W = 256
+const PEEK_H = 320
+const PEEK_GAP = 16
+
+const peek = reactive({ open: false, x: 0, y: 0 })
+
+const peekStyle = computed(() => ({ left: `${peek.x}px`, top: `${peek.y}px` }))
+
+/**
+ * Put the overlay beside the pointer, and on whichever side of it there is
+ * room for. The drawer this row lives in is pinned to the right-hand edge, so
+ * the pointer is always near it — placed only ever down-and-right, the preview
+ * would spend most of its life off the screen.
+ */
+function place(event: MouseEvent) {
+  const { clientX, clientY } = event
+  const room = { w: window.innerWidth, h: window.innerHeight }
+
+  peek.x = clientX + PEEK_GAP + PEEK_W > room.w
+    ? Math.max(PEEK_GAP, clientX - PEEK_GAP - PEEK_W)
+    : clientX + PEEK_GAP
+  peek.y = clientY + PEEK_GAP + PEEK_H > room.h
+    ? Math.max(PEEK_GAP, clientY - PEEK_GAP - PEEK_H)
+    : clientY + PEEK_GAP
+}
+
+function openPeek(event: MouseEvent) {
+  place(event)
+  peek.open = true
+  // A scroll moves the row out from under a pointer that never moved, so no
+  // mouseleave follows and the overlay would be left pointing at nothing.
+  // Capture, because the drawer scrolls its own panel rather than the window.
+  window.addEventListener('scroll', closePeek, true)
+}
+
+function movePeek(event: MouseEvent) {
+  if (peek.open) place(event)
+}
+
+function closePeek() {
+  peek.open = false
+  window.removeEventListener('scroll', closePeek, true)
+}
+
+// The listener outlives the component otherwise: a row unmounted while its
+// preview is open (the panel collapsing, the history refreshing) never sees a
+// mouseleave.
+onBeforeUnmount(closePeek)
 </script>
 
 <style scoped>
@@ -158,6 +239,26 @@ const sleepPhrase = computed(() => {
   object-fit: cover;
   border-radius: 3px;
   background: rgba(var(--v-theme-on-surface), 0.06);
+}
+
+/* The two sizes match PEEK_W and PEEK_H in the script, which needs them to
+   place the box before it is drawn. object-fit keeps a tall thumbnail whole
+   inside that box rather than cropping it — showing the whole picture is the
+   entire point of the preview. */
+.delivery-peek {
+  position: fixed;
+  z-index: 3000;
+  max-width: 256px;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 4px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.2);
+  background: rgb(var(--v-theme-surface));
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  /* Never take the pointer. The overlay follows the cursor, so a version that
+     could be hovered would sit under it, fire mouseleave on the thumbnail
+     behind it, and flicker itself in and out. */
+  pointer-events: none;
 }
 
 .delivery-thumb--placeholder {

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import type { Locator } from '@playwright/test'
 
 // These tests run against the actual dev/preview server (mock mode — no backend).
 // They verify the most important user-facing flows using public/mock-data/photos.ndjson.
@@ -155,5 +156,153 @@ test.describe('Tags', () => {
     // closes it on an outside click.
     await page.waitForTimeout(500)
     await expect(picker).toBeVisible()
+  })
+})
+
+/**
+ * Chrome animates keyboard scrolling, so scrollTop read straight after a
+ * keypress is a frame from the middle of the animation — and the next
+ * assertion then races the tail of the previous scroll rather than measuring
+ * its own. Wait for the number to stop moving before using it as a baseline.
+ */
+async function settledScrollTop(grid: Locator): Promise<number> {
+  let previous = Number.NaN
+  await expect
+    .poll(async () => {
+      const now = await grid.evaluate((el) => el.scrollTop)
+      const stable = now === previous
+      previous = now
+      return stable
+    })
+    .toBe(true)
+  return previous
+}
+
+test.describe('Keyboard', () => {
+  // The grid is the only scroller in the app: .photo-grid-container is 100vh
+  // with overflow:hidden, so the document itself never overflows and the
+  // browser has nothing of its own to move. jsdom cannot show any of this —
+  // it has no layout — so the actual fix is only verifiable here.
+  test('arrow keys and PageDown scroll the grid without a click first', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.locator('.photo-item').first()).toBeVisible()
+
+    const grid = page.locator('.photo-grid')
+    await expect(grid).toBeFocused()
+
+    const before = await settledScrollTop(grid)
+    await page.keyboard.press('PageDown')
+    await expect.poll(() => grid.evaluate((el) => el.scrollTop)).toBeGreaterThan(before)
+
+    const mid = await settledScrollTop(grid)
+    await page.keyboard.press('ArrowUp')
+    await expect.poll(() => grid.evaluate((el) => el.scrollTop)).toBeLessThan(mid)
+  })
+
+  test('the keyboard survives the virtualizer recycling the focused card', async ({ page }) => {
+    await page.goto('/')
+    const first = page.locator('.photo-item').first()
+    await expect(first).toBeVisible()
+
+    // Focus a card, then scroll far enough that its row is unmounted. Focus
+    // used to fall to <body> here and every key went dead.
+    await first.focus()
+    const grid = page.locator('.photo-grid')
+    await grid.evaluate((el) => el.scrollTo({ top: 6000, behavior: 'instant' }))
+
+    await expect(grid).toBeFocused()
+
+    const before = await settledScrollTop(grid)
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(() => grid.evaluate((el) => el.scrollTop)).toBeGreaterThan(before)
+  })
+
+  // The scrubber rail is focusable and runs its own arrow keys. The grid takes
+  // focus back only when focus went *nowhere* — handing it to the rail is
+  // somewhere, and stealing it there would make the rail's keys unreachable.
+  test('the scrubber keeps focus and its own keys once it is tabbed to', async ({ page }) => {
+    await page.goto('/')
+    const grid = page.locator('.photo-grid')
+    await expect(grid).toBeFocused()
+
+    const rail = page.locator('.timeline-scrubber')
+    await expect(rail).toBeVisible({ timeout: 15_000 })
+    await rail.focus()
+    await expect(rail).toBeFocused()
+
+    const before = await settledScrollTop(grid)
+    await page.keyboard.press('End')
+    await expect.poll(() => grid.evaluate((el) => el.scrollTop)).toBeGreaterThan(before)
+
+    // Still the rail's, after the grid's reclaim had its animation frame.
+    await expect(rail).toBeFocused()
+  })
+})
+
+test.describe('Escape', () => {
+  test('closes the tag picker without dropping the selection behind it', async ({ page }) => {
+    await page.goto('/')
+    await page.locator('.photo-item').first().click()
+    await expect(page.locator('.selection-toolbar')).toBeVisible()
+
+    await page.locator('#tag-filter-activator').click()
+    await expect(page.locator('.tag-picker')).toBeVisible()
+
+    await page.keyboard.press('Escape')
+
+    await expect(page.locator('.tag-picker')).not.toBeVisible()
+    // The picker was what Escape was aimed at; the selection is untouched.
+    await expect(page.locator('.selection-toolbar')).toBeVisible()
+
+    // A second Escape, with nothing on top, is the one that clears it.
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.selection-toolbar')).not.toBeVisible()
+  })
+
+  test('closes the per-photo tag sheet', async ({ page }) => {
+    await page.goto('/')
+    await page.locator('.tag-badge').first().click()
+    await expect(page.locator('.photo-tags-sheet')).toBeVisible()
+
+    await page.keyboard.press('Escape')
+
+    await expect(page.locator('.photo-tags-sheet')).not.toBeVisible()
+  })
+
+  test('closes the displays drawer and hands focus back to its trigger', async ({ page }) => {
+    await page.goto('/')
+    await page.locator('.device-drawer-trigger').click()
+
+    // Not toBeVisible: a closed temporary drawer stays in the DOM and is moved
+    // off screen with a transform, which still has a bounding box, so
+    // toBeVisible() passes either way. The --active class is the real state.
+    const drawer = page.locator('.device-drawer')
+    await expect(drawer).toHaveClass(/v-navigation-drawer--active/)
+    await expect(page.locator('.v-navigation-drawer__scrim')).toBeVisible()
+
+    // Focus something inside it, as tabbing in would: closing has to bring
+    // focus back out, or it is left on an element on its way off screen and
+    // the next Tab starts from nowhere.
+    await page.locator('.device-drawer-close').focus()
+
+    // VNavigationDrawer is not a VOverlay and ships no Escape handling of its
+    // own, so this did nothing at all before.
+    await page.keyboard.press('Escape')
+
+    await expect(drawer).not.toHaveClass(/v-navigation-drawer--active/)
+    await expect(page.locator('.v-navigation-drawer__scrim')).toHaveCount(0)
+    await expect(page.locator('.device-drawer-trigger')).toBeFocused()
+  })
+
+  test('typing in the tag search is not disturbed by the IME guard', async ({ page }) => {
+    await page.goto('/')
+    await page.locator('#tag-filter-activator').click()
+
+    const search = page.locator('.tag-picker-search input')
+    await search.fill('a')
+    await expect(search).toHaveValue('a')
+
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.tag-picker')).not.toBeVisible()
   })
 })

@@ -69,11 +69,17 @@ const stubs = {
   PhotoItem: { template: '<div class="photo-item-stub" />', props: ['photo'] },
 }
 
-function mountGrid(pinia: ReturnType<typeof createPinia>) {
+function mountGrid(pinia: ReturnType<typeof createPinia>, attach = false) {
   return mount(PhotoGrid, {
+    // Focus is a no-op on a detached element, so the keyboard tests mount
+    // into the real document.
+    ...(attach ? { attachTo: document.body } : {}),
     global: { plugins: [pinia], stubs },
   })
 }
+
+/** Let the handler's requestAnimationFrame callback run. */
+const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
 
 // ---------- tests ----------
 
@@ -170,5 +176,78 @@ describe('PhotoGrid', () => {
     expect(wrapper.text()).not.toContain('No photos in this catalog')
     expect(wrapper.find('.photo-grid').exists()).toBe(true)
     wrapper.unmount()
+  })
+
+  // ---------- keyboard ----------
+  //
+  // The grid is the app's only scroller and the document never overflows, so
+  // nothing responds to Arrow / PageDown / Space unless this element holds
+  // focus. See the tabindex comment in PhotoGrid.vue.
+  describe('keyboard focus', () => {
+    it('makes the scroll container focusable', () => {
+      const wrapper = mountGrid(pinia)
+
+      expect(wrapper.find('.photo-grid').attributes('tabindex')).toBe('0')
+      wrapper.unmount()
+    })
+
+    it('takes focus on mount, so the arrow keys scroll without a click first', () => {
+      const wrapper = mountGrid(pinia, true)
+
+      expect(document.activeElement).toBe(wrapper.find('.photo-grid').element)
+      wrapper.unmount()
+    })
+
+    it('reclaims focus when the virtualizer unmounts the focused card', async () => {
+      const wrapper = mountGrid(pinia, true)
+      const grid = wrapper.find('.photo-grid').element as HTMLElement
+
+      // What a recycled row looks like: the focused element leaves the DOM and
+      // focus lands on <body>, which scrolls nothing.
+      grid.blur()
+      expect(document.activeElement).toBe(document.body)
+
+      grid.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
+      await nextFrame()
+
+      expect(document.activeElement).toBe(grid)
+      wrapper.unmount()
+    })
+
+    it('leaves focus alone when it moved somewhere else', async () => {
+      const wrapper = mountGrid(pinia, true)
+      const grid = wrapper.find('.photo-grid').element as HTMLElement
+      const elsewhere = document.createElement('button')
+      document.body.appendChild(elsewhere)
+
+      elsewhere.focus()
+      grid.dispatchEvent(
+        new FocusEvent('focusout', { bubbles: true, relatedTarget: elsewhere }),
+      )
+      await nextFrame()
+
+      expect(document.activeElement).toBe(elsewhere)
+
+      elsewhere.remove()
+      wrapper.unmount()
+    })
+
+    it('does not steal focus from an open overlay', async () => {
+      const wrapper = mountGrid(pinia, true)
+      const grid = wrapper.find('.photo-grid').element as HTMLElement
+
+      const overlay = document.createElement('div')
+      overlay.className = 'v-overlay v-overlay--active'
+      document.body.appendChild(overlay)
+
+      grid.blur()
+      grid.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
+      await nextFrame()
+
+      expect(document.activeElement).toBe(document.body)
+
+      overlay.remove()
+      wrapper.unmount()
+    })
   })
 })

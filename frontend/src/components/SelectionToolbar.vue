@@ -58,20 +58,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed } from 'vue'
 import { useSelectionStore } from '@/stores/selection'
 
+// Escape still exits selection mode, but it is resolved in App.vue along with
+// everything else Escape can mean. Handled here, it fired even when the tag
+// picker or the displays drawer was the thing on screen, and dismissing those
+// silently wiped the selection underneath.
 const selectionStore = useSelectionStore()
-
-// Esc anywhere exits selection mode.
-const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && selectionStore.isSelectionMode) {
-    selectionStore.clearSelection()
-  }
-}
-
-onMounted(() => window.addEventListener('keydown', handleKeydown))
-onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 
 const isSelectionMode = computed(() => selectionStore.isSelectionMode)
 const selectedCount = computed(() => selectionStore.selectedCount)

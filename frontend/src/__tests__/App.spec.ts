@@ -219,4 +219,89 @@ describe('App', () => {
     expect(wrapper.text()).toContain('1 selected')
     wrapper.unmount()
   })
+
+  // ---------- Escape ----------
+  //
+  // One handler resolves Escape for the whole app, in priority order:
+  // an open Vuetify overlay wins, then the displays drawer, then the
+  // selection. See handleEscape in App.vue.
+  describe('Escape', () => {
+    const pressEscape = (init: KeyboardEventInit = {}) =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', ...init }))
+
+    it('clears the selection when nothing is open on top of the grid', async () => {
+      const wrapper = mountApp(pinia)
+      const selectionStore = useSelectionStore(pinia)
+      selectionStore.togglePhotoSelection(1)
+      await wrapper.vm.$nextTick()
+
+      pressEscape()
+      await wrapper.vm.$nextTick()
+
+      expect(selectionStore.isSelectionMode).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('leaves the selection alone while a Vuetify overlay is up', async () => {
+      const wrapper = mountApp(pinia)
+      const selectionStore = useSelectionStore(pinia)
+      selectionStore.togglePhotoSelection(1)
+      await wrapper.vm.$nextTick()
+
+      // What an open tag picker / tag sheet / select menu looks like in the
+      // DOM. Vuetify closes it from its own listener; we must not also act.
+      const overlay = document.createElement('div')
+      overlay.className = 'v-overlay v-overlay--active'
+      document.body.appendChild(overlay)
+
+      pressEscape()
+      await wrapper.vm.$nextTick()
+
+      expect(selectionStore.isSelectionMode).toBe(true)
+
+      overlay.remove()
+      wrapper.unmount()
+    })
+
+    it('closes the displays drawer rather than clearing the selection', async () => {
+      const wrapper = mountApp(pinia)
+      const selectionStore = useSelectionStore(pinia)
+      selectionStore.togglePhotoSelection(1)
+      await wrapper.find('.device-drawer-trigger').trigger('click')
+
+      expect(wrapper.find('.device-drawer-stub--open').exists()).toBe(true)
+
+      pressEscape()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.device-drawer-stub--open').exists()).toBe(false)
+      expect(selectionStore.isSelectionMode).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('ignores Escape sent while an IME is composing', async () => {
+      const wrapper = mountApp(pinia)
+      const selectionStore = useSelectionStore(pinia)
+      selectionStore.togglePhotoSelection(1)
+      await wrapper.vm.$nextTick()
+
+      pressEscape({ isComposing: true })
+      await wrapper.vm.$nextTick()
+
+      expect(selectionStore.isSelectionMode).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('stops listening once unmounted', async () => {
+      const wrapper = mountApp(pinia)
+      const selectionStore = useSelectionStore(pinia)
+      selectionStore.togglePhotoSelection(1)
+      await wrapper.vm.$nextTick()
+      wrapper.unmount()
+
+      pressEscape()
+
+      expect(selectionStore.isSelectionMode).toBe(true)
+    })
+  })
 })

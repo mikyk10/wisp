@@ -19,6 +19,7 @@
       <v-spacer />
 
       <v-btn
+        ref="deviceTrigger"
         class="device-drawer-trigger mr-2"
         icon="mdi-image-frame"
         variant="text"
@@ -138,7 +139,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { useCatalogsStore } from '@/stores/catalogs'
 import { usePhotosStore } from '@/stores/photos'
 import { useSelectionStore } from '@/stores/selection'
@@ -157,6 +159,7 @@ const selectionStore = useSelectionStore()
 
 /** Right-hand device drawer; see DeviceDrawer.vue for why it is `temporary`. */
 const deviceDrawerOpen = ref(false)
+const deviceTrigger = ref<ComponentPublicInstance | null>(null)
 
 const catalogs = computed(() => catalogsStore.catalogs)
 const catalogsError = computed(() => catalogsStore.error)
@@ -211,8 +214,62 @@ const tagSheetOpen = computed({
   },
 })
 
+/**
+ * Escape, resolved in one place.
+ *
+ * It used to be handled in SelectionToolbar with a plain window listener that
+ * looked only at the selection, which made Escape do the wrong thing wherever
+ * something was open on top of the grid: dismissing the tag picker also wiped
+ * the photo selection behind it, and the displays drawer did not close at all.
+ *
+ * Registered in the *capture* phase. VOverlay attaches its own window listener
+ * per open overlay, and in the bubble phase Vuetify would close the picker
+ * first — this handler would then see nothing open and fall through to the
+ * selection, which is the bug. Capture runs before any of that, so the
+ * priority below is the one that decides.
+ */
+function handleEscape(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return
+  // Escape while an IME is converting cancels the conversion — it belongs to
+  // the input, not to us. keyCode 229 covers browsers that report the
+  // composition state that way instead.
+  if (event.isComposing || event.keyCode === 229) return
+
+  // 1. Anything Vuetify put up — the tag picker, the per-photo tag sheet, the
+  //    catalogue select's menu — closes itself, topmost first, which is what
+  //    we want. Yield rather than double-handle it.
+  if (document.querySelector('.v-overlay--active')) return
+
+  // 2. VNavigationDrawer is not a VOverlay and ships no Escape handling, so
+  //    the displays drawer (and the delivery history inside it) had no way to
+  //    be dismissed from the keyboard.
+  if (deviceDrawerOpen.value) {
+    deviceDrawerOpen.value = false
+    // Vuetify returns focus to the activator when an overlay closes; a drawer
+    // has no activator to return it to, so focus would be left on an element
+    // that is on its way out of the DOM.
+    nextTick(() => {
+      const el = deviceTrigger.value?.$el
+      if (el instanceof HTMLElement) el.focus()
+    })
+    event.preventDefault()
+    return
+  }
+
+  // 3. Nothing on top: Escape means "never mind" about the selection.
+  if (selectionStore.isSelectionMode) {
+    selectionStore.clearSelection()
+    event.preventDefault()
+  }
+}
+
 onMounted(() => {
   catalogsStore.initCatalogs()
+  window.addEventListener('keydown', handleEscape, true)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleEscape, true)
 })
 </script>
 

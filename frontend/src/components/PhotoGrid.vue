@@ -65,13 +65,24 @@
       fluid
       class="photo-grid-content"
     >
+      <!-- tabindex: this div is the only thing in the app that scrolls. The
+           page itself is pinned — html/body are overflow:hidden and v-main
+           hands out the viewport as a flex column — so the browser's own
+           scroller has nothing to move; without a tabindex this element could
+           not take focus either, which left Arrow / PageUp / PageDown / Space
+           / Home / End doing nothing at all until a photo happened to be
+           clicked. With the native scrollbar hidden in favour of the scrubber
+           rail there is no drag target here either, so the keyboard is one of
+           only three ways to move: wheel, scrubber, keys. -->
       <div
         ref="scrollParentRef"
         class="photo-grid"
         role="listbox"
+        tabindex="0"
         aria-label="Photos"
         aria-multiselectable="true"
         @scroll="handleScroll"
+        @focusout="handleFocusOut"
       >
         <div
           class="photo-grid-spacer"
@@ -233,6 +244,32 @@ const handleScroll = () => {
   }, 150)
 }
 
+/**
+ * Keep the keyboard alive when the virtualizer unmounts the focused card.
+ *
+ * Scrolling recycles rows, so the PhotoItem holding focus is routinely removed
+ * from the DOM under the reader. Focus then falls to <body>, which scrolls
+ * nothing, and every key goes dead again until something is clicked — the
+ * "it worked a second ago" half of the problem. relatedTarget === null is
+ * exactly that case: focus went nowhere rather than somewhere else.
+ *
+ * Taking it back means the grid holds focus whenever nothing else claims it,
+ * which for a single-view gallery is the behaviour you want.
+ */
+const handleFocusOut = (event: FocusEvent) => {
+  if (event.relatedTarget !== null) return
+
+  // A frame later, because the element focus is moving *to* is not always
+  // known at focusout time (Vuetify moves focus into an overlay on open).
+  requestAnimationFrame(() => {
+    // An open menu / sheet / dialog owns focus while it is up; Vuetify hands
+    // it back to the activator when it closes.
+    if (document.querySelector('.v-overlay--active')) return
+    if (document.activeElement !== document.body) return
+    scrollParentRef.value?.focus({ preventScroll: true })
+  })
+}
+
 // Scrubber drags land here as a fraction of the whole list. Written straight
 // to scrollTop rather than through scrollToIndex: a drag names a position,
 // not a row, and snapping each step to a row boundary would make the grid
@@ -260,6 +297,9 @@ onMounted(() => {
   updateColumns()
   window.addEventListener('resize', updateColumns)
   reportViewport()
+  // Arrow keys have to work on arrival, not only after the first click.
+  // preventScroll: taking focus must not itself move the grid.
+  scrollParentRef.value?.focus({ preventScroll: true })
 })
 
 onUnmounted(() => {
@@ -312,6 +352,19 @@ onUnmounted(() => {
 
 .photo-grid::-webkit-scrollbar {
   display: none;
+}
+
+/* No focus ring, deliberately. This container is the app's ambient focus: it
+   takes focus on mount and takes it back whenever focus would otherwise fall
+   to <body>, so it holds focus nearly always — and Chrome matches
+   :focus-visible on the programmatic focus, which put a full-height line down
+   the edge of the grid from the moment the page loaded. An indicator that is
+   always on distinguishes nothing. What a reader needs to see is *which photo*
+   they are on, and that belongs on the cards, which keep their own
+   :focus-visible ring; the scrubber rail keeps its own too. */
+.photo-grid:focus,
+.photo-grid:focus-visible {
+  outline: none;
 }
 
 .photo-grid-spacer {

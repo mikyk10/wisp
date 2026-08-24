@@ -78,7 +78,9 @@ describe('SelectionToolbar', () => {
     wrapper.unmount()
   })
 
-  it('clears the selection when Escape is pressed', async () => {
+  // Escape lives in App.vue now (see its 'Escape' suite): handled here it
+  // fired underneath the tag picker and the displays drawer too.
+  it('does not listen for Escape itself', async () => {
     const wrapper = mountToolbar(pinia)
     const selectionStore = useSelectionStore(pinia)
     selectionStore.togglePhotoSelection(1)
@@ -87,19 +89,7 @@ describe('SelectionToolbar', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     await wrapper.vm.$nextTick()
 
-    expect(selectionStore.isSelectionMode).toBe(false)
-    expect(wrapper.find('.selection-toolbar').exists()).toBe(false)
-    wrapper.unmount()
-  })
-
-  it('ignores Escape when nothing is selected', async () => {
-    const wrapper = mountToolbar(pinia)
-    const selectionStore = useSelectionStore(pinia)
-    const clearSpy = vi.spyOn(selectionStore, 'clearSelection')
-
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-
-    expect(clearSpy).not.toHaveBeenCalled()
+    expect(selectionStore.isSelectionMode).toBe(true)
     wrapper.unmount()
   })
 

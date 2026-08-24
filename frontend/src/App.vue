@@ -241,8 +241,24 @@ html,
 body {
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
+  /* The page itself never scrolls: every scrolling surface in the app is an
+     inner container with its own overflow, and the only position indicator is
+     the scrubber. A document scrollbar here means the height maths below has
+     broken, and hiding the symptom beats shipping a second, slightly-off
+     scrollbar — but the flex column below is the actual fix. */
+  overflow: hidden;
   background: var(--wisp-bg);
+}
+
+/* One viewport, distributed: v-main pads itself below the app bar, the filter
+   bar takes its own height, the grid gets the rest. Nothing states "100vh
+   minus the app bar" for itself any more — the grid doing exactly that while
+   the filter bar sat above it is what made the document taller than the
+   window by one filter bar. */
+.v-main {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .fancy-app-bar {
@@ -250,7 +266,7 @@ body {
 }
 
 .app-error {
-  height: calc(100vh - var(--v-layout-top, 0px));
+  flex: 1 1 auto;
   padding: 24px;
 }
 

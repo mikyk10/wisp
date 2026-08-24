@@ -277,7 +277,11 @@ onUnmounted(() => {
 <style scoped>
 .photo-grid-container {
   position: relative;
-  height: calc(100vh - var(--v-layout-top, 0px));
+  /* Fill whatever v-main's column leaves after the filter bar — claiming the
+     viewport height here while the filter bar sat above pushed the document
+     one bar taller than the window. */
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -287,7 +291,8 @@ onUnmounted(() => {
 
 .photo-grid-content {
   max-width: none;
-  height: calc(100vh - var(--v-layout-top, 0px));
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 0;

@@ -147,6 +147,77 @@ describe('TagPicker', () => {
     wrapper.unmount()
   })
 
+  describe('long tag lists', () => {
+    // Production carries 1,255 tags in one catalogue. Drawing them all took
+    // 1,443ms from the click on a phone-class CPU, against ~500ms for a
+    // hundred — almost all of it wrapping layout.
+    const many = Array.from({ length: 300 }, (_, i) => ({
+      name: `tag${String(i).padStart(3, '0')}`,
+      count: 300 - i,
+    }))
+
+    it('draws only the most used, not the whole list', async () => {
+      getCatalogTags.mockResolvedValue(many)
+
+      const wrapper = await openPicker()
+
+      expect(listChips()).toHaveLength(100)
+      // Ordered by use, so the cap keeps the tags worth reaching for.
+      expect(listChips()[0].textContent).toContain('tag000')
+      wrapper.unmount()
+    })
+
+    it('says how much it is withholding', async () => {
+      // Silently drawing a hundred of three hundred would leave a reader
+      // searching for a tag that is there and concluding it is not.
+      getCatalogTags.mockResolvedValue(many)
+
+      const wrapper = await openPicker()
+
+      expect(document.body.textContent).toContain('100 most used of 300')
+      wrapper.unmount()
+    })
+
+    it('still reaches a tag past the cap by searching', async () => {
+      // The tail is not lost, it is searched for: matching runs over every
+      // tag and only the drawing is capped.
+      getCatalogTags.mockResolvedValue(many)
+      const wrapper = await openPicker()
+
+      const input = document.querySelector('.tag-picker-search input') as HTMLInputElement
+      input.value = 'tag287'
+      input.dispatchEvent(new Event('input'))
+      await wrapper.vm.$nextTick()
+
+      const list = document.querySelector('.tag-picker-section--list')?.textContent ?? ''
+      expect(list).toContain('tag287')
+      wrapper.unmount()
+    })
+
+    it('drops the notice once the search fits', async () => {
+      getCatalogTags.mockResolvedValue(many)
+      const wrapper = await openPicker()
+
+      const input = document.querySelector('.tag-picker-search input') as HTMLInputElement
+      input.value = 'tag29'
+      input.dispatchEvent(new Event('input'))
+      await wrapper.vm.$nextTick()
+
+      expect(document.body.textContent).not.toContain('most used of')
+      wrapper.unmount()
+    })
+
+    it('leaves a short list alone', async () => {
+      getCatalogTags.mockResolvedValue(many.slice(0, 40))
+
+      const wrapper = await openPicker()
+
+      expect(listChips()).toHaveLength(40)
+      expect(document.body.textContent).not.toContain('most used of')
+      wrapper.unmount()
+    })
+  })
+
   it('says so when the catalogue has no tags at all', async () => {
     getCatalogTags.mockResolvedValue([])
 

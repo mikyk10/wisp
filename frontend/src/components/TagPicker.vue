@@ -110,6 +110,16 @@
             <span class="tag-picker-count">{{ tag.count }}</span>
           </v-chip>
         </div>
+
+        <!-- Silently drawing a hundred of twelve hundred would leave a reader
+             searching the list for a tag that is there, giving up, and
+             concluding the catalogue does not have it. -->
+        <div
+          v-if="withheld > 0"
+          class="tag-picker-more"
+        >
+          Showing the {{ visible.length }} most used of {{ matching.length }} — search to narrow
+        </div>
       </div>
     </v-card>
   </component>
@@ -167,11 +177,36 @@ const surfaceProps = computed(() =>
     : { target: props.anchor, closeOnContentClick: false, location: 'bottom end' as const },
 )
 
-const visible = computed(() => {
+/*
+ * How many tags are drawn at once.
+ *
+ * Chosen from measurement rather than taste. On a CPU throttled to 6x — a
+ * mid-range phone — drawing this catalogue's 1,255 tags took 1,443ms from the
+ * click, against 514ms for 200 and 488ms for 50. Almost all of the difference
+ * is wrapping layout, which grows faster than the count: the step from 50 to
+ * 200 costs 26ms, the step from 200 to 1,255 costs 929ms. A hundred sits well
+ * inside the flat part, where the cost is the overlay opening rather than the
+ * tags.
+ *
+ * The list is ordered by use, so this is the hundred most used. The tail is
+ * not lost, it is searched for: matching runs over every tag and only the
+ * drawing is capped. It is not much of a loss either — a third of this
+ * catalogue's tags are on a single photograph each, which is not something
+ * anyone finds by scrolling.
+ */
+const RENDER_LIMIT = 100
+
+/** Every tag matching the search, however many that is. */
+const matching = computed(() => {
   const q = (query.value ?? '').trim().toLowerCase()
   if (q === '') return tags.value
   return tags.value.filter((t) => t.name.toLowerCase().includes(q))
 })
+
+const visible = computed(() => matching.value.slice(0, RENDER_LIMIT))
+
+/** How many matches are being withheld, so the reader can be told. */
+const withheld = computed(() => matching.value.length - visible.value.length)
 
 function isSelected(name: string): boolean {
   return props.modelValue.includes(name)
@@ -290,6 +325,12 @@ watch(
   margin-left: 6px;
   font-variant-numeric: tabular-nums;
   opacity: 0.6;
+}
+
+.tag-picker-more {
+  padding-top: 10px;
+  font-size: 0.75rem;
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
 .tag-picker-status {

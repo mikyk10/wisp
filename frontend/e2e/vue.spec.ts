@@ -11,6 +11,30 @@ test.describe('App startup', () => {
     await expect(page.getByText('WiSP')).toBeVisible()
   })
 
+  test('keeps the whole wordmark on a phone', async ({ page }) => {
+    // VAppBarTitle takes whatever width the controls leave it and hides the
+    // overflow, so a control added to the bar cuts the wordmark mid-word
+    // instead of anything visibly breaking. It read "WI" at 390px once.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await expect(page.locator('.app-title-text')).toBeVisible()
+
+    const cut = await page.evaluate(() => {
+      const title = document.querySelector('.v-app-bar-title')?.getBoundingClientRect()
+      const text = document.querySelector('.app-title-text')?.getBoundingClientRect()
+      if (!title || !text) return true
+      // Half a pixel of slack for sub-pixel layout.
+      return text.right > title.right + 0.5 || text.left < title.left - 0.5
+    })
+    expect(cut, 'the wordmark is being clipped by the title box').toBe(false)
+
+    // And the bar must not have solved it by pushing the page sideways.
+    const scrolls = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+    )
+    expect(scrolls, 'the page scrolls horizontally').toBe(false)
+  })
+
   test('shows the catalog selector in the app bar', async ({ page }) => {
     await page.goto('/')
 

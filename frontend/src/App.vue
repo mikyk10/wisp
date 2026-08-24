@@ -58,7 +58,7 @@
           density="compact"
           hide-details
           variant="outlined"
-          class="mr-3"
+          class="catalog-select mr-3"
           style="max-width: 150px"
           color="primary"
           item-color="primary"
@@ -270,6 +270,18 @@ body {
   text-transform: uppercase;
   font-size: 1rem;
   color: rgba(var(--v-theme-on-surface), 0.9);
+  white-space: nowrap;
+}
+
+/* The title is the one thing in this bar that must not be squeezed.
+   VAppBarTitle takes the space the controls leave it and hides the overflow,
+   so on a 390px screen the wordmark was being cut mid-word — the logo, the
+   gap and "WiSP" need 97px and the box had shrunk to 70. Sizing to content
+   makes the select give way instead, which it can: it is a fixed-width
+   control with room to spare. */
+.v-app-bar-title {
+  flex: 0 0 auto;
+  margin-inline-start: 0;
 }
 
 /* Use !important to prioritise Poppins regardless of bundle order */
@@ -308,9 +320,19 @@ body {
 
 /* Responsive */
 @media (max-width: 600px) {
-  .app-title {
-    font-size: 0.8rem;
+  /* This rule named .app-title, which nothing carries — the element is
+     .app-title-text — so it had never applied. The wordmark is set in
+     letter-spacing that costs three pixels a character, which is worth
+     giving back on a narrow screen. */
+  .app-title-text {
+    font-size: 0.85rem;
     letter-spacing: 2px;
+  }
+
+  /* The catalogue names are short; 150px was never needed on a phone, and
+     the width is better spent on the title beside it. */
+  .catalog-select {
+    max-width: 120px;
   }
 }
 </style>

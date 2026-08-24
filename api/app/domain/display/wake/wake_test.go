@@ -27,7 +27,7 @@ func TestPlan_SleepsUntilTheNextScheduledWake(t *testing.T) {
 		want int
 	}{
 		{"mid-morning, next tick is ten minutes off", "09:00:00", 600},
-		{"part-way through, only the remainder is left", "09:07:30", 150},
+		{"part-way through, only the remainder is left", "09:05:00", 300},
 		{"a second past a tick still waits for the next", "09:00:01", 599},
 		// The last wake of the day is 22:50; from there the schedule does not
 		// call again until 06:00, so the panel simply stays away all night.
@@ -96,8 +96,39 @@ func TestPlan_StaysWithinBounds(t *testing.T) {
 		assert.Equal(t, wake.MaxSeconds, plan.SleepSeconds(at("09:00:00")))
 	})
 
-	t.Run("a minute-by-minute schedule is held to the floor", func(t *testing.T) {
+	t.Run("a minute-by-minute schedule cannot outrun the grace window", func(t *testing.T) {
+		// Every minute is inside Grace by definition, so the ticks in the
+		// window are absorbed and the panel lands just beyond it. A schedule
+		// this dense is misconfiguration for e-paper either way; the point is
+		// that it degrades to a few minutes, not to a busy loop.
 		plan := wake.Plan{Schedule: []string{"* * * * *"}, Fallback: 300}
-		assert.Equal(t, wake.MinSeconds, plan.SleepSeconds(at("09:00:30")))
+		assert.Equal(t, 210, plan.SleepSeconds(at("09:00:30")))
+	})
+}
+
+// TestPlan_EarlyArrivalCountsAsTheScheduledWake is the production story that
+// created Grace. A panel times its sleep on an RC oscillator: told at 17:00 to
+// come back at 07:00, it arrived at 06:59, was told to sleep the minimum, and
+// refreshed again at 07:01 — two full e-paper refreshes, the first picture
+// thrown away after two minutes. Arriving within Grace of a scheduled moment
+// must count as attending it.
+func TestPlan_EarlyArrivalCountsAsTheScheduledWake(t *testing.T) {
+	plan := wake.Plan{Schedule: []string{"0 7 * * *", "0 17 * * *"}, Fallback: 300}
+
+	t.Run("a minute early is this wake, and sleeps to the next one", func(t *testing.T) {
+		// 06:59 → 17:00, not 06:59 → 07:00 → 07:01.
+		assert.Equal(t, 10*60*60+60, plan.SleepSeconds(at("06:59:00")))
+	})
+
+	t.Run("well ahead of the window it is an unrelated wake", func(t *testing.T) {
+		// A manual wake at 06:56 is not drift; the panel is still sent back
+		// for the 07:00 it has not attended.
+		assert.Equal(t, 4*60, plan.SleepSeconds(at("06:56:00")))
+	})
+
+	t.Run("only the imminent tick is absorbed, never the one after", func(t *testing.T) {
+		dense := wake.Plan{Schedule: []string{"*/10 * * * *"}, Fallback: 300}
+		// 08:59 attends the 09:00 tick; the 09:10 one is honoured in full.
+		assert.Equal(t, 11*60, dense.SleepSeconds(at("08:59:00")))
 	})
 }

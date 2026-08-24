@@ -30,6 +30,25 @@ const (
 	// to sleep for years, and a device asleep is a device that cannot be told
 	// anything new.
 	MaxSeconds = 24 * 60 * 60
+
+	// Grace is how close to a scheduled moment a panel may arrive early and
+	// still count as that moment's wake.
+	//
+	// A panel times its own sleep on an RC oscillator, and over the hours a
+	// schedule puts between wakes that clock is honestly wrong — a tenth of a
+	// percent across fourteen hours is most of a minute, either direction. A
+	// panel that arrives at 06:59 for a 07:00 schedule is not an unrelated
+	// visitor to be sent back for the real thing: without this, it was told
+	// to sleep the minimum and refresh again at 07:01 — two full e-paper
+	// refreshes back to back, and the first picture thrown away after living
+	// for two minutes.
+	//
+	// Three minutes covers several times the drift observed in practice while
+	// staying well under any sensible gap between scheduled moments. A tick
+	// closer to the previous one than this is absorbed by design — arriving
+	// early for it IS attending it — but only ever the one tick: the next
+	// wake is computed from the arrival, not from the absorbed moment.
+	Grace = 3 * time.Minute
 )
 
 // Plan is how a single display decides when to come back.
@@ -67,12 +86,16 @@ func (p Plan) SleepSeconds(now time.Time) int {
 // with a bad one means something changed underneath, and the remaining
 // expressions still describe what the panel is for.
 func (p Plan) nextWake(now time.Time) (time.Time, bool) {
+	// Anything scheduled within Grace of now is this wake, already happening —
+	// see Grace. Looking for the next moment starts beyond it.
+	horizon := now.Add(Grace)
+
 	var earliest time.Time
 	for _, expr := range p.Schedule {
 		// gronx works to a one-minute resolution, so ask from the start of the
 		// current minute and exclude it: asking from a moment part-way through
 		// would otherwise skip a match in the minute we are already in.
-		next, err := gronx.NextTickAfter(expr, now.Truncate(time.Minute), false)
+		next, err := gronx.NextTickAfter(expr, horizon.Truncate(time.Minute), false)
 		if err != nil {
 			continue
 		}

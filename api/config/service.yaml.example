@@ -150,6 +150,12 @@ displays:
     # Expressions are read in the server's local time, so set TZ on the
     # container. Sleeps are held to between 60 seconds and 24 hours.
     #
+    # A panel timing a long sleep on its own clock can arrive a minute or two
+    # early; arriving within three minutes of a scheduled moment counts as
+    # that moment's wake, so it is not refreshed twice back to back. Keep
+    # scheduled moments more than three minutes apart — a tick closer than
+    # that to the previous one is absorbed by the same rule.
+    #
     # wake_schedule:
     #   - "*/30 7-16 * * *"   # every half hour through the day
     #   - "*/5 17-21 * * *"   # every five minutes through the evening

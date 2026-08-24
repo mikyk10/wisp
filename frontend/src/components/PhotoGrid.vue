@@ -123,6 +123,7 @@ import {
   MOBILE_BREAKPOINT,
   TIMELINE_WIDTH,
 } from '@/constants'
+import { computeGridLayout } from '@/utils/gridLayout'
 import type { Photo } from '@/types'
 import PhotoItem from './PhotoItem.vue'
 
@@ -142,10 +143,18 @@ const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`)
 
 const updateColumns = () => {
   const isMobile = mobileQuery.matches
-  itemSize.value = isMobile ? GRID_ITEM_SIZE.mobile : GRID_ITEM_SIZE.desktop
   const timelineWidth = isMobile ? TIMELINE_WIDTH.mobile : TIMELINE_WIDTH.desktop
-  const available = window.innerWidth - timelineWidth - GRID_HORIZONTAL_PADDING
-  columns.value = Math.max(1, Math.floor(available / itemSize.value))
+  // The layout viewport, deliberately not window.innerWidth: on iOS,
+  // innerWidth follows the pinch zoom, and a pinch is a magnifying glass,
+  // not a resize — reflowing on it collapsed the grid to one column and
+  // pinching back out did not reliably deliver the resize to undo it.
+  const layout = computeGridLayout(
+    document.documentElement.clientWidth,
+    isMobile ? GRID_ITEM_SIZE.mobile : GRID_ITEM_SIZE.desktop,
+    timelineWidth + GRID_HORIZONTAL_PADDING,
+  )
+  columns.value = layout.columns
+  itemSize.value = layout.itemSize
 }
 
 // The grid virtualizes whole rows; each row holds `columns` photos.

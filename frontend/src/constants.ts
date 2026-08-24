@@ -13,11 +13,21 @@ export const MOBILE_BREAKPOINT = 768
 /** Width (px) of the fixed timeline sidebar. */
 export const TIMELINE_WIDTH = { desktop: 120, mobile: 80 } as const
 
-/** Size (px) of one square grid cell. */
-export const GRID_ITEM_SIZE = { desktop: 256, mobile: 130 } as const
+/**
+ * Target (minimum) size (px) of one square grid cell; the actual cell
+ * stretches to fill the row (see utils/gridLayout.ts). The mobile value is
+ * pinned by a test: it is the largest target that still yields three columns
+ * on a 390px phone (iPhone 13) after the timeline's width and the padding
+ * are taken out.
+ */
+export const GRID_ITEM_SIZE = { desktop: 256, mobile: 100 } as const
 
-/** Horizontal padding (px) reserved around the grid when computing columns. */
-export const GRID_HORIZONTAL_PADDING = 32
+/**
+ * Horizontal padding (px) reserved beside the grid when computing columns.
+ * The scrubber's width is accounted for separately; what remains is the
+ * cells' own 2px padding and a little breathing room.
+ */
+export const GRID_HORIZONTAL_PADDING = 8
 
 /** Number of distinct placeholder images under public/mock-data/images/. */
 export const MOCK_IMAGE_COUNT = 12

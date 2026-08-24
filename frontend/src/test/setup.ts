@@ -45,3 +45,12 @@ if (!window.visualViewport) {
     },
   })
 }
+
+// jsdom does no layout, so Element.clientWidth is always 0. The photo grid
+// reads its width from documentElement.clientWidth — the layout viewport,
+// which unlike window.innerWidth does not follow a pinch zoom — and in a
+// real, un-zoomed browser the two coincide. Make them coincide here too.
+Object.defineProperty(document.documentElement, 'clientWidth', {
+  configurable: true,
+  get: () => window.innerWidth,
+})

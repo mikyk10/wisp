@@ -120,8 +120,8 @@ describe('PhotoGrid', () => {
   })
 
   it('a store scroll request scrolls the virtualizer to the target row', async () => {
-    // jsdom innerWidth is 1024: desktop layout → 3 columns of 256px
-    // (1024 - 120 timeline - 32 padding = 872; floor(872 / 256) = 3).
+    // jsdom innerWidth is 1024: desktop layout → 3 columns
+    // (1024 - 120 timeline - 8 padding = 896; floor(896 / 256) = 3).
     const photosStore = usePhotosStore(pinia)
     const wrapper = mountGrid(pinia)
     await wrapper.vm.$nextTick()

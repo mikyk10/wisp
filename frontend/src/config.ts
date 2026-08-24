@@ -28,7 +28,14 @@ export const isApiMode = (): boolean => API_BASE_URL.trim() !== ''
  */
 export const API_PATHS = {
   catalogs: (): string => 'api/catalogs',
-  catalogImages: (catalogKey: string): string => `api/catalog/${catalogKey}/images`,
+  catalogImages: (catalogKey: string, tags: string[] = []): string => {
+    const path = `api/catalog/${catalogKey}/images`
+    // Comma-separated, matching the server's own reading of the parameter. An
+    // empty selection sends no parameter at all rather than `?tags=`, so that
+    // "I cleared my filters" cannot be mistaken for a filter.
+    return tags.length > 0 ? `${path}?tags=${encodeURIComponent(tags.join(','))}` : path
+  },
+  catalogTags: (catalogKey: string): string => `api/catalog/${catalogKey}/tags`,
   catalogToggleVisibility: (): string => 'api/catalog/selected/_toggle-visibility',
   devices: (): string => 'api/devices',
   deviceDeliveries: (displayKey: string): string => `api/device/${displayKey}/deliveries`,

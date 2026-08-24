@@ -31,10 +31,10 @@ func setupScanUseCaseWithConfig(t *testing.T, svc *config.ServiceConfig) (usecas
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	conn.AutoMigrate(&model.Image{}) //nolint:errcheck
+	conn.AutoMigrate(&model.Image{}, &model.Tag{}, &model.ImageTag{}) //nolint:errcheck
 
 	repo := infraRepo.NewImageRepositoryImpl(conn)
-	return usecase.NewCatalogUseCase(&config.GlobalConfig{}, svc, repo, nil), repo
+	return usecase.NewCatalogUseCase(&config.GlobalConfig{}, svc, repo, nil, infraRepo.NewTagRepositoryImpl(conn)), repo
 }
 
 // setupScanUseCase is a convenience helper for single-catalog scenarios.
@@ -71,7 +71,7 @@ func setupCatalogUseCase(t *testing.T) usecase.CatalogUsecase {
 	if err != nil {
 		t.Fatalf("failed to create in-memory DB: %v", err)
 	}
-	conn.AutoMigrate(&model.Image{}) //nolint:errcheck
+	conn.AutoMigrate(&model.Image{}, &model.Tag{}, &model.ImageTag{}) //nolint:errcheck
 
 	repo := infraRepo.NewImageRepositoryImpl(conn)
 
@@ -100,7 +100,7 @@ func setupCatalogUseCase(t *testing.T) usecase.CatalogUsecase {
 		},
 	}
 
-	return usecase.NewCatalogUseCase(&config.GlobalConfig{}, svc, repo, nil)
+	return usecase.NewCatalogUseCase(&config.GlobalConfig{}, svc, repo, nil, infraRepo.NewTagRepositoryImpl(conn))
 }
 
 // Pick() に存在しないディスプレイキーを渡した場合、error を返すこと。
@@ -129,7 +129,7 @@ func TestScan_IndexesNewImages(t *testing.T) {
 	}
 
 	count := 0
-	if err := uc.ListImages("cat1", func(*model.Image) error {
+	if err := uc.ListImages("cat1", nil, func(*model.Image, []string) error {
 		count++
 		return nil
 	}); err != nil {
@@ -158,7 +158,7 @@ func TestScan_SkipsUnchangedFile(t *testing.T) {
 	}
 
 	var imgID model.PrimaryKey
-	_ = uc.ListImages("cat1", func(img *model.Image) error {
+	_ = uc.ListImages("cat1", nil, func(img *model.Image, _ []string) error {
 		imgID = img.ID
 		return nil
 	})
@@ -204,7 +204,7 @@ func TestScan_ReindexesModifiedFile(t *testing.T) {
 	}
 
 	var imgID model.PrimaryKey
-	_ = uc.ListImages("cat1", func(img *model.Image) error {
+	_ = uc.ListImages("cat1", nil, func(img *model.Image, _ []string) error {
 		imgID = img.ID
 		return nil
 	})
@@ -263,7 +263,7 @@ func TestScan_Idempotent(t *testing.T) {
 	}
 
 	count := 0
-	_ = uc.ListImages("cat1", func(*model.Image) error {
+	_ = uc.ListImages("cat1", nil, func(*model.Image, []string) error {
 		count++
 		return nil
 	})
@@ -303,7 +303,7 @@ func TestScan_ExcludesFilesViaCriteria(t *testing.T) {
 
 	// ListImages must not return catalog-excluded images (excluded=true).
 	var listed int
-	if err := uc.ListImages("cat1", func(img *model.Image) error {
+	if err := uc.ListImages("cat1", nil, func(img *model.Image, _ []string) error {
 		listed++
 		return nil
 	}); err != nil {
@@ -352,8 +352,8 @@ func TestScan_MultipleCatalogs(t *testing.T) {
 	}
 
 	count1, count2 := 0, 0
-	_ = uc.ListImages("cat1", func(*model.Image) error { count1++; return nil })
-	_ = uc.ListImages("cat2", func(*model.Image) error { count2++; return nil })
+	_ = uc.ListImages("cat1", nil, func(*model.Image, []string) error { count1++; return nil })
+	_ = uc.ListImages("cat2", nil, func(*model.Image, []string) error { count2++; return nil })
 
 	if count1 != 1 {
 		t.Errorf("cat1: expected 1 image, got %d", count1)
@@ -376,7 +376,7 @@ func TestScan_StoresThumbnail(t *testing.T) {
 	}
 
 	var imgID model.PrimaryKey
-	_ = uc.ListImages("cat1", func(img *model.Image) error {
+	_ = uc.ListImages("cat1", nil, func(img *model.Image, _ []string) error {
 		imgID = img.ID
 		return nil
 	})
@@ -507,7 +507,7 @@ func TestScan_OnNewFileHook_NoHookConfigured(t *testing.T) {
 	}
 
 	count := 0
-	_ = uc.ListImages("cat1", func(*model.Image) error { count++; return nil })
+	_ = uc.ListImages("cat1", nil, func(*model.Image, []string) error { count++; return nil })
 	if count != 1 {
 		t.Errorf("expected 1 indexed image, got %d", count)
 	}
@@ -526,7 +526,7 @@ func TestScan_OnNewFileHook_FailureDoesNotBlockScan(t *testing.T) {
 	}
 
 	count := 0
-	_ = uc.ListImages("cat1", func(*model.Image) error { count++; return nil })
+	_ = uc.ListImages("cat1", nil, func(*model.Image, []string) error { count++; return nil })
 	if count != 1 {
 		t.Errorf("expected 1 indexed image despite hook failure, got %d", count)
 	}

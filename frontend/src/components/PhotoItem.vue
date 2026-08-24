@@ -56,6 +56,44 @@
         class="selection-overlay"
       />
 
+      <!-- Tag badge (bottom-right).
+           Always drawn, on every device, for a photo that has tags. It is the
+           only route to a photo's tags on a touch screen — the previous UI put
+           them behind hover, which on a phone means behind nothing — and on a
+           pointer device it also says which photos have tags without having to
+           sweep the grid to find out.
+
+           @click.stop: the card itself selects, and tapping the badge must not
+           also tick the photo. -->
+      <button
+        v-if="photo.tags.length > 0"
+        class="tag-badge"
+        type="button"
+        :aria-label="`${photo.tags.length} tags on photo ${photo.id}`"
+        @click.stop="photosStore.showPhotoTags(photo)"
+      >
+        <v-icon
+          icon="mdi-tag"
+          size="10"
+        />
+        {{ photo.tags.length }}
+      </button>
+
+      <!-- Hover preview of the same tags. An enhancement on top of the badge,
+           not the way in: it is inside @media (hover: hover) so a touch screen
+           never replays it on tap. Nothing is fetched — the tags arrived with
+           the listing. -->
+      <div
+        v-if="photo.tags.length > 0"
+        class="tag-overlay"
+      >
+        <span
+          v-for="tag in photo.tags"
+          :key="tag"
+          class="tag-overlay-chip"
+        >{{ tag }}</span>
+      </div>
+
       <!-- Selection checkmark (top-left) -->
       <div
         v-if="isSelected"
@@ -74,6 +112,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useSelectionStore } from '@/stores/selection'
+import { usePhotosStore } from '@/stores/photos'
 import type { Photo } from '@/types'
 
 // TODO(lightbox): a zoom/lightbox view needs an endpoint that serves the
@@ -88,6 +127,7 @@ interface Props {
 
 const props = defineProps<Props>()
 const selectionStore = useSelectionStore()
+const photosStore = usePhotosStore()
 
 const isSelected = computed(() => selectionStore.isPhotoSelected(props.photo.id))
 
@@ -181,9 +221,65 @@ const handleClick = (event: MouseEvent) => {
   justify-content: center;
 }
 
+.tag-badge {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 5px;
+  border-radius: 9px;
+  border: none;
+  font-size: 0.65rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+
+.tag-badge:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 1px;
+}
+
+.tag-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: none;
+  flex-wrap: wrap;
+  gap: 3px;
+  /* Right padding keeps the names clear of the badge, which stays put while
+     the overlay is up: hiding it on hover made it unclickable with a mouse —
+     approaching it is what made it disappear. */
+  padding: 20px 44px 6px 6px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  /* The card underneath still has to take the click. */
+  pointer-events: none;
+}
+
+.tag-overlay-chip {
+  font-size: 0.6rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
 /* Hover affordances only on devices that actually hover — touch screens
    otherwise replay them on tap ("sticky hover"). */
 @media (hover: hover) {
+  .photo-item:hover .tag-overlay {
+    display: flex;
+  }
+
+
   .photo-item:hover .photo-image {
     transform: scale(1.06);
   }

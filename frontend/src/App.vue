@@ -28,6 +28,29 @@
         @click="deviceDrawerOpen = true"
       />
 
+      <!-- A 36px button, not a 240px field. The bar has to hold a title, a
+           catalogue select and this on a 390px screen; the previous filter UI
+           was a fixed-width autocomplete in this row, which is precisely what
+           overflowed. What is being filtered lives in TagFilterBar below. -->
+      <v-badge
+        :model-value="filterTags.length > 0"
+        :content="filterTags.length"
+        color="primary"
+        offset-x="6"
+        offset-y="6"
+      >
+        <v-btn
+          id="tag-filter-activator"
+          class="tag-filter-trigger mr-2"
+          icon="mdi-tag-multiple"
+          variant="text"
+          size="small"
+          aria-label="Filter by tags"
+          title="Filter by tags"
+          @click="tagPickerOpen = true"
+        />
+      </v-badge>
+
       <div class="d-flex align-center">
         <v-select
           v-model="currentCatalog"
@@ -35,25 +58,11 @@
           density="compact"
           hide-details
           variant="outlined"
-          class="mr-3"
+          class="catalog-select mr-3"
           style="max-width: 150px"
           color="primary"
           item-color="primary"
         />
-        <v-chip
-          v-if="totalPhotos > 0"
-          variant="outlined"
-          color="primary"
-          class="mr-3"
-          size="small"
-        >
-          <v-icon
-            icon="mdi-image-multiple"
-            start
-          />
-          {{ totalPhotos }} photos
-        </v-chip>
-
         <v-chip
           v-if="selectedCount > 0"
           color="primary"
@@ -70,6 +79,20 @@
     </v-app-bar>
 
     <DeviceDrawer v-model="deviceDrawerOpen" />
+
+    <TagPicker
+      v-model:open="tagPickerOpen"
+      :model-value="filterTags"
+      :catalog-key="currentCatalog"
+      anchor="#tag-filter-activator"
+      @update:model-value="applyTags"
+    />
+
+    <PhotoTagsSheet
+      v-model="tagSheetOpen"
+      :photo="tagSheetPhoto"
+      @filter="filterByTag"
+    />
 
     <v-main>
       <!-- Catalog list fetch failure: nothing can be shown, so take over the whole view -->
@@ -99,6 +122,13 @@
         </v-btn>
       </div>
       <template v-else>
+        <TagFilterBar
+          :shown="totalPhotos"
+          :total="catalogTotal"
+          :filter-tags="filterTags"
+          @remove="removeTag"
+          @clear="clearTags"
+        />
         <PhotoGrid />
         <TimelineScrollbar />
         <SelectionToolbar />
@@ -108,11 +138,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useCatalogsStore } from '@/stores/catalogs'
 import { usePhotosStore } from '@/stores/photos'
 import { useSelectionStore } from '@/stores/selection'
 import PhotoGrid from './components/PhotoGrid.vue'
+import TagFilterBar from './components/TagFilterBar.vue'
+import TagPicker from './components/TagPicker.vue'
+import PhotoTagsSheet from './components/PhotoTagsSheet.vue'
 import TimelineScrollbar from './components/TimelineScrollbar.vue'
 import SelectionToolbar from './components/SelectionToolbar.vue'
 import DeviceDrawer from './components/DeviceDrawer.vue'
@@ -133,6 +166,50 @@ const currentCatalog = computed({
 })
 const totalPhotos = computed(() => photosStore.totalPhotos)
 const selectedCount = computed(() => selectionStore.selectedCount)
+
+const tagPickerOpen = ref(false)
+const filterTags = computed(() => photosStore.filterTags)
+
+/**
+ * How many photos the catalogue holds with no filter applied.
+ *
+ * Remembered from the last unfiltered stream rather than asked for, so that
+ * "1,204 of 18,443" can be read while a filter is on without a second count
+ * query — and so the number does not change as tags are added and removed.
+ */
+const catalogTotal = ref(0)
+watch(
+  () => [photosStore.streamCompleted, photosStore.filterTags.length] as const,
+  ([completed, filtered]) => {
+    if (completed && filtered === 0) catalogTotal.value = photosStore.totalPhotos
+  },
+)
+
+function applyTags(tags: string[]) {
+  void photosStore.setFilterTags(catalogsStore.currentCatalog, tags)
+}
+
+function removeTag(tag: string) {
+  applyTags(filterTags.value.filter((t) => t !== tag))
+}
+
+function clearTags() {
+  applyTags([])
+}
+
+/** "More photos like this one", from a tag on the per-photo sheet. */
+function filterByTag(tag: string) {
+  photosStore.hidePhotoTags()
+  if (!filterTags.value.includes(tag)) applyTags([...filterTags.value, tag])
+}
+
+const tagSheetPhoto = computed(() => photosStore.tagSheetPhoto)
+const tagSheetOpen = computed({
+  get: () => photosStore.tagSheetPhoto !== null,
+  set: (open: boolean) => {
+    if (!open) photosStore.hidePhotoTags()
+  },
+})
 
 onMounted(() => {
   catalogsStore.initCatalogs()
@@ -193,6 +270,18 @@ body {
   text-transform: uppercase;
   font-size: 1rem;
   color: rgba(var(--v-theme-on-surface), 0.9);
+  white-space: nowrap;
+}
+
+/* The title is the one thing in this bar that must not be squeezed.
+   VAppBarTitle takes the space the controls leave it and hides the overflow,
+   so on a 390px screen the wordmark was being cut mid-word — the logo, the
+   gap and "WiSP" need 97px and the box had shrunk to 70. Sizing to content
+   makes the select give way instead, which it can: it is a fixed-width
+   control with room to spare. */
+.v-app-bar-title {
+  flex: 0 0 auto;
+  margin-inline-start: 0;
 }
 
 /* Use !important to prioritise Poppins regardless of bundle order */
@@ -231,9 +320,19 @@ body {
 
 /* Responsive */
 @media (max-width: 600px) {
-  .app-title {
-    font-size: 0.8rem;
+  /* This rule named .app-title, which nothing carries — the element is
+     .app-title-text — so it had never applied. The wordmark is set in
+     letter-spacing that costs three pixels a character, which is worth
+     giving back on a narrow screen. */
+  .app-title-text {
+    font-size: 0.85rem;
     letter-spacing: 2px;
+  }
+
+  /* The catalogue names are short; 150px was never needed on a phone, and
+     the width is better spent on the title beside it. */
+  .catalog-select {
+    max-width: 120px;
   }
 }
 </style>

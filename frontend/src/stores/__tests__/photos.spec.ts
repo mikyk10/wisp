@@ -195,3 +195,39 @@ describe('usePhotosStore', () => {
     })
   })
 })
+
+describe('tag filter', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('records what is being filtered so the bar can show it', async () => {
+    const store = usePhotosStore()
+
+    await store.loadPhotosStream('photos', ['sakura', 'night'])
+
+    expect(store.filterTags).toEqual(['sakura', 'night'])
+  })
+
+  it('drops the filter when asked to clear it', () => {
+    const store = usePhotosStore()
+    store.filterTags = ['sakura']
+
+    store.clearFilterTags()
+
+    expect(store.filterTags).toEqual([])
+  })
+
+  it('holds the photo whose tags are on screen, not a route back to its card', () => {
+    // The card lives in a virtual scroller and may be recycled onto another
+    // photo before the sheet closes.
+    const store = usePhotosStore()
+    const photo = { id: 7, url: '', enabled: true, timestamp: '', tags: ['sky'] }
+
+    store.showPhotoTags(photo)
+    expect(store.tagSheetPhoto).toEqual(photo)
+
+    store.hidePhotoTags()
+    expect(store.tagSheetPhoto).toBeNull()
+  })
+})

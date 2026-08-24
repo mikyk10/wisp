@@ -23,3 +23,25 @@ if (!window.matchMedia) {
       dispatchEvent: () => false,
     }) as MediaQueryList
 }
+
+// visualViewport is not implemented in jsdom. Vuetify's overlays (menus,
+// bottom sheets) read it while positioning themselves, so without it any test
+// that opens one dies with "visualViewport is not defined" before it can
+// assert anything. The numbers are the jsdom window's own.
+if (!window.visualViewport) {
+  Object.defineProperty(window, 'visualViewport', {
+    configurable: true,
+    value: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      offsetLeft: 0,
+      offsetTop: 0,
+      pageLeft: 0,
+      pageTop: 0,
+      scale: 1,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    },
+  })
+}

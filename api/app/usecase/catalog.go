@@ -57,8 +57,15 @@ type CatalogUsecase interface {
 	// LoadSourceImageById loads the original source image and metadata for a given image ID.
 	LoadSourceImageById(id model.PrimaryKey) (image.Image, *model.ImgMeta, error)
 
-	// ListImages retrieves the list of indexed images under the catalog using a callback.
-	ListImages(catalogKey string, cb func(*model.Image) error) error
+	// ListImages retrieves the list of indexed images under the catalog using a
+	// callback, which receives each image with the tags it carries. tags
+	// narrows the result to images carrying every one of them; empty means no
+	// filter.
+	ListImages(catalogKey string, tags []string, cb func(*model.Image, []string) error) error
+
+	// CatalogTags returns every tag carried by an image in the catalogue, most
+	// used first.
+	CatalogTags(catalogKey string) ([]model.TagUsage, error)
 
 	// ToggleLocalImageFileVisibility toggles the visibility state of images by ID.
 	ToggleLocalImageFileVisibility(catalogKey string, ids []model.PrimaryKey) error
@@ -84,14 +91,16 @@ type catalogUseCase struct {
 	serviceConfig *config.ServiceConfig
 	imgr          repository.ImageRepository
 	dhr           repository.DeliveryHistoryRepository
+	tagr          repository.TagRepository
 }
 
-func NewCatalogUseCase(globalConfig *config.GlobalConfig, serviceConfig *config.ServiceConfig, imgr repository.ImageRepository, dhr repository.DeliveryHistoryRepository) CatalogUsecase {
+func NewCatalogUseCase(globalConfig *config.GlobalConfig, serviceConfig *config.ServiceConfig, imgr repository.ImageRepository, dhr repository.DeliveryHistoryRepository, tagr repository.TagRepository) CatalogUsecase {
 	return &catalogUseCase{
 		globalConfig:  globalConfig,
 		serviceConfig: serviceConfig,
 		imgr:          imgr,
 		dhr:           dhr,
+		tagr:          tagr,
 	}
 }
 
@@ -412,8 +421,29 @@ func (uc *catalogUseCase) LoadSourceImageById(id model.PrimaryKey) (image.Image,
 	return catalog.LoadImageFromPath(rec.Src)
 }
 
-func (uc *catalogUseCase) ListImages(catalogKey string, cb func(*model.Image) error) error {
-	return uc.imgr.ListByCatalog(catalogKey, cb)
+// ListImages streams the catalogue with each image's tags alongside it.
+//
+// The assignments are read once, before the stream starts, and looked up per
+// row. The obvious alternative — asking for one image's tags as each row goes
+// out — is a query per row of a stream tens of thousands of rows long, which is
+// the shape that emptied the connection pool once already.
+//
+// The cost is that the first row waits for that read. It is one indexed pass
+// over the catalogue's assignments, against a listing that already sorts the
+// whole catalogue by date before it can send anything.
+func (uc *catalogUseCase) ListImages(catalogKey string, tags []string, cb func(*model.Image, []string) error) error {
+	byImage, err := uc.tagr.LoadCatalogImageTags(catalogKey)
+	if err != nil {
+		return err
+	}
+
+	return uc.imgr.ListByCatalog(catalogKey, tags, func(rec *model.Image) error {
+		return cb(rec, byImage[rec.ID])
+	})
+}
+
+func (uc *catalogUseCase) CatalogTags(catalogKey string) ([]model.TagUsage, error) {
+	return uc.tagr.FindTagUsage(catalogKey)
 }
 
 func (uc *catalogUseCase) ToggleLocalImageFileVisibility(catalogKey string, ids []model.PrimaryKey) error {

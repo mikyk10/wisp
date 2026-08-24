@@ -35,7 +35,7 @@ func (s *stubImageRepository) RemoveImage(model.PrimaryKey) error              {
 func (s *stubImageRepository) ToggleDeletedAt([]model.PrimaryKey) error        { return nil }
 func (s *stubImageRepository) FindById(model.PrimaryKey) (*model.Image, error) { return nil, nil }
 func (s *stubImageRepository) FindAll(func(*model.Image) error)                {}
-func (s *stubImageRepository) ListByCatalog(string, func(*model.Image) error) error {
+func (s *stubImageRepository) ListByCatalog(string, []string, func(*model.Image) error) error {
 	return nil
 }
 func (s *stubImageRepository) CountAllByCatalog(string) (int64, error)          { return s.count, s.countErr }

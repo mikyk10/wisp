@@ -26,6 +26,11 @@ func Configure(e *echo.Echo, ctn *dig.Container) *echo.Echo {
 			// /api/catalog/{catalog key}/images
 			api.GET("/catalog/:catalogKey/images", h.List)
 
+			// Tags available in one catalogue. Its own route rather than a
+			// field on the catalogue list, because it is read when the picker
+			// opens and not when the page loads.
+			api.GET("/catalog/:catalogKey/tags", h.ListTags)
+
 			// /api/catalog/{catalog key}/image/{ID Number}.{Extension}
 			api.GET("/catalog/:catalogKey/image/:imgid", h.ImgManagement)
 

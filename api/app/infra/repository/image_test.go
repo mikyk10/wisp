@@ -567,7 +567,7 @@ func TestListByCatalogOrdersUndatedPhotosLast(t *testing.T) {
 	}
 
 	var listed []string
-	if err := repo.ListByCatalog("cat", func(img *model.Image) error {
+	if err := repo.ListByCatalog("cat", nil, func(img *model.Image) error {
 		listed = append(listed, img.Src)
 		return nil
 	}); err != nil {

@@ -998,7 +998,7 @@ func TestPostgres_ListByCatalog(t *testing.T) {
 	// and src_hash not, so the identity asserted on here has to be src.
 	var listed []string
 	var hidden int
-	if err := repo.ListByCatalog("cat", func(img *model.Image) error {
+	if err := repo.ListByCatalog("cat", nil, func(img *model.Image) error {
 		listed = append(listed, img.Src)
 		if img.DeletedAt.Valid {
 			hidden++
@@ -1058,7 +1058,7 @@ func TestPostgres_ListByCatalog_PutsUndatedPhotosFirst(t *testing.T) {
 	}
 
 	var listed []string
-	if err := repo.ListByCatalog("cat", func(img *model.Image) error {
+	if err := repo.ListByCatalog("cat", nil, func(img *model.Image) error {
 		listed = append(listed, img.Src)
 		return nil
 	}); err != nil {

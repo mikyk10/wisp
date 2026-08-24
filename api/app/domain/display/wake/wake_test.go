@@ -132,3 +132,36 @@ func TestPlan_EarlyArrivalCountsAsTheScheduledWake(t *testing.T) {
 		assert.Equal(t, 11*60, dense.SleepSeconds(at("08:59:00")))
 	})
 }
+
+// TestPlan_AnswersSanelyAtEveryMoment sweeps clock time instead of picking
+// examples. The grace window moves the search start past "now", and the
+// question this answers is whether any alignment of arrival time and schedule
+// — just before a tick, dead on it, just past it, mid-gap, overnight — can
+// produce a sleep outside [MinSeconds, MaxSeconds] or a panic. The clamp
+// bounds what SleepSeconds returns, so the real assertion is that every
+// moment reaches the clamp with a positive, finite answer rather than falling
+// somewhere no test has looked.
+func TestPlan_AnswersSanelyAtEveryMoment(t *testing.T) {
+	plans := map[string]wake.Plan{
+		"production pair":     {Schedule: []string{"0 7 * * *", "0 17 * * *"}, Fallback: 300},
+		"dense day":           {Schedule: []string{"*/10 6-22 * * *"}, Fallback: 300},
+		"denser than grace":   {Schedule: []string{"* * * * *"}, Fallback: 300},
+		"never matches again": {Schedule: []string{"0 0 29 2 *"}, Fallback: 600},
+	}
+
+	// A prime step keeps the samples sliding across minute boundaries instead
+	// of hitting the same second of every minute.
+	start := at("00:00:00")
+	for name, plan := range plans {
+		t.Run(name, func(t *testing.T) {
+			for offset := 0; offset < 48*60*60; offset += 977 {
+				now := start.Add(time.Duration(offset) * time.Second)
+				got := plan.SleepSeconds(now)
+				if got < wake.MinSeconds || got > wake.MaxSeconds {
+					t.Fatalf("SleepSeconds(%s) = %d, outside [%d, %d]",
+						now.Format("15:04:05"), got, wake.MinSeconds, wake.MaxSeconds)
+				}
+			}
+		})
+	}
+}

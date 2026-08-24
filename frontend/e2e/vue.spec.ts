@@ -103,15 +103,21 @@ test.describe('Photo selection', () => {
     await expect(toolbar).not.toBeVisible()
   })
 
-  test('Timeline sidebar is visible', async ({ page }) => {
+  test('Timeline scrubber answers a hover with the month under the pointer', async ({ page }) => {
     await page.goto('/')
 
-    const timeline = page.locator('.timeline-scrollbar')
-    await expect(timeline).toBeVisible()
+    // The rail appears once photos exist; before that there is nothing to
+    // navigate and it renders nothing at all.
+    const rail = page.locator('.timeline-scrubber')
+    await expect(rail).toBeVisible({ timeout: 15_000 })
+    await expect(rail).toHaveAttribute('role', 'slider')
 
-    // At least one month entry should appear once photos are loaded
-    const entry = page.locator('.timeline-entry').first()
-    await expect(entry).toBeVisible({ timeout: 15_000 })
+    // Idle, the rail keeps quiet. Hovering it must name the month (or the
+    // honest "No date") beside the pointer without scrolling anything.
+    await rail.hover()
+    const bubble = page.locator('.scrubber-bubble')
+    await expect(bubble).toBeVisible()
+    await expect(bubble).toHaveText(/^(\d{4}\/\d{2}|No date)$/)
   })
 })
 

@@ -77,6 +77,33 @@ func (r *tagRepositoryImpl) FindImagesWithoutTags(catalogKey string, limit int) 
 // which catalogue an image belongs to would offer the reader tags that return
 // nothing here. Excluded images are left out for the same reason: the listing
 // they would be filtering does not show them either.
+//
+// The counts are computed on every request. There is no summary table and no
+// cache, so what is returned is always what the catalogue holds right now —
+// which matters while tagging is running, because the numbers move under the
+// reader.
+//
+// TODO(tag-counts): keep the counts as rows once this stops being cheap.
+//
+// Measured 2026-08-24 against production (catalogue `uco`, 18,068 images,
+// 1,255 tags, 30,668 assignments): 13.2ms median server-side, which is about
+// 1% of what opening the picker costs a phone. Not worth pre-computing yet.
+//
+// The cost is proportional to the assignments in the catalogue, not to the
+// tags returned, because image_tags carries no catalogue of its own and every
+// row has to be joined back to images to find out whose it is. At 184k
+// assignments — where `uco` lands if tagging fills out to the configured ten
+// tags per image, currently averaging 1.7 — the same query measured 107ms on
+// an in-memory SQLite of the same shape. Two ways out were measured there:
+//
+//   - denormalise catalog_key onto image_tags, indexed (catalog_key, tag_id):
+//     12.7ms, and it makes LoadCatalogImageTags cheaper on the same grounds
+//   - keep (catalog_key, tag_id, count) as rows, written where tags are:
+//     0.28ms, at the price of a second place that has to stay true
+//
+// Act on it when /api/catalog/:key/tags passes ~50ms in the access log, or
+// when a second screen starts asking for these counts. Until then the picker's
+// latency is in the rendering, not here.
 func (r *tagRepositoryImpl) FindTagUsage(catalogKey string) ([]model.TagUsage, error) {
 	usage := []model.TagUsage{}
 	err := r.db.Model(&model.ImageTag{}).
@@ -133,4 +160,3 @@ func (r *tagRepositoryImpl) LoadCatalogImageTags(catalogKey string) (map[model.P
 	}
 	return byImage, nil
 }
-

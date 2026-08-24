@@ -130,7 +130,7 @@
           @clear="clearTags"
         />
         <PhotoGrid />
-        <TimelineScrollbar />
+        <TimelineScrubber />
         <SelectionToolbar />
       </template>
     </v-main>
@@ -146,7 +146,7 @@ import PhotoGrid from './components/PhotoGrid.vue'
 import TagFilterBar from './components/TagFilterBar.vue'
 import TagPicker from './components/TagPicker.vue'
 import PhotoTagsSheet from './components/PhotoTagsSheet.vue'
-import TimelineScrollbar from './components/TimelineScrollbar.vue'
+import TimelineScrubber from './components/TimelineScrubber.vue'
 import SelectionToolbar from './components/SelectionToolbar.vue'
 import DeviceDrawer from './components/DeviceDrawer.vue'
 import WispLogo from './components/WispLogo.vue'
@@ -224,12 +224,15 @@ onMounted(() => {
    flash; everything inside <v-app> uses Vuetify's --v-theme-* variables. */
 :root {
   --wisp-bg: #0f1117;
-  --wisp-timeline-width: 120px;
+  /* The scrubber needs only a finger's width of rail; the month labels float
+     over the grid on demand instead of owning a column. The width the old
+     sidebar held goes back to the photos. */
+  --wisp-timeline-width: 32px;
 }
 
 @media (max-width: 768px) {
   :root {
-    --wisp-timeline-width: 80px;
+    --wisp-timeline-width: 24px;
   }
 }
 

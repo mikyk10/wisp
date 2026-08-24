@@ -10,8 +10,8 @@
 /** Viewport width (px) at or below which the mobile layout applies. */
 export const MOBILE_BREAKPOINT = 768
 
-/** Width (px) of the fixed timeline sidebar. */
-export const TIMELINE_WIDTH = { desktop: 120, mobile: 80 } as const
+/** Width (px) of the fixed timeline scrubber rail. */
+export const TIMELINE_WIDTH = { desktop: 32, mobile: 24 } as const
 
 /**
  * Target (minimum) size (px) of one square grid cell; the actual cell

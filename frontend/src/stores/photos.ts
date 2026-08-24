@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { API_PATHS, isApiMode, buildImageUrl } from '@/config'
 import { photosApi } from '@/api/photos'
 import type { Photo, PhotoRecord, TimelineEntry } from '@/types'
+import { clampFraction } from '@/utils/scrubber'
 
 /** Month bucket key ("YYYY-MM") for a photo, or null for invalid/zero-value dates. */
 function monthKeyOf(timestamp: string): string | null {
@@ -52,6 +53,26 @@ export const usePhotosStore = defineStore('photos', () => {
    * fired by the programmatic scroll cannot snap the highlight back.
    */
   const scrollRequest = ref<{ index: number; key: string } | null>(null)
+
+  /**
+   * Where the viewport sits in the whole list, 0 at the newest photo and 1 at
+   * the oldest, reported by the grid on every scroll frame. This is the
+   * scrubber thumb's position. It is separate from activeTimelineKey on
+   * purpose: the key is month-grained and debounced, which is right for a
+   * highlight and visibly wrong for a marker that should track the scroll.
+   */
+  const viewportFraction = ref(0)
+
+  /**
+   * Pending scrub — a proportional scroll position, requested by dragging the
+   * scrubber rail. A distinct channel from scrollRequest because the two mean
+   * different things: a click means "take me to this month" (snap to its first
+   * row, hold the highlight until arrival), a drag means "put the viewport
+   * exactly here, now" and arrives dozens of times a second. Suppressing a
+   * viewport report per drag step would fight the very reports that keep the
+   * highlight following the drag.
+   */
+  const scrubRequest = ref<{ fraction: number } | null>(null)
 
   // ── Getters ──────────────────────────────────────────────────────────────
   const totalPhotos = computed(() => items.value.length)
@@ -112,6 +133,8 @@ export const usePhotosStore = defineStore('photos', () => {
     error.value = null
     activeTimelineKey.value = ''
     scrollRequest.value = null
+    viewportFraction.value = 0
+    scrubRequest.value = null
   }
 
   // ── Actions ──────────────────────────────────────────────────────────────
@@ -131,6 +154,19 @@ export const usePhotosStore = defineStore('photos', () => {
    * it must not overwrite the clicked month. Consuming exactly one report is
    * the state-based replacement for the old 300ms suppression timer.
    */
+  /** Grid scroll position as a fraction; drives the scrubber thumb. */
+  function reportScrollFraction(fraction: number) {
+    viewportFraction.value = clampFraction(fraction)
+  }
+
+  /** Scrubber drag: ask the grid to place the viewport at this fraction. */
+  function requestScrub(fraction: number) {
+    // A fresh object every call, even for an unchanged value: the grid reacts
+    // to the request's identity, and a drag that wiggles back over the same
+    // pixel still expects the viewport to follow.
+    scrubRequest.value = { fraction: clampFraction(fraction) }
+  }
+
   function reportViewport(firstVisibleIndex: number) {
     if (scrollRequest.value) {
       scrollRequest.value = null
@@ -259,6 +295,8 @@ export const usePhotosStore = defineStore('photos', () => {
     error,
     activeTimelineKey,
     scrollRequest,
+    viewportFraction,
+    scrubRequest,
     // getters
     totalPhotos,
     timelineEntries,
@@ -272,5 +310,7 @@ export const usePhotosStore = defineStore('photos', () => {
     togglePhotoStatus,
     requestTimelineScroll,
     reportViewport,
+    reportScrollFraction,
+    requestScrub,
   }
 })

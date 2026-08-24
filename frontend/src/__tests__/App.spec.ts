@@ -80,7 +80,7 @@ const vuetifyStubs = {
 // Own heavy components stubbed to avoid their internal complexity.
 const componentStubs = {
   PhotoGrid: { template: '<div class="photo-grid-stub" />' },
-  TimelineScrollbar: { template: '<div />' },
+  TimelineScrubber: { template: '<div />' },
   SelectionToolbar: { template: '<div />' },
   DeviceDrawer: {
     template: '<div class="device-drawer-stub" :class="{ \'device-drawer-stub--open\': modelValue }" />',

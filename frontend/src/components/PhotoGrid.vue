@@ -194,7 +194,7 @@ const retry = () => {
 }
 
 // Report the index of the first visible item to the store, which owns the
-// active-timeline-month state shared with TimelineScrollbar.
+// active-timeline-month state shared with the timeline scrubber.
 const reportViewport = () => {
   const el = scrollParentRef.value
   if (!el || photos.value.length === 0) return
@@ -205,8 +205,25 @@ const reportViewport = () => {
   photosStore.reportViewport(firstVisibleIndex)
 }
 
+// The thumb on the scrubber rail tracks this. Throttled to animation frames
+// rather than debounced: the month highlight can afford to settle after the
+// scroll stops, a position marker that does the same looks broken.
+let fractionFrame: number | null = null
+const reportScrollFraction = () => {
+  if (fractionFrame !== null) return
+  fractionFrame = requestAnimationFrame(() => {
+    fractionFrame = null
+    const el = scrollParentRef.value
+    if (!el) return
+    const range = el.scrollHeight - el.clientHeight
+    photosStore.reportScrollFraction(range > 0 ? el.scrollTop / range : 0)
+  })
+}
+
 // Debounced scroll handler
 const handleScroll = () => {
+  reportScrollFraction()
+
   if (scrollTimeout.value) {
     clearTimeout(scrollTimeout.value)
   }
@@ -215,6 +232,19 @@ const handleScroll = () => {
     reportViewport()
   }, 150)
 }
+
+// Scrubber drags land here as a fraction of the whole list. Written straight
+// to scrollTop rather than through scrollToIndex: a drag names a position,
+// not a row, and snapping each step to a row boundary would make the grid
+// move in visible jumps under a smoothly moving finger.
+watch(
+  () => photosStore.scrubRequest,
+  (req) => {
+    const el = scrollParentRef.value
+    if (!req || !el) return
+    el.scrollTop = req.fraction * (el.scrollHeight - el.clientHeight)
+  },
+)
 
 // Timeline clicks land in the store as a scroll request; execute it here.
 watch(
@@ -237,6 +267,9 @@ onUnmounted(() => {
 
   if (scrollTimeout.value) {
     clearTimeout(scrollTimeout.value)
+  }
+  if (fractionFrame !== null) {
+    cancelAnimationFrame(fractionFrame)
   }
 })
 </script>
@@ -264,6 +297,16 @@ onUnmounted(() => {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* No native scrollbar: the scrubber rail is the position indicator now, and
+     two bars answering "where am I" side by side — one proportional to rows,
+     one to photos — would disagree slightly and both look wrong. Scrolling
+     itself (wheel, touch, keys) is untouched; only the bar is gone.
+     scrollbar-width covers Firefox and Chromium, the -webkit rule Safari. */
+  scrollbar-width: none;
+}
+
+.photo-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .photo-grid-spacer {

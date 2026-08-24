@@ -230,4 +230,40 @@ describe('tag filter', () => {
     store.hidePhotoTags()
     expect(store.tagSheetPhoto).toBeNull()
   })
+
+  it('clamps scrub and scroll-fraction reports to the rail', () => {
+    const store = usePhotosStore()
+
+    store.reportScrollFraction(1.4)
+    expect(store.viewportFraction).toBe(1)
+    store.reportScrollFraction(-2)
+    expect(store.viewportFraction).toBe(0)
+
+    store.requestScrub(1.4)
+    expect(store.scrubRequest?.fraction).toBe(1)
+  })
+
+  it('re-issues a scrub even at an unchanged fraction', () => {
+    // The grid reacts to the request's identity: a drag that wiggles back
+    // over the same pixel still expects the viewport to follow.
+    const store = usePhotosStore()
+
+    store.requestScrub(0.5)
+    const first = store.scrubRequest
+    store.requestScrub(0.5)
+
+    expect(store.scrubRequest).not.toBe(first)
+    expect(store.scrubRequest?.fraction).toBe(0.5)
+  })
+
+  it('resets the scrub state with everything else', () => {
+    const store = usePhotosStore()
+    store.reportScrollFraction(0.7)
+    store.requestScrub(0.7)
+
+    store.resetPhotos()
+
+    expect(store.viewportFraction).toBe(0)
+    expect(store.scrubRequest).toBeNull()
+  })
 })

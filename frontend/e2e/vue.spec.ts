@@ -160,14 +160,15 @@ test.describe('Tags', () => {
 })
 
 /**
- * Browsers animate keyboard scrolling, so scrollTop read straight after a
- * keypress is a frame from the middle of the animation — and the next
- * assertion then races the tail of the previous scroll rather than measuring
- * its own. Wait for the number to stop moving before using it as a baseline.
+ * Read scrollTop once it has held the same value for three samples.
  *
- * Three matching reads, not two: WebKit's animation has plateaus long enough
- * that two consecutive samples can agree while it is still travelling, which
- * is what made this flaky there.
+ * Only ever called where nothing is animating — either nothing has scrolled
+ * yet, or a written scrollTop has cancelled what was — so this is a cheap
+ * confirmation rather than a wait. It is not a
+ * way to outlast an animated keyboard scroll and must not be used as one:
+ * WebKit's has plateaus long enough for consecutive samples to agree while it
+ * is still travelling, and no sample count fixes that reliably. Tests that
+ * need a stable starting point write one.
  */
 async function settledScrollTop(grid: Locator): Promise<number> {
   let previous = Number.NaN
@@ -198,13 +199,21 @@ test.describe('Keyboard', () => {
     const grid = page.locator('.photo-grid')
     await expect(grid).toBeFocused()
 
-    const before = await settledScrollTop(grid)
+    // Down, from the top.
     await page.keyboard.press('PageDown')
-    await expect.poll(() => grid.evaluate((el) => el.scrollTop)).toBeGreaterThan(before)
+    await expect.poll(() => grid.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
 
-    const mid = await settledScrollTop(grid)
+    // Up, from a baseline this test *sets* rather than one it waits for.
+    // WebKit's keyboard scrolling animates with a tail long enough that
+    // "sample until scrollTop stops moving" cannot tell the end of the
+    // PageDown from the start of the ArrowUp — it read 413 as settled and
+    // then travelled on to 426, which no number of extra samples fixes
+    // reliably. Writing scrollTop cancels the animation outright, which does.
+    await grid.evaluate((el) => el.scrollTo({ top: 2000, behavior: 'instant' }))
+    const baseline = await settledScrollTop(grid)
+
     await page.keyboard.press('ArrowUp')
-    await expect.poll(() => grid.evaluate((el) => el.scrollTop)).toBeLessThan(mid)
+    await expect.poll(() => grid.evaluate((el) => el.scrollTop)).toBeLessThan(baseline)
   })
 
   test('the keyboard survives the virtualizer recycling the focused card', async ({ page }) => {

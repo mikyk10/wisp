@@ -214,6 +214,23 @@ describe('PhotoGrid', () => {
       wrapper.unmount()
     })
 
+    // Firefox and WebKit fire no focusout when the focused element is deleted,
+    // so the scroll that deleted it has to be enough on its own — otherwise
+    // the fix exists in Chromium only.
+    it('reclaims focus from the scroll alone, with no focusout to help', async () => {
+      const wrapper = mountGrid(pinia, true)
+      const grid = wrapper.find('.photo-grid').element as HTMLElement
+
+      grid.blur()
+      expect(document.activeElement).toBe(document.body)
+
+      grid.dispatchEvent(new Event('scroll'))
+      await nextFrame()
+
+      expect(document.activeElement).toBe(grid)
+      wrapper.unmount()
+    })
+
     it('leaves focus alone when it moved somewhere else', async () => {
       const wrapper = mountGrid(pinia, true)
       const grid = wrapper.find('.photo-grid').element as HTMLElement
@@ -242,11 +259,30 @@ describe('PhotoGrid', () => {
 
       grid.blur()
       grid.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
+      grid.dispatchEvent(new Event('scroll'))
       await nextFrame()
 
       expect(document.activeElement).toBe(document.body)
 
       overlay.remove()
+      wrapper.unmount()
+    })
+
+    // The rail is focusable and runs its own arrow keys; a scroll it caused
+    // must not pull focus off it.
+    it('leaves focus where it is when something else holds it', async () => {
+      const wrapper = mountGrid(pinia, true)
+      const grid = wrapper.find('.photo-grid').element as HTMLElement
+      const elsewhere = document.createElement('button')
+      document.body.appendChild(elsewhere)
+
+      elsewhere.focus()
+      grid.dispatchEvent(new Event('scroll'))
+      await nextFrame()
+
+      expect(document.activeElement).toBe(elsewhere)
+
+      elsewhere.remove()
       wrapper.unmount()
     })
   })

@@ -160,21 +160,29 @@ test.describe('Tags', () => {
 })
 
 /**
- * Chrome animates keyboard scrolling, so scrollTop read straight after a
+ * Browsers animate keyboard scrolling, so scrollTop read straight after a
  * keypress is a frame from the middle of the animation — and the next
  * assertion then races the tail of the previous scroll rather than measuring
  * its own. Wait for the number to stop moving before using it as a baseline.
+ *
+ * Three matching reads, not two: WebKit's animation has plateaus long enough
+ * that two consecutive samples can agree while it is still travelling, which
+ * is what made this flaky there.
  */
 async function settledScrollTop(grid: Locator): Promise<number> {
   let previous = Number.NaN
+  let repeats = 0
   await expect
-    .poll(async () => {
-      const now = await grid.evaluate((el) => el.scrollTop)
-      const stable = now === previous
-      previous = now
-      return stable
-    })
-    .toBe(true)
+    .poll(
+      async () => {
+        const now = await grid.evaluate((el) => el.scrollTop)
+        repeats = now === previous ? repeats + 1 : 0
+        previous = now
+        return repeats
+      },
+      { intervals: [120], timeout: 20_000 },
+    )
+    .toBeGreaterThanOrEqual(3)
   return previous
 }
 

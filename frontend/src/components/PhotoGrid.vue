@@ -231,9 +231,56 @@ const reportScrollFraction = () => {
   })
 }
 
+/**
+ * Keep the keyboard alive when the virtualizer unmounts the focused card.
+ *
+ * Scrolling recycles rows, so the PhotoItem holding focus is routinely removed
+ * from the DOM under the reader. Focus then falls to <body>, which scrolls
+ * nothing, and every key goes dead until something is clicked — the "it worked
+ * a second ago" half of the problem.
+ *
+ * Deleting the focused element fires focusout in Chromium and in neither
+ * Firefox nor WebKit, so the event cannot be what drives this: written that
+ * way the fix exists in one browser out of three. The check rides along with
+ * the scroll that caused the deletion instead, one animation frame later so
+ * that Vue has re-rendered by the time it looks. focusout is kept only as the
+ * earlier signal where a browser offers it.
+ */
+let reclaimFrame: number | null = null
+
+const reclaimFocus = () => {
+  // "Focus went nowhere" is the only state worth undoing: the scrubber rail, a
+  // control in the bar, a card — anything else is somewhere a reader put it,
+  // and taking it back would be a theft. Engines disagree on what nowhere
+  // looks like after the focused element is deleted — <body>, nothing at all,
+  // or the detached element itself — so all three are read as the same thing.
+  const active = document.activeElement
+  const nowhere = active === null || active === document.body || !active.isConnected
+  if (!nowhere) return
+  // Vuetify moves focus into an overlay on open and returns it to the
+  // activator on close; while one is up it is not ours to claim.
+  if (document.querySelector('.v-overlay--active')) return
+  scrollParentRef.value?.focus({ preventScroll: true })
+}
+
+const scheduleReclaim = () => {
+  if (reclaimFrame !== null) return
+  reclaimFrame = requestAnimationFrame(() => {
+    reclaimFrame = null
+    reclaimFocus()
+  })
+}
+
+const handleFocusOut = (event: FocusEvent) => {
+  // Focus moved to something real. Leave it there.
+  if (event.relatedTarget !== null) return
+  scheduleReclaim()
+}
+
 // Debounced scroll handler
 const handleScroll = () => {
   reportScrollFraction()
+  scheduleReclaim()
 
   if (scrollTimeout.value) {
     clearTimeout(scrollTimeout.value)
@@ -242,32 +289,6 @@ const handleScroll = () => {
   scrollTimeout.value = window.setTimeout(() => {
     reportViewport()
   }, 150)
-}
-
-/**
- * Keep the keyboard alive when the virtualizer unmounts the focused card.
- *
- * Scrolling recycles rows, so the PhotoItem holding focus is routinely removed
- * from the DOM under the reader. Focus then falls to <body>, which scrolls
- * nothing, and every key goes dead again until something is clicked — the
- * "it worked a second ago" half of the problem. relatedTarget === null is
- * exactly that case: focus went nowhere rather than somewhere else.
- *
- * Taking it back means the grid holds focus whenever nothing else claims it,
- * which for a single-view gallery is the behaviour you want.
- */
-const handleFocusOut = (event: FocusEvent) => {
-  if (event.relatedTarget !== null) return
-
-  // A frame later, because the element focus is moving *to* is not always
-  // known at focusout time (Vuetify moves focus into an overlay on open).
-  requestAnimationFrame(() => {
-    // An open menu / sheet / dialog owns focus while it is up; Vuetify hands
-    // it back to the activator when it closes.
-    if (document.querySelector('.v-overlay--active')) return
-    if (document.activeElement !== document.body) return
-    scrollParentRef.value?.focus({ preventScroll: true })
-  })
 }
 
 // Scrubber drags land here as a fraction of the whole list. Written straight
@@ -310,6 +331,9 @@ onUnmounted(() => {
   }
   if (fractionFrame !== null) {
     cancelAnimationFrame(fractionFrame)
+  }
+  if (reclaimFrame !== null) {
+    cancelAnimationFrame(reclaimFrame)
   }
 })
 </script>

@@ -65,13 +65,24 @@
       fluid
       class="photo-grid-content"
     >
+      <!-- tabindex: this div is the only thing in the app that scrolls. The
+           page itself is pinned — html/body are overflow:hidden and v-main
+           hands out the viewport as a flex column — so the browser's own
+           scroller has nothing to move; without a tabindex this element could
+           not take focus either, which left Arrow / PageUp / PageDown / Space
+           / Home / End doing nothing at all until a photo happened to be
+           clicked. With the native scrollbar hidden in favour of the scrubber
+           rail there is no drag target here either, so the keyboard is one of
+           only three ways to move: wheel, scrubber, keys. -->
       <div
         ref="scrollParentRef"
         class="photo-grid"
         role="listbox"
+        tabindex="0"
         aria-label="Photos"
         aria-multiselectable="true"
         @scroll="handleScroll"
+        @focusout="handleFocusOut"
       >
         <div
           class="photo-grid-spacer"
@@ -194,7 +205,7 @@ const retry = () => {
 }
 
 // Report the index of the first visible item to the store, which owns the
-// active-timeline-month state shared with TimelineScrollbar.
+// active-timeline-month state shared with the timeline scrubber.
 const reportViewport = () => {
   const el = scrollParentRef.value
   if (!el || photos.value.length === 0) return
@@ -205,8 +216,72 @@ const reportViewport = () => {
   photosStore.reportViewport(firstVisibleIndex)
 }
 
+// The thumb on the scrubber rail tracks this. Throttled to animation frames
+// rather than debounced: the month highlight can afford to settle after the
+// scroll stops, a position marker that does the same looks broken.
+let fractionFrame: number | null = null
+const reportScrollFraction = () => {
+  if (fractionFrame !== null) return
+  fractionFrame = requestAnimationFrame(() => {
+    fractionFrame = null
+    const el = scrollParentRef.value
+    if (!el) return
+    const range = el.scrollHeight - el.clientHeight
+    photosStore.reportScrollFraction(range > 0 ? el.scrollTop / range : 0)
+  })
+}
+
+/**
+ * Keep the keyboard alive when the virtualizer unmounts the focused card.
+ *
+ * Scrolling recycles rows, so the PhotoItem holding focus is routinely removed
+ * from the DOM under the reader. Focus then falls to <body>, which scrolls
+ * nothing, and every key goes dead until something is clicked — the "it worked
+ * a second ago" half of the problem.
+ *
+ * Deleting the focused element fires focusout in Chromium and in neither
+ * Firefox nor WebKit, so the event cannot be what drives this: written that
+ * way the fix exists in one browser out of three. The check rides along with
+ * the scroll that caused the deletion instead, one animation frame later so
+ * that Vue has re-rendered by the time it looks. focusout is kept only as the
+ * earlier signal where a browser offers it.
+ */
+let reclaimFrame: number | null = null
+
+const reclaimFocus = () => {
+  // "Focus went nowhere" is the only state worth undoing: the scrubber rail, a
+  // control in the bar, a card — anything else is somewhere a reader put it,
+  // and taking it back would be a theft. Engines disagree on what nowhere
+  // looks like after the focused element is deleted — <body>, nothing at all,
+  // or the detached element itself — so all three are read as the same thing.
+  const active = document.activeElement
+  const nowhere = active === null || active === document.body || !active.isConnected
+  if (!nowhere) return
+  // Vuetify moves focus into an overlay on open and returns it to the
+  // activator on close; while one is up it is not ours to claim.
+  if (document.querySelector('.v-overlay--active')) return
+  scrollParentRef.value?.focus({ preventScroll: true })
+}
+
+const scheduleReclaim = () => {
+  if (reclaimFrame !== null) return
+  reclaimFrame = requestAnimationFrame(() => {
+    reclaimFrame = null
+    reclaimFocus()
+  })
+}
+
+const handleFocusOut = (event: FocusEvent) => {
+  // Focus moved to something real. Leave it there.
+  if (event.relatedTarget !== null) return
+  scheduleReclaim()
+}
+
 // Debounced scroll handler
 const handleScroll = () => {
+  reportScrollFraction()
+  scheduleReclaim()
+
   if (scrollTimeout.value) {
     clearTimeout(scrollTimeout.value)
   }
@@ -215,6 +290,19 @@ const handleScroll = () => {
     reportViewport()
   }, 150)
 }
+
+// Scrubber drags land here as a fraction of the whole list. Written straight
+// to scrollTop rather than through scrollToIndex: a drag names a position,
+// not a row, and snapping each step to a row boundary would make the grid
+// move in visible jumps under a smoothly moving finger.
+watch(
+  () => photosStore.scrubRequest,
+  (req) => {
+    const el = scrollParentRef.value
+    if (!req || !el) return
+    el.scrollTop = req.fraction * (el.scrollHeight - el.clientHeight)
+  },
+)
 
 // Timeline clicks land in the store as a scroll request; execute it here.
 watch(
@@ -230,6 +318,9 @@ onMounted(() => {
   updateColumns()
   window.addEventListener('resize', updateColumns)
   reportViewport()
+  // Arrow keys have to work on arrival, not only after the first click.
+  // preventScroll: taking focus must not itself move the grid.
+  scrollParentRef.value?.focus({ preventScroll: true })
 })
 
 onUnmounted(() => {
@@ -238,13 +329,23 @@ onUnmounted(() => {
   if (scrollTimeout.value) {
     clearTimeout(scrollTimeout.value)
   }
+  if (fractionFrame !== null) {
+    cancelAnimationFrame(fractionFrame)
+  }
+  if (reclaimFrame !== null) {
+    cancelAnimationFrame(reclaimFrame)
+  }
 })
 </script>
 
 <style scoped>
 .photo-grid-container {
   position: relative;
-  height: calc(100vh - var(--v-layout-top, 0px));
+  /* Fill whatever v-main's column leaves after the filter bar — claiming the
+     viewport height here while the filter bar sat above pushed the document
+     one bar taller than the window. */
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -254,7 +355,8 @@ onUnmounted(() => {
 
 .photo-grid-content {
   max-width: none;
-  height: calc(100vh - var(--v-layout-top, 0px));
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -264,6 +366,29 @@ onUnmounted(() => {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* No native scrollbar: the scrubber rail is the position indicator now, and
+     two bars answering "where am I" side by side — one proportional to rows,
+     one to photos — would disagree slightly and both look wrong. Scrolling
+     itself (wheel, touch, keys) is untouched; only the bar is gone.
+     scrollbar-width covers Firefox and Chromium, the -webkit rule Safari. */
+  scrollbar-width: none;
+}
+
+.photo-grid::-webkit-scrollbar {
+  display: none;
+}
+
+/* No focus ring, deliberately. This container is the app's ambient focus: it
+   takes focus on mount and takes it back whenever focus would otherwise fall
+   to <body>, so it holds focus nearly always — and Chrome matches
+   :focus-visible on the programmatic focus, which put a full-height line down
+   the edge of the grid from the moment the page loaded. An indicator that is
+   always on distinguishes nothing. What a reader needs to see is *which photo*
+   they are on, and that belongs on the cards, which keep their own
+   :focus-visible ring; the scrubber rail keeps its own too. */
+.photo-grid:focus,
+.photo-grid:focus-visible {
+  outline: none;
 }
 
 .photo-grid-spacer {

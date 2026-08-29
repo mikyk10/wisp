@@ -1,6 +1,6 @@
 <template>
   <!-- `temporary` is deliberate: this layout is hand-rolled with position:fixed
-       (TimelineScrollbar pins itself to right:0, PhotoGrid compensates with
+       (TimelineScrubber pins itself to right:0, PhotoGrid compensates with
        padding-right, and the column maths reads window.innerWidth directly).
        A permanent drawer would shift --v-layout-right, which none of that
        observes, and the drawer would sit on top of the timeline. An overlay

@@ -159,6 +159,8 @@ void setup() {
         Serial.printf("[WiFi] Connection failed, showing error and sleeping %ds...\n",
                       FALLBACK_SLEEP_SECONDS);
 
+        wifiManager.shutdownRadio();
+
         initEPaper();
         epaper->sendErrorScreen();
         epaper->displayImage();
@@ -187,16 +189,21 @@ void setup() {
                  serverBaseURL.c_str(),
                  macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
         sleepSeconds = fetchImage(imageURL, epaper);
+    }
 
-        // NOTE: sleepSeconds == 0 (server returned X-Sleep-Seconds: 0) falls through to error path.
-        // If 0-second sleep becomes a valid server response, change this to >= 0.
-        if (sleepSeconds > 0) {
-            // Display whatever the server sent (normal image or error image) and sleep.
-            epaper->displayImage();
-            epaper->enterSleep();
-            deepSleep(sleepSeconds);
-            return;
-        }
+    // All network work is done — the image bytes are already in the panel's RAM.
+    // Cut the radio before the refresh so beacon reception and keep-alive TX bursts
+    // don't stack on top of the EPD drive current and deepen the supply sag.
+    wifiManager.shutdownRadio();
+
+    // NOTE: sleepSeconds == 0 (server returned X-Sleep-Seconds: 0) falls through to error path.
+    // If 0-second sleep becomes a valid server response, change this to >= 0.
+    if (sleepSeconds > 0) {
+        // Display whatever the server sent (normal image or error image) and sleep.
+        epaper->displayImage();
+        epaper->enterSleep();
+        deepSleep(sleepSeconds);
+        return;
     }
 
     // ここに来ているということはなんか問題があった

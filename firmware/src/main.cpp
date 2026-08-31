@@ -89,19 +89,17 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
         Serial.printf("[http] HTTP error %d — attempting to render server error image\n", httpCode);
     }
 
-    // -1 means the length is unknown, which is what a chunked response looks
-    // like. The drivers fall back to the byte count their own panel needs, so
-    // that is worth attempting rather than discarding along with the sleep
-    // interval below. Only an explicitly empty body is hopeless.
+    // -1 means the length is unknown — a chunked response. That cannot be
+    // rescued here: the drivers read the raw socket via getStreamPtr(), and
+    // this HTTP client only strips chunked framing in writeToStream(), so the
+    // readers would clock chunk-size lines into the panel as pixel data.
+    // Reject it and show the error screen, exactly like an empty body.
     int contentLength = httpClient.getSize();
-    if (contentLength == 0) {
+    if (contentLength <= 0) {
         Serial.println("[http] No content received");
         httpClient.end();
         delete secureClient;
         return -1;
-    }
-    if (contentLength < 0) {
-        Serial.println("[http] Content length unknown, falling back to panel size");
     }
 
     int sleepSeconds = 300;

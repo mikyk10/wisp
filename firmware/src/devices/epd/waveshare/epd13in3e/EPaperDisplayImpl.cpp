@@ -295,6 +295,11 @@ void EPD13In3EImpl::displayImage() {
 }
 
 void EPD13In3EImpl::enterSleep() {
+    // A failsafe entry can arrive mid-transfer with one CS already LOW; the
+    // IC only treats the next byte as a command after a fresh falling edge,
+    // otherwise 0x07/0xA5 would be consumed as two pixels by the stuck IC.
+    csAll(HIGH);
+    delay(1);
     csAll(LOW);
     SPI.transfer(0x07);  // DEEP_SLEEP
     SPI.transfer(0xA5);

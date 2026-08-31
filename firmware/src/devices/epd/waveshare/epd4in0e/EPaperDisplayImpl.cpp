@@ -23,6 +23,7 @@ void EPD4InE6Impl::spiWrite(unsigned char data) {
 // EPDの電源投入後に1度だけ行う処理
 void EPD4InE6Impl::moduleInit()  {
 	//gpio
+  gpio_hold_dis((gpio_num_t)EPD_PWR_PIN); // release the deep-sleep hold before driving it
   pinMode(EPD_BUSY_PIN,  INPUT);
   pinMode(EPD_RST_PIN , OUTPUT);
   pinMode(EPD_DC_PIN  , OUTPUT);

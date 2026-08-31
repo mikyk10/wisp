@@ -53,6 +53,7 @@ void EPD13In3KImpl::moduleInit() {
     pinMode(EPD_CS_PIN,   OUTPUT);
 
 #ifdef EPD_PWR_PIN
+    gpio_hold_dis((gpio_num_t)EPD_PWR_PIN); // release the deep-sleep hold before driving it
     pinMode(EPD_PWR_PIN, OUTPUT);
     digitalWrite(EPD_PWR_PIN, HIGH);
 #endif

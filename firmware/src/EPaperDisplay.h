@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <HTTPClient.h>
 #include <esp_sleep.h>
+#include <driver/gpio.h>
 
 class EPaperDisplay {
 public:
@@ -11,12 +12,24 @@ public:
     static constexpr unsigned long EPD_STREAM_TIMEOUT_MS = 30000;
     static constexpr uint64_t      EPD_ERROR_SLEEP_US    = 3600ULL * 1000000ULL;
 
+    // Timer deep sleep with the panel's power switch held LOW. Deep sleep
+    // releases every ordinary GPIO, so without the hold EPD_PWR_PIN floats
+    // for the whole sleep — harmless only if the board has its own pulldown.
+    // moduleInit() releases the hold again on the next wake.
+    [[noreturn]] static void startTimedDeepSleep(uint64_t us) {
+        #ifdef EPD_PWR_PIN
+        gpio_hold_en((gpio_num_t)EPD_PWR_PIN);
+        gpio_deep_sleep_hold_en();
+        #endif
+        esp_sleep_enable_timer_wakeup(us);
+        esp_deep_sleep_start();
+    }
+
     // For error paths where no display instance exists (factory returned
     // nullptr): nothing was ever powered, so there is no panel to fold.
     [[noreturn]] static void sleepOnErrorNoPanel(const char* reason) {
         Serial.printf("[EPD] %s — entering deep sleep\n", reason);
-        esp_sleep_enable_timer_wakeup(EPD_ERROR_SLEEP_US);
-        esp_deep_sleep_start();
+        startTimedDeepSleep(EPD_ERROR_SLEEP_US);
     }
 
     // Every caller of this sits past moduleInit(), so the panel is powered —
@@ -31,8 +44,7 @@ public:
             inFailsafe = true;
             failsafePanelOff();
         }
-        esp_sleep_enable_timer_wakeup(EPD_ERROR_SLEEP_US);
-        esp_deep_sleep_start();
+        startTimedDeepSleep(EPD_ERROR_SLEEP_US);
     }
 
     virtual void initialize() = 0;

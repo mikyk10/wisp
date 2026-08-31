@@ -155,8 +155,7 @@ void deepSleep(int seconds) {
         Serial.printf("[sys] Sleep request of %d s out of bounds, clamped\n", seconds);
     }
     Serial.printf("[sys] Entering deep sleep for %d seconds...\n", clamped);
-    esp_sleep_enable_timer_wakeup(clamped * 1000000ULL);
-    esp_deep_sleep_start();
+    EPaperDisplay::startTimedDeepSleep(clamped * 1000000ULL);
 }
 
 void initEPaper() {

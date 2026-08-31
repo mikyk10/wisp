@@ -25,4 +25,12 @@ const char hostname_template[] = "WISP-******";  // Dynamically replaced by hard
 
 #define FALLBACK_SLEEP_SECONDS 3600
 
+// Bounds for any deep sleep request. The cap stops a corrupted or mistyped
+// X-Sleep-Seconds from parking the frame for years (recoverable only via RST);
+// it is not an operating policy — a weekly wake schedule (604800) passes
+// through untouched. The floor matches the documented minimum and keeps a
+// misbehaving server from driving continuous wake/refresh cycles.
+#define SLEEP_MIN_SECONDS 180
+#define SLEEP_MAX_SECONDS 2592000  // 30 days
+
 #endif

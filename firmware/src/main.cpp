@@ -115,9 +115,15 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
 }
 
 
+// Every sleep in the firmware funnels through here, so the clamp cannot be
+// bypassed by a code path that forgets it.
 void deepSleep(int seconds) {
-    Serial.printf("[sys] Entering deep sleep for %d seconds...\n", seconds);
-    esp_sleep_enable_timer_wakeup(seconds * 1000000ULL);
+    int clamped = constrain(seconds, SLEEP_MIN_SECONDS, SLEEP_MAX_SECONDS);
+    if (clamped != seconds) {
+        Serial.printf("[sys] Sleep request of %d s out of bounds, clamped\n", seconds);
+    }
+    Serial.printf("[sys] Entering deep sleep for %d seconds...\n", clamped);
+    esp_sleep_enable_timer_wakeup(clamped * 1000000ULL);
     esp_deep_sleep_start();
 }
 
@@ -250,7 +256,10 @@ void setup() {
     epaper->sendErrorScreen();
     epaper->displayImage();
     epaper->enterSleep();
-    deepSleep(86400);
+    // Server URL missing or fetch failed — both are fixed by a config or
+    // server-side change, so retry on the normal fallback cadence instead of
+    // going dark for a day.
+    deepSleep(FALLBACK_SLEEP_SECONDS);
 }
 
 void loop() {

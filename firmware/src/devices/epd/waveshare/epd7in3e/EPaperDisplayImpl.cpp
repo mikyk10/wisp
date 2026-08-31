@@ -124,6 +124,7 @@ void EPD7In3EImpl::initialize(){
 
   sendCommand(0x04);     //PWR on
   busyHigh();          //waiting for the electronic paper IC to release the idle signal
+  panelPowered = true;
 
   Serial.println("[display] initialized");
   return;
@@ -189,6 +190,7 @@ void EPD7In3EImpl::sendImageData(HTTPClient *client, int length) {
 void EPD7In3EImpl::displayImage() {
   sendCommand(0x04);
   busyHigh();
+  panelPowered = true;
   Serial.println("[displayImage] power on");
   delay(200);
 
@@ -209,12 +211,22 @@ void EPD7In3EImpl::displayImage() {
   sendCommand(0x02); // POWER_OFF
   sendData(0X00);
   busyHigh();
+  panelPowered = false;
   Serial.println("[displayImage] power off");
   delay(200);
 }
 
 void EPD7In3EImpl::enterSleep() {
-  // POWER_OFF is already sent at the end of displayImage(); skip here to avoid double send.
+  // displayImage() normally ends with POWER_OFF, but the skip-redraw and
+  // failsafe paths arrive here with initialize()'s PON still active — cutting
+  // VCC with the booster energized is the power-down the datasheet forbids.
+  // A fixed delay stands in for the BUSY wait: BUSY may be why we are here.
+  if (panelPowered) {
+    sendCommand(0x02); // POWER_OFF
+    sendData(0x00);
+    delay(200);
+    panelPowered = false;
+  }
   delay(100);
   sendCommand(0x07);
   sendData(0xA5);

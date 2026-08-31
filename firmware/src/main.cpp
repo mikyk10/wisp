@@ -131,7 +131,7 @@ void initEPaper() {
     Serial.println("[EPD] Creating display...");
     epaper = EPaperFactory::create();
     if (!epaper) {
-        EPaperDisplay::sleepOnError("EPaperFactory::create() returned nullptr — no EPD model defined");
+        EPaperDisplay::sleepOnErrorNoPanel("EPaperFactory::create() returned nullptr — no EPD model defined");
     }
     Serial.println("[EPD] Initializing...");
     epaper->initialize();

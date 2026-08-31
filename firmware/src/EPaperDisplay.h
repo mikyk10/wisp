@@ -11,8 +11,26 @@ public:
     static constexpr unsigned long EPD_STREAM_TIMEOUT_MS = 30000;
     static constexpr uint64_t      EPD_ERROR_SLEEP_US    = 3600ULL * 1000000ULL;
 
-    static void sleepOnError(const char* reason) {
+    // For error paths where no display instance exists (factory returned
+    // nullptr): nothing was ever powered, so there is no panel to fold.
+    [[noreturn]] static void sleepOnErrorNoPanel(const char* reason) {
         Serial.printf("[EPD] %s — entering deep sleep\n", reason);
+        esp_sleep_enable_timer_wakeup(EPD_ERROR_SLEEP_US);
+        esp_deep_sleep_start();
+    }
+
+    // Every caller of this sits past moduleInit(), so the panel is powered —
+    // and the MCU's deep sleep does not cut external power. Fold the panel
+    // first or it draws current for the entire error sleep, deepening the
+    // very supply sag that likely brought us here.
+    [[noreturn]] void sleepOnError(const char* reason) {
+        static bool inFailsafe = false;
+        Serial.printf("[EPD] %s — folding panel, entering deep sleep\n", reason);
+        if (!inFailsafe) {
+            // A failsafe that fails again must not recurse; skip straight to sleep.
+            inFailsafe = true;
+            failsafePanelOff();
+        }
         esp_sleep_enable_timer_wakeup(EPD_ERROR_SLEEP_US);
         esp_deep_sleep_start();
     }
@@ -25,6 +43,13 @@ public:
     virtual void enterSleep() = 0;
 
     virtual ~EPaperDisplay() {}
+
+protected:
+    // Best-effort shutdown for a panel in an unknown state. enterSleep() is
+    // safe wherever its sequence never waits on BUSY; a driver whose sleep
+    // sequence does wait must override this with a no-wait variant, because
+    // a stuck BUSY line is often exactly why we are here.
+    virtual void failsafePanelOff() { enterSleep(); }
 };
 
 #endif // EPAPER_DISPLAY_H

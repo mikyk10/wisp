@@ -199,7 +199,7 @@ void WiFiManager::handleRoot()
         "<datalist id='ssids'></datalist>"
         "<label>WiFi SSID</label>"
         "<input type='text' name='ssid' list='ssids' autocomplete='off' spellcheck='false'"
-        " value='";
+        " required value='";
     html += htmlEsc(savedSSID);
     html +=
         "' placeholder='e.g. MyHomeNetwork'>"
@@ -210,6 +210,7 @@ void WiFiManager::handleRoot()
         ">"
         "<label>Server URL</label>"
         "<input type='text' name='server_url' autocomplete='off' spellcheck='false'"
+        " required pattern='https?://.*' title='Must start with http:// or https://'"
         " value='";
     html += htmlEsc(savedServerURL);
     html +=
@@ -263,6 +264,27 @@ void WiFiManager::handleSave()
     String newSSID      = server.arg("ssid");
     String newPassword  = server.arg("password");
     String newServerURL = server.arg("server_url");
+    newSSID.trim();
+    newServerURL.trim();
+
+    // Last line of defence behind the form's own validation (which can be
+    // bypassed): a saved garbage URL costs a reboot into the error-sleep
+    // loop, recoverable only by holding BOOT at power-on.
+    if (newSSID.length() == 0 ||
+        (!newServerURL.startsWith("http://") && !newServerURL.startsWith("https://")))
+    {
+        server.send(400, "text/html",
+            "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'></head>"
+            "<body style='font-family:sans-serif;max-width:420px;margin:48px auto;"
+            "padding:0 16px;background:#0f1117;color:#e0e0e0'>"
+            "<h2>Invalid settings</h2>"
+            "<p>SSID must not be empty and the server URL must start with "
+            "<code>http://</code> or <code>https://</code>.</p>"
+            "<p><a href='/' style='color:#00d2a8'>&larr; Back</a></p>"
+            "</body></html>");
+        return;
+    }
 
     // Empty password → keep existing
     if (newPassword.length() == 0)

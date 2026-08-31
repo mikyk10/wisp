@@ -185,6 +185,29 @@ void initEPaper() {
     Serial.println("[EPD] Initialized.");
 }
 
+// Draws the built-in error screen unless the panel already shows it, keeping
+// the skip cadence and its bookkeeping in one place. With needsInit the panel
+// is powered up only when the draw actually happens — a skipped redraw leaves
+// it unpowered for the whole cycle — and folded again afterwards; a caller
+// whose panel is already initialized folds it itself.
+void showErrorScreenThrottled(bool needsInit) {
+    uint8_t skips = loadErrorSkips();
+    if (errorRedrawDue(skips)) {
+        if (needsInit) {
+            initEPaper();
+        }
+        epaper->sendErrorScreen();
+        epaper->displayImage();
+        saveErrorSkips(1); // after the refresh: an interrupted draw retries next cycle
+        if (needsInit) {
+            epaper->enterSleep();
+        }
+    } else {
+        Serial.printf("[EPD] Error screen already shown (%u cycles), skipping redraw\n", skips);
+        saveErrorSkips(skips + 1);
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(true);
@@ -259,19 +282,7 @@ void setup() {
 
         wifiManager.shutdownRadio();
 
-        uint8_t skips = loadErrorSkips();
-        if (errorRedrawDue(skips)) {
-            initEPaper();
-            epaper->sendErrorScreen();
-            epaper->displayImage();
-            saveErrorSkips(1); // after the refresh: an interrupted draw retries next cycle
-            epaper->enterSleep();
-        } else {
-            // The error screen is already on the panel — skip the redraw, and
-            // the panel power-up along with it.
-            Serial.printf("[EPD] Error screen already shown (%u cycles), skipping redraw\n", skips);
-            saveErrorSkips(skips + 1);
-        }
+        showErrorScreenThrottled(true);
 
         deepSleep(FALLBACK_SLEEP_SECONDS);
         return;
@@ -334,15 +345,7 @@ void setup() {
     // schedule as a failed WiFi connection rather than leaving the frame dark
     // for a day — a server restart should not cost a day of pictures.
     Serial.println("[fallback] Default error page");
-    uint8_t skips = loadErrorSkips();
-    if (errorRedrawDue(skips)) {
-        epaper->sendErrorScreen();
-        epaper->displayImage();
-        saveErrorSkips(1);
-    } else {
-        Serial.printf("[EPD] Error screen already shown (%u cycles), skipping redraw\n", skips);
-        saveErrorSkips(skips + 1);
-    }
+    showErrorScreenThrottled(false);
     // The panel was powered for the fetch attempt — fold it regardless.
     epaper->enterSleep();
     deepSleep(FALLBACK_SLEEP_SECONDS);

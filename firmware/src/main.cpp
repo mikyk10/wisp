@@ -88,8 +88,16 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
         return -1;
     }
     if (httpCode != HTTP_CODE_OK) {
-        // HTTP error (4xx/5xx): the server may have sent an error image as the body.
-        // Fall through to display it instead of silently falling back to the built-in error screen.
+        // HTTP error (4xx/5xx): a WiSP server sends an error *card* here and
+        // stamps X-Sleep-Seconds immediately before writing it — a response
+        // without the header is some other server's HTML/JSON, which would be
+        // clocked into the panel as pixels and repainted every default cycle.
+        if (!httpClient.hasHeader(xSleepSecondsHeader)) {
+            Serial.printf("[http] HTTP error %d without X-Sleep-Seconds — not a WiSP error card\n", httpCode);
+            httpClient.end();
+            delete secureClient;
+            return -1;
+        }
         Serial.printf("[http] HTTP error %d — attempting to render server error image\n", httpCode);
     }
 

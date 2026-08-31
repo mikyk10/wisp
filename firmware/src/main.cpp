@@ -14,6 +14,36 @@ EPaperDisplay* epaper = nullptr;
 
 #define LED 2
 
+// Short tokens, safe to embed in a URL query as-is.
+const char* resetReasonName(esp_reset_reason_t r) {
+    switch (r) {
+        case ESP_RST_POWERON:   return "poweron";
+        case ESP_RST_EXT:       return "ext";
+        case ESP_RST_SW:        return "sw";
+        case ESP_RST_PANIC:     return "panic";
+        case ESP_RST_INT_WDT:   return "int_wdt";
+        case ESP_RST_TASK_WDT:  return "task_wdt";
+        case ESP_RST_WDT:       return "wdt";
+        case ESP_RST_DEEPSLEEP: return "deepsleep";
+        case ESP_RST_BROWNOUT:  return "brownout";
+        case ESP_RST_SDIO:      return "sdio";
+        default:                return "unknown";
+    }
+}
+
+const char* wakeupCauseName(esp_sleep_wakeup_cause_t c) {
+    switch (c) {
+        case ESP_SLEEP_WAKEUP_TIMER: return "timer";
+        case ESP_SLEEP_WAKEUP_EXT0:  return "ext0";
+        case ESP_SLEEP_WAKEUP_EXT1:  return "ext1";
+        case ESP_SLEEP_WAKEUP_GPIO:  return "gpio";
+        case ESP_SLEEP_WAKEUP_UART:  return "uart";
+        case ESP_SLEEP_WAKEUP_ULP:   return "ulp";
+        case ESP_SLEEP_WAKEUP_UNDEFINED: return "none"; // not a deep-sleep wake
+        default:                     return "other";
+    }
+}
+
 int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
     WiFiClient wifiClient;
     HTTPClient httpClient;
@@ -109,6 +139,13 @@ void setup() {
 
     Serial.printf("Free heap before new: %d\n", ESP.getFreeHeap());
 
+    // Why this boot happened. A brownout here is the smoking gun for supply
+    // sag, and it is unreadable after the next reset — which is why it also
+    // rides to the server on the image request below.
+    Serial.printf("[sys] reset: %s, wakeup: %s\n",
+                  resetReasonName(esp_reset_reason()),
+                  wakeupCauseName(esp_sleep_get_wakeup_cause()));
+
     // Check BOOT button early: press and release RST then immediately hold BOOT to enter config mode
     // Must be checked before the serial delay, as the user holds BOOT right after RST release
     pinMode(BOOT_PIN, INPUT_PULLUP);
@@ -185,9 +222,11 @@ void setup() {
         uint8_t macAddr[6];
         WiFi.macAddress(macAddr);
         snprintf(imageURL, sizeof(imageURL),
-                 "%s/pf/%02x%02x%02x%02x%02x%02x/image/random.bin",
+                 "%s/pf/%02x%02x%02x%02x%02x%02x/image/random.bin?rr=%s&wc=%s",
                  serverBaseURL.c_str(),
-                 macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
+                 macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5],
+                 resetReasonName(esp_reset_reason()),
+                 wakeupCauseName(esp_sleep_get_wakeup_cause()));
         sleepSeconds = fetchImage(imageURL, epaper);
     }
 

@@ -56,6 +56,7 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
     const char* xSleepSecondsHeader = "X-Sleep-Seconds";
     const char* requiredHeaders[] = {xSleepSecondsHeader};
     httpClient.collectHeaders(requiredHeaders, 1);
+    httpClient.addHeader("X-Firmware-Version", WISP_FW_VERSION);
 
     Serial.printf("[http] Fetching image: %s\n", imageURL);
 
@@ -179,6 +180,7 @@ void setup() {
     // Why this boot happened. A brownout here is the smoking gun for supply
     // sag, and it is unreadable after the next reset — which is why it also
     // rides to the server on the image request below.
+    Serial.printf("[sys] WiSP firmware %s\n", WISP_FW_VERSION);
     Serial.printf("[sys] reset: %s, wakeup: %s\n",
                   resetReasonName(esp_reset_reason()),
                   wakeupCauseName(esp_sleep_get_wakeup_cause()));

@@ -9,7 +9,7 @@ Arduino/PlatformIO firmware for ESP32-based e-paper photo frames. Wakes from dee
 - Deep-sleep power management — minimal current draw between updates
 - WiFi provisioning via SoftAP web UI — credentials stored in ESP32 NVS, not hardcoded
 - BOOT-button config mode — press and release RST then immediately hold BOOT to re-enter provisioning without reflashing
-- Supports 7.3″ and 4.0″ Waveshare Spectra 6 (6-color) displays
+- Supports Waveshare Spectra 6 (6-color) displays — 7.3″ and 4.0″ built in CI; 13.3″ Spectra 6 and 13.3″ 4-grayscale drivers await hardware (see the table below)
 - Sleep duration controlled by `X-Sleep-Seconds` response header from server (default 300 s, clamped to [180 s, 30 days])
 - Error screen displayed on failed image fetch, followed by 1-hour sleep
 

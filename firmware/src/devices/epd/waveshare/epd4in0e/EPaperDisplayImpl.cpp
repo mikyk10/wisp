@@ -181,6 +181,7 @@ void EPD4InE6Impl::sendImageData(HTTPClient *client, int length) {
 
 void EPD4InE6Impl::displayImage() {
   sendCommand(0x04);
+  panelPowered = true; // before the wait: a stuck BUSY must still fold the rails
   busyHigh();
   Serial.println("[displayImage] power on");
   delay(200);
@@ -202,12 +203,27 @@ void EPD4InE6Impl::displayImage() {
   sendCommand(0x02); // POWER_OFF
   sendData(0X00);
   busyHigh();
+  panelPowered = false;
   Serial.println("[displayImage] power off");
   delay(200);
 }
 
 
 void EPD4InE6Impl::enterSleep() {
+  // The failsafe path can arrive with PON still active — cutting VCC with the
+  // booster energized is the power-down the datasheet forbids. Wait on BUSY,
+  // but bounded and without sleepOnError: on the failsafe entry a dead BUSY
+  // line may be exactly why we are here. LOW = busy on this family.
+  if (panelPowered) {
+    sendCommand(0x02); // POWER_OFF
+    sendData(0x00);
+    unsigned long pofStart = millis();
+    while (!digitalRead(EPD_BUSY_PIN) && millis() - pofStart < 3000) {
+      delay(10);
+    }
+    delay(100);
+    panelPowered = false;
+  }
   delay(100);
   sendCommand(0x07);
   sendData(0xA5);

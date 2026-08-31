@@ -15,6 +15,11 @@ public:
     void enterSleep() override;
 
 private:
+    // True while the panel's high-voltage rails are up (PON sent, POF not yet
+    // completed). enterSleep() consults it so no path — the failsafe included —
+    // can cut VCC with the booster live.
+    bool panelPowered = false;
+
     void moduleInit();
     void spiWrite(unsigned char data);
     void moduleExit();

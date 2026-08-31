@@ -99,6 +99,7 @@ void EPD13In3EImpl::turnOnDisplay() {
     csAll(LOW);
     SPI.transfer(0x04);  // POWER_ON
     csAll(HIGH);
+    panelPowered = true; // before the wait: a stuck BUSY must still fold the rails
     busyHigh();
 
     delay(50);
@@ -112,6 +113,10 @@ void EPD13In3EImpl::turnOnDisplay() {
     csAll(LOW);
     spiSend(0x02, pof_v, sizeof(pof_v));  // POWER_OFF
     csAll(HIGH);
+    // Wait POF out before anyone can issue DEEP_SLEEP: a sleep command sent
+    // while the IC is still powering down may simply be discarded.
+    busyHigh();
+    panelPowered = false;
     Serial.println("[displayImage] power off");
 }
 
@@ -297,9 +302,25 @@ void EPD13In3EImpl::displayImage() {
 void EPD13In3EImpl::enterSleep() {
     // A failsafe entry can arrive mid-transfer with one CS already LOW; the
     // IC only treats the next byte as a command after a fresh falling edge,
-    // otherwise 0x07/0xA5 would be consumed as two pixels by the stuck IC.
+    // otherwise the bytes below would be consumed as pixels by the stuck IC.
     csAll(HIGH);
     delay(1);
+
+    // The failsafe path can also arrive with PON still active — cutting VCC
+    // with the booster energized is the power-down the datasheet forbids.
+    // Bounded wait, no sleepOnError: BUSY may be why we are here.
+    if (panelPowered) {
+        static const uint8_t pof_v[] = {0x00};
+        csAll(LOW);
+        spiSend(0x02, pof_v, sizeof(pof_v));  // POWER_OFF
+        csAll(HIGH);
+        unsigned long pofStart = millis();
+        while (!digitalRead(EPD_BUSY_PIN) && millis() - pofStart < 3000) {
+            delay(10);
+        }
+        panelPowered = false;
+    }
+
     csAll(LOW);
     SPI.transfer(0x07);  // DEEP_SLEEP
     SPI.transfer(0xA5);

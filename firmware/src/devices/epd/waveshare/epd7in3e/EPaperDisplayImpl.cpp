@@ -123,8 +123,8 @@ void EPD7In3EImpl::initialize(){
   sendData(0x2F);
 
   sendCommand(0x04);     //PWR on
+  panelPowered = true;   // before the wait: a stuck BUSY must still fold the rails
   busyHigh();          //waiting for the electronic paper IC to release the idle signal
-  panelPowered = true;
 
   Serial.println("[display] initialized");
   return;
@@ -189,8 +189,8 @@ void EPD7In3EImpl::sendImageData(HTTPClient *client, int length) {
 
 void EPD7In3EImpl::displayImage() {
   sendCommand(0x04);
+  panelPowered = true; // before the wait: a stuck BUSY must still fold the rails
   busyHigh();
-  panelPowered = true;
   Serial.println("[displayImage] power on");
   delay(200);
 
@@ -218,13 +218,18 @@ void EPD7In3EImpl::displayImage() {
 
 void EPD7In3EImpl::enterSleep() {
   // displayImage() normally ends with POWER_OFF, but the skip-redraw and
-  // failsafe paths arrive here with initialize()'s PON still active — cutting
-  // VCC with the booster energized is the power-down the datasheet forbids.
-  // A fixed delay stands in for the BUSY wait: BUSY may be why we are here.
+  // failsafe paths arrive here with PON still active — cutting VCC with the
+  // booster energized is the power-down the datasheet forbids. Wait on BUSY,
+  // but bounded and without sleepOnError: on the failsafe entry a dead BUSY
+  // line may be exactly why we are here. LOW = busy on this family.
   if (panelPowered) {
     sendCommand(0x02); // POWER_OFF
     sendData(0x00);
-    delay(200);
+    unsigned long pofStart = millis();
+    while (!digitalRead(EPD_BUSY_PIN) && millis() - pofStart < 3000) {
+      delay(10);
+    }
+    delay(100);
     panelPowered = false;
   }
   delay(100);

@@ -191,7 +191,7 @@ void WiFiManager::handleRoot()
     html +=
         "</span>&nbsp;&nbsp;"
         "<span class='lbl'>FW &nbsp;</span><span class='val sm'>";
-    html += WISP_FW_VERSION;
+    html += htmlEsc(WISP_FW_VERSION);
     html +=
         "</span></div>"
         "</div>"

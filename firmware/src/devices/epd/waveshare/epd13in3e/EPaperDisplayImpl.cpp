@@ -55,6 +55,11 @@ void EPD13In3EImpl::moduleInit() {
 }
 
 void EPD13In3EImpl::moduleExit() {
+    // Deep sleep latches every digital pad (gpio_deep_sleep_hold_en is
+    // chip-wide), so any line left HIGH would back-power the unpowered panel
+    // through its protection diodes for the whole sleep.
+    csAll(LOW);
+    digitalWrite(EPD_RST_PIN, LOW);
     #ifdef EPD_PWR_PIN
     digitalWrite(EPD_PWR_PIN, LOW);
     #endif

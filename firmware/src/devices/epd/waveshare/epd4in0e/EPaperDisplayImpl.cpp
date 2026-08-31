@@ -39,8 +39,14 @@ void EPD4InE6Impl::moduleInit()  {
 }
 
 void EPD4InE6Impl::moduleExit()  {
+  // Deep sleep latches every digital pad (gpio_deep_sleep_hold_en is
+  // chip-wide), so any line left HIGH would back-power the unpowered panel
+  // through its protection diodes for the whole sleep.
+  digitalWrite(EPD_DC_PIN, LOW);
+  digitalWrite(EPD_CS_PIN, LOW);
+  digitalWrite(EPD_RST_PIN, LOW);
   digitalWrite(EPD_PWR_PIN , LOW);
-} 
+}
 
 
 void EPD4InE6Impl::initialize(){

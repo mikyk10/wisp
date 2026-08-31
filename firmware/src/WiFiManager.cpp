@@ -199,7 +199,7 @@ void WiFiManager::handleRoot()
         "<datalist id='ssids'></datalist>"
         "<label>WiFi SSID</label>"
         "<input type='text' name='ssid' list='ssids' autocomplete='off' spellcheck='false'"
-        " required value='";
+        " required maxlength='32' value='";
     html += htmlEsc(savedSSID);
     html +=
         "' placeholder='e.g. MyHomeNetwork'>"
@@ -210,7 +210,8 @@ void WiFiManager::handleRoot()
         ">"
         "<label>Server URL</label>"
         "<input type='text' name='server_url' autocomplete='off' spellcheck='false'"
-        " pattern='https?://.+' title='Must start with http:// or https:// (leave blank to set up WiFi only)'"
+        " pattern='https?://\\S+' maxlength='400'"
+        " title='Must start with http:// or https:// (leave blank to set up WiFi only)'"
         " value='";
     html += htmlEsc(savedServerURL);
     html +=
@@ -277,11 +278,22 @@ void WiFiManager::handleSave()
     // bypassed): a saved garbage URL costs a reboot into the error-sleep
     // loop, recoverable only by holding BOOT at power-on. An empty URL is
     // allowed — WiFi-only provisioning is a supported first step.
+    // wifi_config_t caps the SSID at 32 bytes — a longer one can never
+    // associate, and would only be discovered one error-sleep at a time.
+    bool ssidOk = newSSID.length() > 0 && newSSID.length() <= 32;
+
     bool urlOk = newServerURL.length() == 0;
     if (!urlOk && newServerURL.startsWith("http://"))  urlOk = newServerURL.length() > 7;
     if (!urlOk && newServerURL.startsWith("https://")) urlOk = newServerURL.length() > 8;
+    if (urlOk && newServerURL.length() > 0) {
+        // Whitespace never survives as a URL, and beyond ~450 bytes the
+        // image-URL composer in main.cpp refuses to send at all — both are
+        // detectable now, while a human is still looking at the form.
+        if (newServerURL.indexOf(' ') >= 0 || newServerURL.indexOf('\t') >= 0) urlOk = false;
+        if (newServerURL.length() > 400) urlOk = false;
+    }
 
-    if (newSSID.length() == 0 || !urlOk)
+    if (!ssidOk || !urlOk)
     {
         server.send(400, "text/html",
             "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
@@ -289,8 +301,9 @@ void WiFiManager::handleSave()
             "<body style='font-family:sans-serif;max-width:420px;margin:48px auto;"
             "padding:0 16px;background:#0f1117;color:#e0e0e0'>"
             "<h2>Invalid settings</h2>"
-            "<p>SSID must not be empty, and the server URL (if given) must be "
-            "<code>http://</code> or <code>https://</code> followed by a host.</p>"
+            "<p>SSID must be 1&ndash;32 bytes. The server URL (if given) must be "
+            "<code>http://</code> or <code>https://</code> followed by a host, "
+            "contain no spaces, and be at most 400 characters.</p>"
             "<p><a href='/' style='color:#00d2a8'>&larr; Back</a></p>"
             "</body></html>");
         return;

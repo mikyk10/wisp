@@ -238,25 +238,27 @@ void EPD13In3KImpl::sendImageData(HTTPClient *client, int length) {
         if (avail > 0) {
             int toRead = min(avail, min(streamRemaining, (int)BUF_SIZE));
             int c = stream->read(rxBuf, toRead);
-            streamRemaining -= c;
-            lastRecv = millis();
-            Serial.print(".");
+            if (c > 0) { // a failed read must not feed the timeout watchdog
+                streamRemaining -= c;
+                lastRecv = millis();
+                Serial.print(".");
 
-            int i = 0;
-            if (hasCarry) {
-                // Pair the leftover byte from the previous read with rxBuf[0]
-                splitPlanes(carry, rxBuf[0], plane0[planeIdx], plane1[planeIdx]);
-                planeIdx++;
-                hasCarry = false;
-                i = 1;
-            }
-            for (; i + 1 < c; i += 2) {
-                splitPlanes(rxBuf[i], rxBuf[i + 1], plane0[planeIdx], plane1[planeIdx]);
-                planeIdx++;
-            }
-            if (i < c) {
-                carry = rxBuf[i];
-                hasCarry = true;
+                int i = 0;
+                if (hasCarry) {
+                    // Pair the leftover byte from the previous read with rxBuf[0]
+                    splitPlanes(carry, rxBuf[0], plane0[planeIdx], plane1[planeIdx]);
+                    planeIdx++;
+                    hasCarry = false;
+                    i = 1;
+                }
+                for (; i + 1 < c; i += 2) {
+                    splitPlanes(rxBuf[i], rxBuf[i + 1], plane0[planeIdx], plane1[planeIdx]);
+                    planeIdx++;
+                }
+                if (i < c) {
+                    carry = rxBuf[i];
+                    hasCarry = true;
+                }
             }
         } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
             delete[] plane0;

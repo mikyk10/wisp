@@ -239,12 +239,14 @@ void EPD13In3EImpl::sendImageData(HTTPClient *client, int length) {
         int avail = stream->available();
         if (avail > 0) {
             int c = stream->read(buff, min(remaining, (int)BUF_SIZE));
-            for (int i = 0; i < c; i++) {
-                SPI.transfer(buff[i]);
+            if (c > 0) { // a failed read must not feed the timeout watchdog
+                for (int i = 0; i < c; i++) {
+                    SPI.transfer(buff[i]);
+                }
+                remaining -= c;
+                Serial.print(".");
+                lastRecv = millis();
             }
-            remaining -= c;
-            Serial.print(".");
-            lastRecv = millis();
         } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
             sleepOnError("sendImageData CS_M stream timeout");
         }
@@ -263,12 +265,14 @@ void EPD13In3EImpl::sendImageData(HTTPClient *client, int length) {
         int avail = stream->available();
         if (avail > 0) {
             int c = stream->read(buff, min(remaining, (int)BUF_SIZE));
-            for (int i = 0; i < c; i++) {
-                SPI.transfer(buff[i]);
+            if (c > 0) { // a failed read must not feed the timeout watchdog
+                for (int i = 0; i < c; i++) {
+                    SPI.transfer(buff[i]);
+                }
+                remaining -= c;
+                Serial.print(".");
+                lastRecv = millis();
             }
-            remaining -= c;
-            Serial.print(".");
-            lastRecv = millis();
         } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
             sleepOnError("sendImageData CS_S stream timeout");
         }

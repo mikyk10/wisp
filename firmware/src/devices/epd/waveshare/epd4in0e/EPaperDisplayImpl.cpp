@@ -148,24 +148,20 @@ void EPD4InE6Impl::sendImageData(HTTPClient *client, int length) {
         
     uint8_t buff[BUF_SIZE];
 
+    // When Content-Length is unknown (-1), fall back to the panel's exact frame size
+    int remaining = (length > 0) ? length : (EPD_WIDTH * EPD_HEIGHT / 2);
     unsigned long lastRecv = millis();
-    while(length > 0 || length == -1) {
-      size_t size = wifiStream->available();
-
-      if(size) {
-        int c = wifiStream->read(buff, BUF_SIZE);
-        Serial.printf(".");
-
-        uint8_t *p = buff;
-        for (int i = 0; i < c; i++) {
-          sendData(*p);
-          p++;
+    while (remaining > 0) {
+      if (wifiStream->available() > 0) {
+        int c = wifiStream->read(buff, min(remaining, (int)BUF_SIZE));
+        if (c > 0) { // a failed read must not feed the timeout watchdog
+          Serial.printf(".");
+          for (int i = 0; i < c; i++) {
+            sendData(buff[i]);
+          }
+          remaining -= c;
+          lastRecv = millis();
         }
-
-        if(length > 0) {
-            length -= c;
-        }
-        lastRecv = millis();
       } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
         sleepOnError("sendImageData stream timeout");
       }

@@ -187,6 +187,13 @@ void setup() {
                   resetReasonName(esp_reset_reason()),
                   wakeupCauseName(esp_sleep_get_wakeup_cause()));
 
+    // Anything but a deep-sleep wake (battery swap, RST, brownout) cleared the
+    // GPIO holds the skip-redraw branch counts on, and may have left the panel
+    // showing anything at all — forget the error screen and draw this cycle.
+    if (esp_reset_reason() != ESP_RST_DEEPSLEEP && loadErrorSkips() != 0) {
+        saveErrorSkips(0);
+    }
+
     // Check BOOT button early: press and release RST then immediately hold BOOT to enter config mode
     // Must be checked before the serial delay, as the user holds BOOT right after RST release
     pinMode(BOOT_PIN, INPUT_PULLUP);
@@ -290,10 +297,13 @@ void setup() {
     if (sleepSeconds > 0) {
         // Display whatever the server sent (normal image or error image) and sleep.
         epaper->displayImage();
-        epaper->enterSleep();
+        // Clear the marker before enterSleep(): a busy timeout in there dies
+        // via sleepOnError, and a stale marker would suppress the next error
+        // screen while the panel actually shows this photo.
         if (loadErrorSkips() != 0) {
             saveErrorSkips(0); // healthy again; write only on the transition
         }
+        epaper->enterSleep();
         deepSleep(sleepSeconds);
         return;
     }

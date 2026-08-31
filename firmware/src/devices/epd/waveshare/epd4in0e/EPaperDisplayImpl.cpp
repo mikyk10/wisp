@@ -146,34 +146,23 @@ void EPD4InE6Impl::sendClearScreenData(unsigned char color) {
 }
 
 void EPD4InE6Impl::sendImageData(HTTPClient *client, int length) {
-    WiFiClient *wifiStream;
-    wifiStream = client->getStreamPtr();
+    if (length <= 0) {
+      // fetchImage() rejects unknown lengths before any driver runs — the raw
+      // socket cannot be dechunked here. Arriving anyway means the upstream
+      // contract broke; fold the panel rather than clock garbage into it.
+      sleepOnError("sendImageData: unknown content length");
+    }
 
     sendCommand(0x10);
 
     Serial.printf("[disp] Transferring data: ");
-        
-    uint8_t buff[BUF_SIZE];
-
-    // When Content-Length is unknown (-1), fall back to the panel's exact frame size
-    int remaining = (length > 0) ? length : (EPD_WIDTH * EPD_HEIGHT / 2);
-    unsigned long lastRecv = millis();
-    while (remaining > 0) {
-      if (wifiStream->available() > 0) {
-        int c = wifiStream->read(buff, min(remaining, (int)BUF_SIZE));
-        if (c > 0) { // a failed read must not feed the timeout watchdog
-          Serial.printf(".");
-          for (int i = 0; i < c; i++) {
-            sendData(buff[i]);
-          }
-          remaining -= c;
-          lastRecv = millis();
-        }
-      } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
-        sleepOnError("sendImageData stream timeout");
+    streamFromHttp(client->getStreamPtr(), min(length, EPD_WIDTH * EPD_HEIGHT / 2),
+                   [this](const uint8_t *b, int c) {
+      Serial.printf(".");
+      for (int i = 0; i < c; i++) {
+        sendData(b[i]);
       }
-      delay(1);
-    }
+    });
     Serial.println("done.");
 
     delay(200);

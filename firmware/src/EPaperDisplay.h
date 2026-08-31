@@ -66,11 +66,35 @@ public:
     virtual ~EPaperDisplay() {}
 
 protected:
-    // Best-effort shutdown for a panel in an unknown state. enterSleep() is
-    // safe wherever its sequence never waits on BUSY; a driver whose sleep
-    // sequence does wait must override this with a no-wait variant, because
-    // a stuck BUSY line is often exactly why we are here.
+    // Best-effort shutdown for a panel in an unknown state. The default
+    // reuses enterSleep(), whose waits are bounded and never call
+    // sleepOnError; a driver whose sleep path needs extra recovery (such as
+    // a hardware reset first) overrides this.
     virtual void failsafePanelOff() { enterSleep(); }
+
+    // Reads exactly `remaining` bytes from the HTTP stream, handing each
+    // chunk to consume(buf, count) — the one home for the read clamp, the
+    // failed-read watchdog guard and the stream timeout, shared by every
+    // driver. Callers guarantee remaining > 0: fetchImage() rejects unknown
+    // lengths, because the raw socket cannot be dechunked here.
+    template <typename Consume>
+    void streamFromHttp(WiFiClient* stream, int remaining, Consume consume) {
+        uint8_t buff[BUF_SIZE];
+        unsigned long lastRecv = millis();
+        while (remaining > 0) {
+            if (stream->available() > 0) {
+                int c = stream->read(buff, min(remaining, (int)BUF_SIZE));
+                if (c > 0) { // a failed read must not feed the timeout watchdog
+                    consume(buff, c);
+                    remaining -= c;
+                    lastRecv = millis();
+                }
+            } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
+                sleepOnError("sendImageData stream timeout");
+            }
+            delay(1);
+        }
+    }
 };
 
 #endif // EPAPER_DISPLAY_H

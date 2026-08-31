@@ -234,35 +234,31 @@ void EPD13In3EImpl::sendClearScreenData(unsigned char color) {
 }
 
 void EPD13In3EImpl::sendImageData(HTTPClient *client, int length) {
+    if (length <= 0) {
+        // fetchImage() rejects unknown lengths before any driver runs — the
+        // raw socket cannot be dechunked here. Arriving anyway means the
+        // upstream contract broke; fold the panel rather than clock garbage.
+        sleepOnError("sendImageData: unknown content length");
+    }
     WiFiClient *stream = client->getStreamPtr();
-    uint8_t buff[BUF_SIZE];
 
-    // When Content-Length is unknown (-1), fall back to exact expected size per panel
-    int halfLen = (length > 0) ? (length / 2) : (EPD_HALF_BYTES_PER_ROW * EPD_HEIGHT);
+    // Clamp to the panel's frame and split evenly: each IC gets exactly half,
+    // and a stray odd byte is left unread instead of skewing CS_S by a byte.
+    const int frame = EPD_HALF_BYTES_PER_ROW * EPD_HEIGHT * 2;
+    const int halfLen = min(length, frame) / 2;
+
+    auto toPanel = [](const uint8_t *b, int c) {
+        for (int i = 0; i < c; i++) {
+            SPI.transfer(b[i]);
+        }
+        Serial.print(".");
+    };
 
     // First half → CS_M (left panel)
     Serial.print("[disp] Transferring CS_M: ");
     digitalWrite(EPD_CS_PIN, LOW);
     SPI.transfer(0x10);  // DTM
-    int remaining = halfLen;
-    unsigned long lastRecv = millis();
-    while (remaining > 0) {
-        int avail = stream->available();
-        if (avail > 0) {
-            int c = stream->read(buff, min(remaining, (int)BUF_SIZE));
-            if (c > 0) { // a failed read must not feed the timeout watchdog
-                for (int i = 0; i < c; i++) {
-                    SPI.transfer(buff[i]);
-                }
-                remaining -= c;
-                Serial.print(".");
-                lastRecv = millis();
-            }
-        } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
-            sleepOnError("sendImageData CS_M stream timeout");
-        }
-        delay(1);
-    }
+    streamFromHttp(stream, halfLen, toPanel);
     csAll(HIGH);
     Serial.println("done.");
 
@@ -270,25 +266,7 @@ void EPD13In3EImpl::sendImageData(HTTPClient *client, int length) {
     Serial.print("[disp] Transferring CS_S: ");
     digitalWrite(EPD_CS_S_PIN, LOW);
     SPI.transfer(0x10);  // DTM
-    remaining = (length > 0) ? (length - halfLen) : halfLen;
-    lastRecv = millis();
-    while (remaining > 0) {
-        int avail = stream->available();
-        if (avail > 0) {
-            int c = stream->read(buff, min(remaining, (int)BUF_SIZE));
-            if (c > 0) { // a failed read must not feed the timeout watchdog
-                for (int i = 0; i < c; i++) {
-                    SPI.transfer(buff[i]);
-                }
-                remaining -= c;
-                Serial.print(".");
-                lastRecv = millis();
-            }
-        } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
-            sleepOnError("sendImageData CS_S stream timeout");
-        }
-        delay(1);
-    }
+    streamFromHttp(stream, halfLen, toPanel);
     csAll(HIGH);
     Serial.println("done.");
 

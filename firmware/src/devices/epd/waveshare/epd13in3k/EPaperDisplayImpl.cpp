@@ -226,7 +226,12 @@ void EPD13In3KImpl::sendClearScreenData(unsigned char color) {
 // Requires ~163 KB of heap (two 81,600-byte plane buffers).
 // On ESP32S3 with PSRAM this is fine; without PSRAM it will likely fail.
 void EPD13In3KImpl::sendImageData(HTTPClient *client, int length) {
-    WiFiClient *stream = client->getStreamPtr();
+    if (length <= 0) {
+        // fetchImage() rejects unknown lengths before any driver runs — the
+        // raw socket cannot be dechunked here. Arriving anyway means the
+        // upstream contract broke; fold the panel rather than clock garbage.
+        sleepOnError("sendImageData: unknown content length");
+    }
 
     // nothrow, or the null check below is dead code: a throwing new on this
     // platform aborts into a panic boot loop instead of the error sleep.
@@ -240,50 +245,35 @@ void EPD13In3KImpl::sendImageData(HTTPClient *client, int length) {
 
     Serial.print("[disp] Buffering 4-gray stream: ");
 
-    // Clamp to the panel's own stream size: the plane buffers are sized for
-    // exactly EPD_PLANE_SIZE entries, and a server-declared length beyond
-    // that would write past both heap allocations via splitPlanes().
-    int streamRemaining = (length > 0) ? min(length, (int)EPD_STREAM_SIZE) : (int)EPD_STREAM_SIZE;
     int planeIdx = 0;
-    uint8_t rxBuf[BUF_SIZE];
     uint8_t carry = 0;     // leftover byte when read count is odd
     bool hasCarry = false;
-    unsigned long lastRecv = millis();
 
-    while (streamRemaining > 0) {
-        int avail = stream->available();
-        if (avail > 0) {
-            int toRead = min(avail, min(streamRemaining, (int)BUF_SIZE));
-            int c = stream->read(rxBuf, toRead);
-            if (c > 0) { // a failed read must not feed the timeout watchdog
-                streamRemaining -= c;
-                lastRecv = millis();
-                Serial.print(".");
-
-                int i = 0;
-                if (hasCarry) {
-                    // Pair the leftover byte from the previous read with rxBuf[0]
-                    splitPlanes(carry, rxBuf[0], plane0[planeIdx], plane1[planeIdx]);
-                    planeIdx++;
-                    hasCarry = false;
-                    i = 1;
-                }
-                for (; i + 1 < c; i += 2) {
-                    splitPlanes(rxBuf[i], rxBuf[i + 1], plane0[planeIdx], plane1[planeIdx]);
-                    planeIdx++;
-                }
-                if (i < c) {
-                    carry = rxBuf[i];
-                    hasCarry = true;
-                }
-            }
-        } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
-            delete[] plane0;
-            delete[] plane1;
-            sleepOnError("sendImageData stream timeout");
+    // Clamped to the panel's own stream size: the plane buffers are sized for
+    // exactly EPD_PLANE_SIZE entries, and a server-declared length beyond
+    // that would write past both heap allocations via splitPlanes(). A stream
+    // timeout inside the helper deep-sleeps without freeing the planes, which
+    // is fine — deep sleep discards the heap wholesale anyway.
+    streamFromHttp(client->getStreamPtr(), min(length, (int)EPD_STREAM_SIZE),
+                   [&](const uint8_t *rxBuf, int c) {
+        Serial.print(".");
+        int i = 0;
+        if (hasCarry) {
+            // Pair the leftover byte from the previous read with rxBuf[0]
+            splitPlanes(carry, rxBuf[0], plane0[planeIdx], plane1[planeIdx]);
+            planeIdx++;
+            hasCarry = false;
+            i = 1;
         }
-        delay(1);
-    }
+        for (; i + 1 < c; i += 2) {
+            splitPlanes(rxBuf[i], rxBuf[i + 1], plane0[planeIdx], plane1[planeIdx]);
+            planeIdx++;
+        }
+        if (i < c) {
+            carry = rxBuf[i];
+            hasCarry = true;
+        }
+    });
     Serial.println(" done.");
 
     Serial.print("[disp] Sending plane0 (0x24): ");

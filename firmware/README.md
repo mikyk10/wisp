@@ -10,7 +10,7 @@ Arduino/PlatformIO firmware for ESP32-based e-paper photo frames. Wakes from dee
 - WiFi provisioning via SoftAP web UI — credentials stored in ESP32 NVS, not hardcoded
 - BOOT-button config mode — press and release RST then immediately hold BOOT to re-enter provisioning without reflashing
 - Supports 7.3″ 7-color and 4.0″ black/white Waveshare displays
-- Sleep duration controlled by `X-Sleep-Seconds` response header from server (default 300 s, minimum 180 s)
+- Sleep duration controlled by `X-Sleep-Seconds` response header from server (default 300 s, clamped to [180 s, 30 days])
 - Error screen displayed on failed image fetch, followed by 1-hour sleep
 
 ## Hardware Requirements
@@ -28,9 +28,10 @@ Arduino/PlatformIO firmware for ESP32-based e-paper photo frames. Wakes from dee
 
 | Display | Resolution | Colors |
 |---------|-----------|--------|
-| Waveshare EPD7IN3E | 600 × 448 | 7 |
-| Waveshare EPD4IN0E | 400 × 300 | 7 |
+| Waveshare EPD7IN3E | 800 × 480 | 7 |
+| Waveshare EPD4IN0E | 600 × 400 | 7 |
 | Waveshare EPD13IN3E | 1200 × 1600 | 7 |
+| Waveshare EPD13IN3K | 960 × 680 | 4 grayscale |
 
 Combinations other than those reflected in the PlatformIO environments are untested.
 
@@ -109,7 +110,7 @@ After provisioning, each wake cycle follows this sequence:
 1. Connect to the configured WiFi network (15-second timeout).
 3. GET `{serverURL}/pf/{MAC}/image/random.bin`.
 4. Stream binary image data to the e-paper display.
-5. Read the `X-Sleep-Seconds` header from the response (default 300, minimum enforced at 180).
+5. Read the `X-Sleep-Seconds` header from the response (default 300; the firmware clamps every sleep to [180 s, 30 days]).
 6. Enter deep sleep for that duration.
 
 On any error (WiFi failure, HTTP error, timeout), the firmware displays an error screen and sleeps for 1 hour before retrying.

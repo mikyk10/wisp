@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <esp_system.h>
 #include <WiFiClientSecure.h>
+#include <Preferences.h>
 #include "WiFiManager.h"
 #include "config/network.h"
 
@@ -115,6 +116,36 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
 }
 
 
+// The built-in error screen only changes when the situation does, so
+// repainting it every error cycle spends the most expensive event of the
+// cycle — a full refresh — on an identical image. This counter tracks
+// consecutive error cycles since the screen was last drawn; it lives in NVS
+// (not RTC memory) so it survives deep sleep, brownout resets and battery
+// swaps alike. The suppression is bounded on purpose: after this many skipped
+// cycles the screen is drawn again anyway, so no stale counter, failed write
+// or sag-garbled refresh can freeze the panel for longer than a day. Reads
+// that fail map to 0 ("not shown"), which fails open into drawing.
+#define ERROR_REDRAW_EVERY_N_CYCLES 24
+
+uint8_t loadErrorSkips() {
+    Preferences prefs;
+    if (!prefs.begin("state", true)) return 0;
+    uint8_t n = prefs.getUChar("errskip", 0);
+    prefs.end();
+    return n;
+}
+
+void saveErrorSkips(uint8_t n) {
+    Preferences prefs;
+    if (!prefs.begin("state", false)) return;
+    prefs.putUChar("errskip", n);
+    prefs.end();
+}
+
+bool errorRedrawDue(uint8_t skips) {
+    return skips == 0 || skips >= ERROR_REDRAW_EVERY_N_CYCLES;
+}
+
 // Every sleep in the firmware funnels through here, so the clamp cannot be
 // bypassed by a code path that forgets it.
 void deepSleep(int seconds) {
@@ -204,10 +235,19 @@ void setup() {
 
         wifiManager.shutdownRadio();
 
-        initEPaper();
-        epaper->sendErrorScreen();
-        epaper->displayImage();
-        epaper->enterSleep();
+        uint8_t skips = loadErrorSkips();
+        if (errorRedrawDue(skips)) {
+            initEPaper();
+            epaper->sendErrorScreen();
+            epaper->displayImage();
+            saveErrorSkips(1); // after the refresh: an interrupted draw retries next cycle
+            epaper->enterSleep();
+        } else {
+            // The error screen is already on the panel — skip the redraw, and
+            // the panel power-up along with it.
+            Serial.printf("[EPD] Error screen already shown (%u cycles), skipping redraw\n", skips);
+            saveErrorSkips(skips + 1);
+        }
 
         deepSleep(FALLBACK_SLEEP_SECONDS);
         return;
@@ -247,14 +287,25 @@ void setup() {
         // Display whatever the server sent (normal image or error image) and sleep.
         epaper->displayImage();
         epaper->enterSleep();
+        if (loadErrorSkips() != 0) {
+            saveErrorSkips(0); // healthy again; write only on the transition
+        }
         deepSleep(sleepSeconds);
         return;
     }
 
     // ここに来ているということはなんか問題があった
     Serial.println("[fallback] Default error page");
-    epaper->sendErrorScreen();
-    epaper->displayImage();
+    uint8_t skips = loadErrorSkips();
+    if (errorRedrawDue(skips)) {
+        epaper->sendErrorScreen();
+        epaper->displayImage();
+        saveErrorSkips(1);
+    } else {
+        Serial.printf("[EPD] Error screen already shown (%u cycles), skipping redraw\n", skips);
+        saveErrorSkips(skips + 1);
+    }
+    // The panel was powered for the fetch attempt — fold it regardless.
     epaper->enterSleep();
     // Server URL missing or fetch failed — both are fixed by a config or
     // server-side change, so retry on the normal fallback cadence instead of

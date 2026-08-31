@@ -304,14 +304,15 @@ void setup() {
     // NOTE: sleepSeconds == 0 (server returned X-Sleep-Seconds: 0) falls through to error path.
     // If 0-second sleep becomes a valid server response, change this to >= 0.
     if (sleepSeconds > 0) {
-        // Display whatever the server sent (normal image or error image) and sleep.
-        epaper->displayImage();
-        // Clear the marker before enterSleep(): a busy timeout in there dies
-        // via sleepOnError, and a stale marker would suppress the next error
-        // screen while the panel actually shows this photo.
+        // Clear the marker before the refresh: displayImage() and enterSleep()
+        // can both die via [[noreturn]] sleepOnError, and a stale marker would
+        // suppress the next error screen. Clearing early fails open — at worst
+        // one redundant error redraw, never a silently missing one.
         if (loadErrorSkips() != 0) {
             saveErrorSkips(0); // healthy again; write only on the transition
         }
+        // Display whatever the server sent (normal image or error image) and sleep.
+        epaper->displayImage();
         epaper->enterSleep();
         deepSleep(sleepSeconds);
         return;

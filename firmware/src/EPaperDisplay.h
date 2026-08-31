@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <esp_sleep.h>
 #include <driver/gpio.h>
+#include "config/network.h"
 
 class EPaperDisplay {
 public:
@@ -16,7 +17,15 @@ public:
     // releases every ordinary GPIO, so without the hold EPD_PWR_PIN floats
     // for the whole sleep — harmless only if the board has its own pulldown.
     // moduleInit() releases the hold again on the next wake.
+    //
+    // Every sleep in the firmware — deepSleep() and both sleepOnError
+    // variants — ends here, so this is where the duration bounds live and
+    // cannot be bypassed by a caller that forgets them.
     [[noreturn]] static void startTimedDeepSleep(uint64_t us) {
+        constexpr uint64_t kMinUs = (uint64_t)SLEEP_MIN_SECONDS * 1000000ULL;
+        constexpr uint64_t kMaxUs = (uint64_t)SLEEP_MAX_SECONDS * 1000000ULL;
+        if (us < kMinUs) us = kMinUs;
+        if (us > kMaxUs) us = kMaxUs;
         #ifdef EPD_PWR_PIN
         gpio_hold_en((gpio_num_t)EPD_PWR_PIN);
         gpio_deep_sleep_hold_en();

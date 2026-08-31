@@ -162,8 +162,9 @@ bool errorRedrawDue(uint8_t skips) {
     return skips == 0 || skips >= ERROR_REDRAW_EVERY_N_CYCLES;
 }
 
-// Every sleep in the firmware funnels through here, so the clamp cannot be
-// bypassed by a code path that forgets it.
+// The hard bound lives in startTimedDeepSleep(), the funnel every sleep in
+// the firmware actually ends in; the clamp here only exists so the log line
+// below reports the sleep that will really happen.
 void deepSleep(int seconds) {
     int clamped = constrain(seconds, SLEEP_MIN_SECONDS, SLEEP_MAX_SECONDS);
     if (clamped != seconds) {

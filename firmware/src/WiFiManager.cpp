@@ -210,7 +210,7 @@ void WiFiManager::handleRoot()
         ">"
         "<label>Server URL</label>"
         "<input type='text' name='server_url' autocomplete='off' spellcheck='false'"
-        " required pattern='https?://.*' title='Must start with http:// or https://'"
+        " pattern='https?://.+' title='Must start with http:// or https:// (leave blank to set up WiFi only)'"
         " value='";
     html += htmlEsc(savedServerURL);
     html +=
@@ -261,17 +261,27 @@ void WiFiManager::handleSave()
         return;
     }
 
+    // The SSID is saved verbatim: 802.11 allows any octets, leading and
+    // trailing spaces included, and a trimmed name would never match the AP.
     String newSSID      = server.arg("ssid");
     String newPassword  = server.arg("password");
     String newServerURL = server.arg("server_url");
-    newSSID.trim();
     newServerURL.trim();
+    // A trailing slash is the most common paste and would build '//pf/...'
+    // URLs the server routes to a 404 — normalise it away before validating.
+    while (newServerURL.endsWith("/")) {
+        newServerURL.remove(newServerURL.length() - 1);
+    }
 
     // Last line of defence behind the form's own validation (which can be
     // bypassed): a saved garbage URL costs a reboot into the error-sleep
-    // loop, recoverable only by holding BOOT at power-on.
-    if (newSSID.length() == 0 ||
-        (!newServerURL.startsWith("http://") && !newServerURL.startsWith("https://")))
+    // loop, recoverable only by holding BOOT at power-on. An empty URL is
+    // allowed — WiFi-only provisioning is a supported first step.
+    bool urlOk = newServerURL.length() == 0;
+    if (!urlOk && newServerURL.startsWith("http://"))  urlOk = newServerURL.length() > 7;
+    if (!urlOk && newServerURL.startsWith("https://")) urlOk = newServerURL.length() > 8;
+
+    if (newSSID.length() == 0 || !urlOk)
     {
         server.send(400, "text/html",
             "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
@@ -279,8 +289,8 @@ void WiFiManager::handleSave()
             "<body style='font-family:sans-serif;max-width:420px;margin:48px auto;"
             "padding:0 16px;background:#0f1117;color:#e0e0e0'>"
             "<h2>Invalid settings</h2>"
-            "<p>SSID must not be empty and the server URL must start with "
-            "<code>http://</code> or <code>https://</code>.</p>"
+            "<p>SSID must not be empty, and the server URL (if given) must be "
+            "<code>http://</code> or <code>https://</code> followed by a host.</p>"
             "<p><a href='/' style='color:#00d2a8'>&larr; Back</a></p>"
             "</body></html>");
         return;

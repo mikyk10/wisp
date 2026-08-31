@@ -37,6 +37,10 @@ public:
                        int32_t channelHint = 0, const uint8_t *bssidHint = nullptr);
     void startSoftAP();
     void startSoftAPWithWebServer();
+
+    // Powers the radio down (disconnect + WIFI_OFF). Call once the network work is
+    // done, before driving the panel — see the note at the call site in main.cpp.
+    void shutdownRadio();
     void saveCredentials(const char *ssid, const char *password);
     bool loadCredentials(String &ssid, String &password);
     void saveServerURL(const char *url);

@@ -81,6 +81,13 @@ bool WiFiManager::connectToWiFi(const char *ssid, const char *password, int time
     return false;
 }
 
+void WiFiManager::shutdownRadio()
+{
+    WiFi.disconnect(true); // wifioff=true: drop the association and power the radio down
+    WiFi.mode(WIFI_OFF);
+    Serial.println("[WiFi] Radio off");
+}
+
 void WiFiManager::startSoftAP()
 {
     String apSSID = generateSSID();

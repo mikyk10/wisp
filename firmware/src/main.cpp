@@ -13,8 +13,6 @@ EPaperDisplay* epaper = nullptr;
 
 #define HTTP_TIMEOUT 30000
 
-#define LED 2
-
 // Short tokens, safe to embed in a URL query as-is.
 const char* resetReasonName(esp_reset_reason_t r) {
     switch (r) {

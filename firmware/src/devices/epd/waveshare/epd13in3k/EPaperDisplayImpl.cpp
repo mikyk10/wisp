@@ -120,6 +120,10 @@ void EPD13In3KImpl::reset() {
 
 void EPD13In3KImpl::initialize() {
     moduleInit();
+    // pinMode() alone drives RST at the output register's default LOW —
+    // without this pulse the controller sits in hardware reset through the
+    // whole init sequence and busyLow() below can never release.
+    reset();
     busyLow();
 
     sendCommand(0x12);  // SWRESET
@@ -233,7 +237,10 @@ void EPD13In3KImpl::sendImageData(HTTPClient *client, int length) {
 
     Serial.print("[disp] Buffering 4-gray stream: ");
 
-    int streamRemaining = (length > 0) ? length : EPD_STREAM_SIZE;
+    // Clamp to the panel's own stream size: the plane buffers are sized for
+    // exactly EPD_PLANE_SIZE entries, and a server-declared length beyond
+    // that would write past both heap allocations via splitPlanes().
+    int streamRemaining = (length > 0) ? min(length, (int)EPD_STREAM_SIZE) : (int)EPD_STREAM_SIZE;
     int planeIdx = 0;
     uint8_t rxBuf[BUF_SIZE];
     uint8_t carry = 0;     // leftover byte when read count is odd
@@ -323,28 +330,16 @@ void EPD13In3KImpl::displayImage() {
 }
 
 void EPD13In3KImpl::enterSleep() {
+    // No busyLow() after the deep-sleep command: BUSY stays HIGH once the
+    // controller sleeps (Waveshare's own sample does not wait either), so a
+    // wait here would spin to its timeout on every successful cycle. This
+    // also makes the sequence safe as the base-class failsafe path.
     sendCommand(0x10);  // Deep sleep mode 1 (retains RAM)
     sendData(0x03);
     delay(100);
-    busyLow();
 
     digitalWrite(EPD_RST_PIN, LOW);
     Serial.println("e-Paper in sleep mode");
-    moduleExit();
-
-    SPI.endTransaction();
-    SPI.end();
-}
-
-// enterSleep() minus the busyLow() wait: BUSY may never release again, and
-// even if the sleep command is not taken, moduleExit() cutting EPD_PWR_PIN
-// is what actually stops the drain.
-void EPD13In3KImpl::failsafePanelOff() {
-    sendCommand(0x10);  // Deep sleep mode 1
-    sendData(0x03);
-    delay(100);
-
-    digitalWrite(EPD_RST_PIN, LOW);
     moduleExit();
 
     SPI.endTransaction();

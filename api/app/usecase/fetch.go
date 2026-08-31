@@ -100,29 +100,17 @@ func (cu *catalogUseCase) fetchCatalog(ctx context.Context, catalogKey string, c
 		return fmt.Errorf("image_source.mode=fixed requires image_id")
 	}
 
-	// Evict oldest images if over depth.
 	count, err := cu.imgr.CountAllByCatalog(catalogKey)
 	if err != nil {
 		return fmt.Errorf("count failed: %w", err)
 	}
 
-	evictCount := conf.Cache.EvictCount
-	if evictCount <= 0 {
-		evictCount = max(conf.Cache.Depth/5, 1)
-	}
-	if int(count) >= conf.Cache.Depth {
-		toEvict := min(evictCount, int(count))
-		slog.Info("fetch: evicting", "catalog", catalogKey, "count", toEvict)
-		if err := cu.imgr.EvictOldestImages(catalogKey, toEvict); err != nil {
-			return fmt.Errorf("eviction failed: %w", err)
-		}
-		count -= int64(toEvict)
-	}
-
 	fetchCount := conf.Cache.Depth - int(count)
 	if fetchCount <= 0 {
-		slog.Info("fetch: cache full", "catalog", catalogKey)
-		return nil
+		fetchCount = conf.Cache.EvictCount
+		if fetchCount <= 0 {
+			fetchCount = max(conf.Cache.Depth/5, 1)
+		}
 	}
 
 	timeout := time.Duration(conf.TimeoutSec) * time.Second
@@ -146,6 +134,20 @@ func (cu *catalogUseCase) fetchCatalog(ctx context.Context, catalogKey string, c
 	}
 
 	wg.Wait()
+
+	// Evict oldest images after fetching so existing cache survives fetch failures.
+	count, err = cu.imgr.CountAllByCatalog(catalogKey)
+	if err != nil {
+		return fmt.Errorf("count failed: %w", err)
+	}
+	if int(count) > conf.Cache.Depth {
+		toEvict := int(count) - conf.Cache.Depth
+		slog.Info("fetch: evicting", "catalog", catalogKey, "count", toEvict)
+		if err := cu.imgr.EvictOldestImages(catalogKey, toEvict); err != nil {
+			return fmt.Errorf("eviction failed: %w", err)
+		}
+	}
+
 	slog.Info("fetch: completed", "catalog", catalogKey)
 	return ctx.Err()
 }

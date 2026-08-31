@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <SPI.h>
 #include <esp_sleep.h>
+#include <new>
 #include "EPaperDisplayImpl.h"
 #include "EPaperDisplay.h"
 
@@ -227,8 +228,10 @@ void EPD13In3KImpl::sendClearScreenData(unsigned char color) {
 void EPD13In3KImpl::sendImageData(HTTPClient *client, int length) {
     WiFiClient *stream = client->getStreamPtr();
 
-    uint8_t *plane0 = new uint8_t[EPD_PLANE_SIZE];
-    uint8_t *plane1 = new uint8_t[EPD_PLANE_SIZE];
+    // nothrow, or the null check below is dead code: a throwing new on this
+    // platform aborts into a panic boot loop instead of the error sleep.
+    uint8_t *plane0 = new (std::nothrow) uint8_t[EPD_PLANE_SIZE];
+    uint8_t *plane1 = new (std::nothrow) uint8_t[EPD_PLANE_SIZE];
     if (!plane0 || !plane1) {
         delete[] plane0;
         delete[] plane1;
@@ -344,6 +347,14 @@ void EPD13In3KImpl::enterSleep() {
 
     SPI.endTransaction();
     SPI.end();
+}
+
+// A busyLow timeout means the controller is likely mid-update and may discard
+// the deep-sleep command outright; pulse a hardware reset first so the
+// power-down sequence lands on a controller that is actually listening.
+void EPD13In3KImpl::failsafePanelOff() {
+    reset();
+    enterSleep();
 }
 
 #endif // EPD_WAVESHARE_EPD13IN3K

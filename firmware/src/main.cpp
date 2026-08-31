@@ -54,7 +54,6 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
     const char* xSleepSecondsHeader = "X-Sleep-Seconds";
     const char* requiredHeaders[] = {xSleepSecondsHeader};
     httpClient.collectHeaders(requiredHeaders, 1);
-    httpClient.addHeader("X-Firmware-Version", WISP_FW_VERSION);
 
     Serial.printf("[http] Fetching image: %s\n", imageURL);
 
@@ -73,6 +72,11 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
         delete secureClient;
         return -1;
     }
+
+    // Must come after begin(): some begin() overloads reset the header list,
+    // and relying on this one not to is how the header silently disappears
+    // on the next platform bump.
+    httpClient.addHeader("X-Firmware-Version", WISP_FW_VERSION);
 
     int httpCode = httpClient.GET();
     Serial.printf("[http] HTTP status: %d\n", httpCode);
@@ -275,16 +279,21 @@ void setup() {
     int sleepSeconds = -1;
 
     if (hasServerURL) {
-        char imageURL[256];
+        char imageURL[512];
         uint8_t macAddr[6];
         WiFi.macAddress(macAddr);
-        snprintf(imageURL, sizeof(imageURL),
+        int n = snprintf(imageURL, sizeof(imageURL),
                  "%s/pf/%02x%02x%02x%02x%02x%02x/image/random.bin?rr=%s&wc=%s",
                  serverBaseURL.c_str(),
                  macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5],
                  resetReasonName(esp_reset_reason()),
                  wakeupCauseName(esp_sleep_get_wakeup_cause()));
-        sleepSeconds = fetchImage(imageURL, epaper);
+        if (n < 0 || n >= (int)sizeof(imageURL)) {
+            // A truncated URL would 404 forever with no hint in any log.
+            Serial.println("[http] Server URL too long, refusing to send a truncated request");
+        } else {
+            sleepSeconds = fetchImage(imageURL, epaper);
+        }
     }
 
     // All network work is done — the image bytes are already in the panel's RAM.

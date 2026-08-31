@@ -29,6 +29,11 @@ public:
     void displayImage() override;
     void enterSleep() override;
 
+protected:
+    // enterSleep() waits on BUSY via busyLow(), which must not run in the
+    // failsafe path (a busyLow timeout is one of the ways we get here).
+    void failsafePanelOff() override;
+
 private:
     void moduleInit();
     void moduleExit();

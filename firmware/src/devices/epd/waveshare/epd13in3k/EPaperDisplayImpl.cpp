@@ -327,4 +327,19 @@ void EPD13In3KImpl::enterSleep() {
     SPI.end();
 }
 
+// enterSleep() minus the busyLow() wait: BUSY may never release again, and
+// even if the sleep command is not taken, moduleExit() cutting EPD_PWR_PIN
+// is what actually stops the drain.
+void EPD13In3KImpl::failsafePanelOff() {
+    sendCommand(0x10);  // Deep sleep mode 1
+    sendData(0x03);
+    delay(100);
+
+    digitalWrite(EPD_RST_PIN, LOW);
+    moduleExit();
+
+    SPI.endTransaction();
+    SPI.end();
+}
+
 #endif // EPD_WAVESHARE_EPD13IN3K

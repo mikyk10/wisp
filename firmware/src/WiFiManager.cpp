@@ -189,6 +189,10 @@ void WiFiManager::handleRoot()
         "<span class='lbl'>Hostname &nbsp;</span><span class='val sm'>";
     html += hostname;
     html +=
+        "</span>&nbsp;&nbsp;"
+        "<span class='lbl'>FW &nbsp;</span><span class='val sm'>";
+    html += WISP_FW_VERSION;
+    html +=
         "</span></div>"
         "</div>"
         "<form action='/save' method='POST' autocomplete='off'>"

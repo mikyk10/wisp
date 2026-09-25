@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <SPI.h>
 #include <esp_sleep.h>
+#include <new>
 #include "EPaperDisplayImpl.h"
 #include "EPaperDisplay.h"
 
@@ -53,6 +54,7 @@ void EPD13In3KImpl::moduleInit() {
     pinMode(EPD_CS_PIN,   OUTPUT);
 
 #ifdef EPD_PWR_PIN
+    gpio_hold_dis((gpio_num_t)EPD_PWR_PIN); // release the deep-sleep hold before driving it
     pinMode(EPD_PWR_PIN, OUTPUT);
     digitalWrite(EPD_PWR_PIN, HIGH);
 #endif
@@ -64,6 +66,12 @@ void EPD13In3KImpl::moduleInit() {
 }
 
 void EPD13In3KImpl::moduleExit() {
+    // Deep sleep latches every digital pad (gpio_deep_sleep_hold_en is
+    // chip-wide), so any line left HIGH would back-power the unpowered panel
+    // through its protection diodes for the whole sleep.
+    digitalWrite(EPD_DC_PIN, LOW);
+    digitalWrite(EPD_CS_PIN, LOW);
+    digitalWrite(EPD_RST_PIN, LOW);
 #ifdef EPD_PWR_PIN
     digitalWrite(EPD_PWR_PIN, LOW);
 #endif
@@ -113,6 +121,10 @@ void EPD13In3KImpl::reset() {
 
 void EPD13In3KImpl::initialize() {
     moduleInit();
+    // pinMode() alone drives RST at the output register's default LOW —
+    // without this pulse the controller sits in hardware reset through the
+    // whole init sequence and busyLow() below can never release.
+    reset();
     busyLow();
 
     sendCommand(0x12);  // SWRESET
@@ -214,10 +226,17 @@ void EPD13In3KImpl::sendClearScreenData(unsigned char color) {
 // Requires ~163 KB of heap (two 81,600-byte plane buffers).
 // On ESP32S3 with PSRAM this is fine; without PSRAM it will likely fail.
 void EPD13In3KImpl::sendImageData(HTTPClient *client, int length) {
-    WiFiClient *stream = client->getStreamPtr();
+    if (length <= 0) {
+        // fetchImage() rejects unknown lengths before any driver runs — the
+        // raw socket cannot be dechunked here. Arriving anyway means the
+        // upstream contract broke; fold the panel rather than clock garbage.
+        sleepOnError("sendImageData: unknown content length");
+    }
 
-    uint8_t *plane0 = new uint8_t[EPD_PLANE_SIZE];
-    uint8_t *plane1 = new uint8_t[EPD_PLANE_SIZE];
+    // nothrow, or the null check below is dead code: a throwing new on this
+    // platform aborts into a panic boot loop instead of the error sleep.
+    uint8_t *plane0 = new (std::nothrow) uint8_t[EPD_PLANE_SIZE];
+    uint8_t *plane1 = new (std::nothrow) uint8_t[EPD_PLANE_SIZE];
     if (!plane0 || !plane1) {
         delete[] plane0;
         delete[] plane1;
@@ -226,45 +245,35 @@ void EPD13In3KImpl::sendImageData(HTTPClient *client, int length) {
 
     Serial.print("[disp] Buffering 4-gray stream: ");
 
-    int streamRemaining = (length > 0) ? length : EPD_STREAM_SIZE;
     int planeIdx = 0;
-    uint8_t rxBuf[BUF_SIZE];
     uint8_t carry = 0;     // leftover byte when read count is odd
     bool hasCarry = false;
-    unsigned long lastRecv = millis();
 
-    while (streamRemaining > 0) {
-        int avail = stream->available();
-        if (avail > 0) {
-            int toRead = min(avail, min(streamRemaining, (int)BUF_SIZE));
-            int c = stream->read(rxBuf, toRead);
-            streamRemaining -= c;
-            lastRecv = millis();
-            Serial.print(".");
-
-            int i = 0;
-            if (hasCarry) {
-                // Pair the leftover byte from the previous read with rxBuf[0]
-                splitPlanes(carry, rxBuf[0], plane0[planeIdx], plane1[planeIdx]);
-                planeIdx++;
-                hasCarry = false;
-                i = 1;
-            }
-            for (; i + 1 < c; i += 2) {
-                splitPlanes(rxBuf[i], rxBuf[i + 1], plane0[planeIdx], plane1[planeIdx]);
-                planeIdx++;
-            }
-            if (i < c) {
-                carry = rxBuf[i];
-                hasCarry = true;
-            }
-        } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
-            delete[] plane0;
-            delete[] plane1;
-            sleepOnError("sendImageData stream timeout");
+    // Clamped to the panel's own stream size: the plane buffers are sized for
+    // exactly EPD_PLANE_SIZE entries, and a server-declared length beyond
+    // that would write past both heap allocations via splitPlanes(). A stream
+    // timeout inside the helper deep-sleeps without freeing the planes, which
+    // is fine — deep sleep discards the heap wholesale anyway.
+    streamFromHttp(client->getStreamPtr(), min(length, (int)EPD_STREAM_SIZE),
+                   [&](const uint8_t *rxBuf, int c) {
+        Serial.print(".");
+        int i = 0;
+        if (hasCarry) {
+            // Pair the leftover byte from the previous read with rxBuf[0]
+            splitPlanes(carry, rxBuf[0], plane0[planeIdx], plane1[planeIdx]);
+            planeIdx++;
+            hasCarry = false;
+            i = 1;
         }
-        delay(1);
-    }
+        for (; i + 1 < c; i += 2) {
+            splitPlanes(rxBuf[i], rxBuf[i + 1], plane0[planeIdx], plane1[planeIdx]);
+            planeIdx++;
+        }
+        if (i < c) {
+            carry = rxBuf[i];
+            hasCarry = true;
+        }
+    });
     Serial.println(" done.");
 
     Serial.print("[disp] Sending plane0 (0x24): ");
@@ -314,10 +323,13 @@ void EPD13In3KImpl::displayImage() {
 }
 
 void EPD13In3KImpl::enterSleep() {
+    // No busyLow() after the deep-sleep command: BUSY stays HIGH once the
+    // controller sleeps (Waveshare's own sample does not wait either), so a
+    // wait here would spin to its timeout on every successful cycle. This
+    // also makes the sequence safe as the base-class failsafe path.
     sendCommand(0x10);  // Deep sleep mode 1 (retains RAM)
     sendData(0x03);
     delay(100);
-    busyLow();
 
     digitalWrite(EPD_RST_PIN, LOW);
     Serial.println("e-Paper in sleep mode");
@@ -325,6 +337,14 @@ void EPD13In3KImpl::enterSleep() {
 
     SPI.endTransaction();
     SPI.end();
+}
+
+// A busyLow timeout means the controller is likely mid-update and may discard
+// the deep-sleep command outright; pulse a hardware reset first so the
+// power-down sequence lands on a controller that is actually listening.
+void EPD13In3KImpl::failsafePanelOff() {
+    reset();
+    enterSleep();
 }
 
 #endif // EPD_WAVESHARE_EPD13IN3K

@@ -23,6 +23,7 @@ void EPD4InE6Impl::spiWrite(unsigned char data) {
 // EPDの電源投入後に1度だけ行う処理
 void EPD4InE6Impl::moduleInit()  {
 	//gpio
+  gpio_hold_dis((gpio_num_t)EPD_PWR_PIN); // release the deep-sleep hold before driving it
   pinMode(EPD_BUSY_PIN,  INPUT);
   pinMode(EPD_RST_PIN , OUTPUT);
   pinMode(EPD_DC_PIN  , OUTPUT);
@@ -38,8 +39,14 @@ void EPD4InE6Impl::moduleInit()  {
 }
 
 void EPD4InE6Impl::moduleExit()  {
+  // Deep sleep latches every digital pad (gpio_deep_sleep_hold_en is
+  // chip-wide), so any line left HIGH would back-power the unpowered panel
+  // through its protection diodes for the whole sleep.
+  digitalWrite(EPD_DC_PIN, LOW);
+  digitalWrite(EPD_CS_PIN, LOW);
+  digitalWrite(EPD_RST_PIN, LOW);
   digitalWrite(EPD_PWR_PIN , LOW);
-} 
+}
 
 
 void EPD4InE6Impl::initialize(){
@@ -139,38 +146,23 @@ void EPD4InE6Impl::sendClearScreenData(unsigned char color) {
 }
 
 void EPD4InE6Impl::sendImageData(HTTPClient *client, int length) {
-    WiFiClient *wifiStream;
-    wifiStream = client->getStreamPtr();
+    if (length <= 0) {
+      // fetchImage() rejects unknown lengths before any driver runs — the raw
+      // socket cannot be dechunked here. Arriving anyway means the upstream
+      // contract broke; fold the panel rather than clock garbage into it.
+      sleepOnError("sendImageData: unknown content length");
+    }
 
     sendCommand(0x10);
 
     Serial.printf("[disp] Transferring data: ");
-        
-    uint8_t buff[BUF_SIZE];
-
-    unsigned long lastRecv = millis();
-    while(length > 0 || length == -1) {
-      size_t size = wifiStream->available();
-
-      if(size) {
-        int c = wifiStream->read(buff, BUF_SIZE);
-        Serial.printf(".");
-
-        uint8_t *p = buff;
-        for (int i = 0; i < c; i++) {
-          sendData(*p);
-          p++;
-        }
-
-        if(length > 0) {
-            length -= c;
-        }
-        lastRecv = millis();
-      } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
-        sleepOnError("sendImageData stream timeout");
+    streamFromHttp(client->getStreamPtr(), min(length, EPD_WIDTH * EPD_HEIGHT / 2),
+                   [this](const uint8_t *b, int c) {
+      Serial.printf(".");
+      for (int i = 0; i < c; i++) {
+        sendData(b[i]);
       }
-      delay(1);
-    }
+    });
     Serial.println("done.");
 
     delay(200);
@@ -178,6 +170,7 @@ void EPD4InE6Impl::sendImageData(HTTPClient *client, int length) {
 
 void EPD4InE6Impl::displayImage() {
   sendCommand(0x04);
+  panelPowered = true; // before the wait: a stuck BUSY must still fold the rails
   busyHigh();
   Serial.println("[displayImage] power on");
   delay(200);
@@ -199,12 +192,27 @@ void EPD4InE6Impl::displayImage() {
   sendCommand(0x02); // POWER_OFF
   sendData(0X00);
   busyHigh();
+  panelPowered = false;
   Serial.println("[displayImage] power off");
   delay(200);
 }
 
 
 void EPD4InE6Impl::enterSleep() {
+  // The failsafe path can arrive with PON still active — cutting VCC with the
+  // booster energized is the power-down the datasheet forbids. Wait on BUSY,
+  // but bounded and without sleepOnError: on the failsafe entry a dead BUSY
+  // line may be exactly why we are here. LOW = busy on this family.
+  if (panelPowered) {
+    sendCommand(0x02); // POWER_OFF
+    sendData(0x00);
+    unsigned long pofStart = millis();
+    while (!digitalRead(EPD_BUSY_PIN) && millis() - pofStart < 3000) {
+      delay(10);
+    }
+    delay(100);
+    panelPowered = false;
+  }
   delay(100);
   sendCommand(0x07);
   sendData(0xA5);

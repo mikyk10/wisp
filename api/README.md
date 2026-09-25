@@ -268,12 +268,11 @@ Base URL: `http://localhost:9002`
 
 | Model key | Size | Colors | Resolution |
 |-----------|------|--------|------------|
-| `ws4in0e` | 4.0″ | 7-color | 640 × 480 |
-| `ws5in65f` | 5.65″ | 7-color | 600 × 448 |
-| `ws7in3f` | 7.3″ | 7-color | 800 × 480 |
-| `ws7in3e` | 7.3″ | 7-color | 800 × 480 |
-| `ws13in3e` | 13.3″ | 7-color | 1600 × 1200 |
-| `ws13in3k` | 13.3″ | 3-color | 1600 × 1200 |
+| `ws4in0e` | 4.0″ | 6 (Spectra 6) | 400 × 600 |
+| `ws7in3f` | 7.3″ | 7 (ACeP) | 800 × 480 |
+| `ws7in3e` | 7.3″ | 6 (Spectra 6) | 800 × 480 |
+| `ws13in3e` | 13.3″ | 6 (Spectra 6) | 1200 × 1600 |
+| `ws13in3k` | 13.3″ | 4 grayscale | 960 × 680 |
 
 ### Image processing pipeline
 

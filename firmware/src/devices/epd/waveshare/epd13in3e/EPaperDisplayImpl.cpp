@@ -43,6 +43,7 @@ void EPD13In3EImpl::moduleInit() {
     pinMode(EPD_CS_S_PIN, OUTPUT);    // CS_S
 
     #ifdef EPD_PWR_PIN
+    gpio_hold_dis((gpio_num_t)EPD_PWR_PIN); // release the deep-sleep hold before driving it
     pinMode(EPD_PWR_PIN, OUTPUT);
     digitalWrite(EPD_PWR_PIN, HIGH);
     #endif
@@ -54,6 +55,11 @@ void EPD13In3EImpl::moduleInit() {
 }
 
 void EPD13In3EImpl::moduleExit() {
+    // Deep sleep latches every digital pad (gpio_deep_sleep_hold_en is
+    // chip-wide), so any line left HIGH would back-power the unpowered panel
+    // through its protection diodes for the whole sleep.
+    csAll(LOW);
+    digitalWrite(EPD_RST_PIN, LOW);
     #ifdef EPD_PWR_PIN
     digitalWrite(EPD_PWR_PIN, LOW);
     #endif
@@ -93,6 +99,7 @@ void EPD13In3EImpl::turnOnDisplay() {
     csAll(LOW);
     SPI.transfer(0x04);  // POWER_ON
     csAll(HIGH);
+    panelPowered = true; // before the wait: a stuck BUSY must still fold the rails
     busyHigh();
 
     delay(50);
@@ -106,6 +113,10 @@ void EPD13In3EImpl::turnOnDisplay() {
     csAll(LOW);
     spiSend(0x02, pof_v, sizeof(pof_v));  // POWER_OFF
     csAll(HIGH);
+    // Wait POF out before anyone can issue DEEP_SLEEP: a sleep command sent
+    // while the IC is still powering down may simply be discarded.
+    busyHigh();
+    panelPowered = false;
     Serial.println("[displayImage] power off");
 }
 
@@ -223,33 +234,31 @@ void EPD13In3EImpl::sendClearScreenData(unsigned char color) {
 }
 
 void EPD13In3EImpl::sendImageData(HTTPClient *client, int length) {
+    if (length <= 0) {
+        // fetchImage() rejects unknown lengths before any driver runs — the
+        // raw socket cannot be dechunked here. Arriving anyway means the
+        // upstream contract broke; fold the panel rather than clock garbage.
+        sleepOnError("sendImageData: unknown content length");
+    }
     WiFiClient *stream = client->getStreamPtr();
-    uint8_t buff[BUF_SIZE];
 
-    // When Content-Length is unknown (-1), fall back to exact expected size per panel
-    int halfLen = (length > 0) ? (length / 2) : (EPD_HALF_BYTES_PER_ROW * EPD_HEIGHT);
+    // Clamp to the panel's frame and split evenly: each IC gets exactly half,
+    // and a stray odd byte is left unread instead of skewing CS_S by a byte.
+    const int frame = EPD_HALF_BYTES_PER_ROW * EPD_HEIGHT * 2;
+    const int halfLen = min(length, frame) / 2;
+
+    auto toPanel = [](const uint8_t *b, int c) {
+        for (int i = 0; i < c; i++) {
+            SPI.transfer(b[i]);
+        }
+        Serial.print(".");
+    };
 
     // First half → CS_M (left panel)
     Serial.print("[disp] Transferring CS_M: ");
     digitalWrite(EPD_CS_PIN, LOW);
     SPI.transfer(0x10);  // DTM
-    int remaining = halfLen;
-    unsigned long lastRecv = millis();
-    while (remaining > 0) {
-        int avail = stream->available();
-        if (avail > 0) {
-            int c = stream->read(buff, min(remaining, (int)BUF_SIZE));
-            for (int i = 0; i < c; i++) {
-                SPI.transfer(buff[i]);
-            }
-            remaining -= c;
-            Serial.print(".");
-            lastRecv = millis();
-        } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
-            sleepOnError("sendImageData CS_M stream timeout");
-        }
-        delay(1);
-    }
+    streamFromHttp(stream, halfLen, toPanel);
     csAll(HIGH);
     Serial.println("done.");
 
@@ -257,23 +266,7 @@ void EPD13In3EImpl::sendImageData(HTTPClient *client, int length) {
     Serial.print("[disp] Transferring CS_S: ");
     digitalWrite(EPD_CS_S_PIN, LOW);
     SPI.transfer(0x10);  // DTM
-    remaining = (length > 0) ? (length - halfLen) : halfLen;
-    lastRecv = millis();
-    while (remaining > 0) {
-        int avail = stream->available();
-        if (avail > 0) {
-            int c = stream->read(buff, min(remaining, (int)BUF_SIZE));
-            for (int i = 0; i < c; i++) {
-                SPI.transfer(buff[i]);
-            }
-            remaining -= c;
-            Serial.print(".");
-            lastRecv = millis();
-        } else if (millis() - lastRecv >= EPD_STREAM_TIMEOUT_MS) {
-            sleepOnError("sendImageData CS_S stream timeout");
-        }
-        delay(1);
-    }
+    streamFromHttp(stream, halfLen, toPanel);
     csAll(HIGH);
     Serial.println("done.");
 
@@ -285,6 +278,27 @@ void EPD13In3EImpl::displayImage() {
 }
 
 void EPD13In3EImpl::enterSleep() {
+    // A failsafe entry can arrive mid-transfer with one CS already LOW; the
+    // IC only treats the next byte as a command after a fresh falling edge,
+    // otherwise the bytes below would be consumed as pixels by the stuck IC.
+    csAll(HIGH);
+    delay(1);
+
+    // The failsafe path can also arrive with PON still active — cutting VCC
+    // with the booster energized is the power-down the datasheet forbids.
+    // Bounded wait, no sleepOnError: BUSY may be why we are here.
+    if (panelPowered) {
+        static const uint8_t pof_v[] = {0x00};
+        csAll(LOW);
+        spiSend(0x02, pof_v, sizeof(pof_v));  // POWER_OFF
+        csAll(HIGH);
+        unsigned long pofStart = millis();
+        while (!digitalRead(EPD_BUSY_PIN) && millis() - pofStart < 3000) {
+            delay(10);
+        }
+        panelPowered = false;
+    }
+
     csAll(LOW);
     SPI.transfer(0x07);  // DEEP_SLEEP
     SPI.transfer(0xA5);

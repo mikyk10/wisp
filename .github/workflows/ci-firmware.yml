@@ -30,6 +30,11 @@ jobs:
           - seeed_xiao_esp32c3_epd4in0e
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history + tags so `git describe` (version_flag.py) names
+          # release builds by their tag instead of a bare commit hash.
+          fetch-depth: 0
+          fetch-tags: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <esp_system.h>
 #include <WiFiClientSecure.h>
+#include <Preferences.h>
 #include "WiFiManager.h"
 #include "config/network.h"
 
@@ -12,7 +13,35 @@ EPaperDisplay* epaper = nullptr;
 
 #define HTTP_TIMEOUT 30000
 
-#define LED 2
+// Short tokens, safe to embed in a URL query as-is.
+const char* resetReasonName(esp_reset_reason_t r) {
+    switch (r) {
+        case ESP_RST_POWERON:   return "poweron";
+        case ESP_RST_EXT:       return "ext";
+        case ESP_RST_SW:        return "sw";
+        case ESP_RST_PANIC:     return "panic";
+        case ESP_RST_INT_WDT:   return "int_wdt";
+        case ESP_RST_TASK_WDT:  return "task_wdt";
+        case ESP_RST_WDT:       return "wdt";
+        case ESP_RST_DEEPSLEEP: return "deepsleep";
+        case ESP_RST_BROWNOUT:  return "brownout";
+        case ESP_RST_SDIO:      return "sdio";
+        default:                return "unknown";
+    }
+}
+
+const char* wakeupCauseName(esp_sleep_wakeup_cause_t c) {
+    switch (c) {
+        case ESP_SLEEP_WAKEUP_TIMER: return "timer";
+        case ESP_SLEEP_WAKEUP_EXT0:  return "ext0";
+        case ESP_SLEEP_WAKEUP_EXT1:  return "ext1";
+        case ESP_SLEEP_WAKEUP_GPIO:  return "gpio";
+        case ESP_SLEEP_WAKEUP_UART:  return "uart";
+        case ESP_SLEEP_WAKEUP_ULP:   return "ulp";
+        case ESP_SLEEP_WAKEUP_UNDEFINED: return "none"; // not a deep-sleep wake
+        default:                     return "other";
+    }
+}
 
 int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
     WiFiClient wifiClient;
@@ -44,6 +73,11 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
         return -1;
     }
 
+    // Must come after begin(): some begin() overloads reset the header list,
+    // and relying on this one not to is how the header silently disappears
+    // on the next platform bump.
+    httpClient.addHeader("X-Firmware-Version", WISP_FW_VERSION);
+
     int httpCode = httpClient.GET();
     Serial.printf("[http] HTTP status: %d\n", httpCode);
     if (httpCode < 0) {
@@ -54,11 +88,24 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
         return -1;
     }
     if (httpCode != HTTP_CODE_OK) {
-        // HTTP error (4xx/5xx): the server may have sent an error image as the body.
-        // Fall through to display it instead of silently falling back to the built-in error screen.
+        // HTTP error (4xx/5xx): a WiSP server sends an error *card* here and
+        // stamps X-Sleep-Seconds immediately before writing it — a response
+        // without the header is some other server's HTML/JSON, which would be
+        // clocked into the panel as pixels and repainted every default cycle.
+        if (!httpClient.hasHeader(xSleepSecondsHeader)) {
+            Serial.printf("[http] HTTP error %d without X-Sleep-Seconds — not a WiSP error card\n", httpCode);
+            httpClient.end();
+            delete secureClient;
+            return -1;
+        }
         Serial.printf("[http] HTTP error %d — attempting to render server error image\n", httpCode);
     }
 
+    // -1 means the length is unknown — a chunked response. That cannot be
+    // rescued here: the drivers read the raw socket via getStreamPtr(), and
+    // this HTTP client only strips chunked framing in writeToStream(), so the
+    // readers would clock chunk-size lines into the panel as pixel data.
+    // Reject it and show the error screen, exactly like an empty body.
     int contentLength = httpClient.getSize();
     if (contentLength <= 0) {
         Serial.println("[http] No content received");
@@ -85,21 +132,80 @@ int fetchImage(const char* imageURL, EPaperDisplay* epaper) {
 }
 
 
+// The built-in error screen only changes when the situation does, so
+// repainting it every error cycle spends the most expensive event of the
+// cycle — a full refresh — on an identical image. This counter tracks
+// consecutive error cycles since the screen was last drawn; it lives in NVS
+// (not RTC memory) so it survives deep sleep, brownout resets and battery
+// swaps alike. The suppression is bounded on purpose: after this many skipped
+// cycles the screen is drawn again anyway, so no stale counter, failed write
+// or sag-garbled refresh can freeze the panel for longer than a day. Reads
+// that fail map to 0 ("not shown"), which fails open into drawing.
+#define ERROR_REDRAW_EVERY_N_CYCLES 24
+
+uint8_t loadErrorSkips() {
+    Preferences prefs;
+    if (!prefs.begin("state", true)) return 0;
+    uint8_t n = prefs.getUChar("errskip", 0);
+    prefs.end();
+    return n;
+}
+
+void saveErrorSkips(uint8_t n) {
+    Preferences prefs;
+    if (!prefs.begin("state", false)) return;
+    prefs.putUChar("errskip", n);
+    prefs.end();
+}
+
+bool errorRedrawDue(uint8_t skips) {
+    return skips == 0 || skips >= ERROR_REDRAW_EVERY_N_CYCLES;
+}
+
+// The hard bound lives in startTimedDeepSleep(), the funnel every sleep in
+// the firmware actually ends in; the clamp here only exists so the log line
+// below reports the sleep that will really happen.
 void deepSleep(int seconds) {
-    Serial.printf("[sys] Entering deep sleep for %d seconds...\n", seconds);
-    esp_sleep_enable_timer_wakeup(seconds * 1000000ULL);
-    esp_deep_sleep_start();
+    int clamped = constrain(seconds, SLEEP_MIN_SECONDS, SLEEP_MAX_SECONDS);
+    if (clamped != seconds) {
+        Serial.printf("[sys] Sleep request of %d s out of bounds, clamped\n", seconds);
+    }
+    Serial.printf("[sys] Entering deep sleep for %d seconds...\n", clamped);
+    EPaperDisplay::startTimedDeepSleep(clamped * 1000000ULL);
 }
 
 void initEPaper() {
     Serial.println("[EPD] Creating display...");
     epaper = EPaperFactory::create();
     if (!epaper) {
-        EPaperDisplay::sleepOnError("EPaperFactory::create() returned nullptr — no EPD model defined");
+        EPaperDisplay::sleepOnErrorNoPanel("EPaperFactory::create() returned nullptr — no EPD model defined");
     }
     Serial.println("[EPD] Initializing...");
     epaper->initialize();
     Serial.println("[EPD] Initialized.");
+}
+
+// Draws the built-in error screen unless the panel already shows it, keeping
+// the skip cadence and its bookkeeping in one place. With needsInit the panel
+// is powered up only when the draw actually happens — a skipped redraw leaves
+// it unpowered for the whole cycle — and folded again afterwards; a caller
+// whose panel is already initialized folds it itself.
+void showErrorScreenThrottled(bool needsInit) {
+    uint8_t skips = loadErrorSkips();
+    if (errorRedrawDue(skips)) {
+        if (needsInit) {
+            initEPaper();
+        }
+        epaper->sendErrorScreen();
+        epaper->displayImage();
+        saveErrorSkips(1); // after the refresh: an interrupted draw retries next cycle
+        if (needsInit) {
+            epaper->enterSleep();
+        }
+    } else {
+        Serial.printf("[EPD] Error screen already shown (%u cycles), skipping redraw\n", skips);
+        saveErrorSkips(skips + 1);
+    }
 }
 
 void setup() {
@@ -108,6 +214,21 @@ void setup() {
     //delay(5000); // Wait for serial monitor to connect
 
     Serial.printf("Free heap before new: %d\n", ESP.getFreeHeap());
+
+    // Why this boot happened. A brownout here is the smoking gun for supply
+    // sag, and it is unreadable after the next reset — which is why it also
+    // rides to the server on the image request below.
+    Serial.printf("[sys] WiSP firmware %s\n", WISP_FW_VERSION);
+    Serial.printf("[sys] reset: %s, wakeup: %s\n",
+                  resetReasonName(esp_reset_reason()),
+                  wakeupCauseName(esp_sleep_get_wakeup_cause()));
+
+    // Anything but a deep-sleep wake (battery swap, RST, brownout) cleared the
+    // GPIO holds the skip-redraw branch counts on, and may have left the panel
+    // showing anything at all — forget the error screen and draw this cycle.
+    if (esp_reset_reason() != ESP_RST_DEEPSLEEP && loadErrorSkips() != 0) {
+        saveErrorSkips(0);
+    }
 
     // Check BOOT button early: press and release RST then immediately hold BOOT to enter config mode
     // Must be checked before the serial delay, as the user holds BOOT right after RST release
@@ -161,10 +282,7 @@ void setup() {
 
         wifiManager.shutdownRadio();
 
-        initEPaper();
-        epaper->sendErrorScreen();
-        epaper->displayImage();
-        epaper->enterSleep();
+        showErrorScreenThrottled(true);
 
         deepSleep(FALLBACK_SLEEP_SECONDS);
         return;
@@ -181,14 +299,21 @@ void setup() {
     int sleepSeconds = -1;
 
     if (hasServerURL) {
-        char imageURL[256];
+        char imageURL[512];
         uint8_t macAddr[6];
         WiFi.macAddress(macAddr);
-        snprintf(imageURL, sizeof(imageURL),
-                 "%s/pf/%02x%02x%02x%02x%02x%02x/image/random.bin",
+        int n = snprintf(imageURL, sizeof(imageURL),
+                 "%s/pf/%02x%02x%02x%02x%02x%02x/image/random.bin?rr=%s&wc=%s",
                  serverBaseURL.c_str(),
-                 macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
-        sleepSeconds = fetchImage(imageURL, epaper);
+                 macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5],
+                 resetReasonName(esp_reset_reason()),
+                 wakeupCauseName(esp_sleep_get_wakeup_cause()));
+        if (n < 0 || n >= (int)sizeof(imageURL)) {
+            // A truncated URL would 404 forever with no hint in any log.
+            Serial.println("[http] Server URL too long, refusing to send a truncated request");
+        } else {
+            sleepSeconds = fetchImage(imageURL, epaper);
+        }
     }
 
     // All network work is done — the image bytes are already in the panel's RAM.
@@ -199,6 +324,13 @@ void setup() {
     // NOTE: sleepSeconds == 0 (server returned X-Sleep-Seconds: 0) falls through to error path.
     // If 0-second sleep becomes a valid server response, change this to >= 0.
     if (sleepSeconds > 0) {
+        // Clear the marker before the refresh: displayImage() and enterSleep()
+        // can both die via [[noreturn]] sleepOnError, and a stale marker would
+        // suppress the next error screen. Clearing early fails open — at worst
+        // one redundant error redraw, never a silently missing one.
+        if (loadErrorSkips() != 0) {
+            saveErrorSkips(0); // healthy again; write only on the transition
+        }
         // Display whatever the server sent (normal image or error image) and sleep.
         epaper->displayImage();
         epaper->enterSleep();
@@ -207,11 +339,16 @@ void setup() {
     }
 
     // ここに来ているということはなんか問題があった
+    //
+    // Everything that lands here is transient: the server is down, the network
+    // dropped the request, the response was unusable. Retry on the same
+    // schedule as a failed WiFi connection rather than leaving the frame dark
+    // for a day — a server restart should not cost a day of pictures.
     Serial.println("[fallback] Default error page");
-    epaper->sendErrorScreen();
-    epaper->displayImage();
+    showErrorScreenThrottled(false);
+    // The panel was powered for the fetch attempt — fold it regardless.
     epaper->enterSleep();
-    deepSleep(86400);
+    deepSleep(FALLBACK_SLEEP_SECONDS);
 }
 
 void loop() {

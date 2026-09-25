@@ -29,6 +29,12 @@ public:
     void displayImage() override;
     void enterSleep() override;
 
+protected:
+    // A hung refresh can leave the controller ignoring commands, deep sleep
+    // included; a hardware reset first makes the power-down deterministic.
+    // RAM contents do not matter here — the MCU deep-sleeps right after.
+    void failsafePanelOff() override;
+
 private:
     void moduleInit();
     void moduleExit();

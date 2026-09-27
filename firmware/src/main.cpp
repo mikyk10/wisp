@@ -232,9 +232,9 @@ void setup() {
 
     // Check BOOT button early: press and release RST then immediately hold BOOT to enter config mode
     // Must be checked before the serial delay, as the user holds BOOT right after RST release
-    pinMode(BOOT_PIN, INPUT_PULLUP);
+    pinMode(WISP_BOOT_PIN, INPUT_PULLUP);
     delay(500); // Let pin settle
-    if (digitalRead(BOOT_PIN) == LOW) {
+    if (digitalRead(WISP_BOOT_PIN) == LOW) {
         Serial.println("[sys] BOOT held, entering config mode");
 
         initEPaper();

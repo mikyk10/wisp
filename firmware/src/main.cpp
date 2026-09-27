@@ -171,6 +171,15 @@ void deepSleep(int seconds) {
         Serial.printf("[sys] Sleep request of %d s out of bounds, clamped\n", seconds);
     }
     Serial.printf("[sys] Entering deep sleep for %d seconds...\n", clamped);
+#ifdef WISP_NO_SLEEP
+    // Debug builds stay awake so the USB serial port stays up for logs and
+    // flashing; send 'r' over serial to run another cycle.
+    Serial.println("[sys] WISP_NO_SLEEP: staying awake, send 'r' to restart");
+    while (true) {
+        if (Serial.available() && Serial.read() == 'r') ESP.restart();
+        delay(50);
+    }
+#endif
     EPaperDisplay::startTimedDeepSleep(clamped * 1000000ULL);
 }
 

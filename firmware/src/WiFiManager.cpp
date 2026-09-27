@@ -29,6 +29,19 @@ bool WiFiManager::connectToWiFi(const char *ssid, const char *password, int time
 {
     String hostname = generateHostname();
 
+    // Log every STA disconnect with its reason code: a failed attempt otherwise
+    // shows only as dots, with nothing to tell a rejected handshake from an
+    // AP that never answered.
+    static bool eventsHooked = false;
+    if (!eventsHooked)
+    {
+        eventsHooked = true;
+        WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+            Serial.printf("\n[WiFi] STA disconnected, reason %u\n",
+                          info.wifi_sta_disconnected.reason);
+        }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    }
+
     // Retry across a few attempts: a single WiFi.begin() right after deep-sleep wake
     // often fails to associate, but a disconnect + retry usually succeeds.
     const int maxAttempts = 3;

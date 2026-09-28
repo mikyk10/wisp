@@ -271,20 +271,30 @@ void setup() {
         return;
     }
 
+    // A frame with no server URL has nothing to fetch, so it is treated exactly
+    // like one that cannot reach the network: checked before the radio comes up,
+    // and failed down the same path instead of associating only to give up.
+    String serverBaseURL;
+    bool hasServerURL = wifiManager.loadServerURL(serverBaseURL);
+    if (!hasServerURL) {
+        Serial.println("[WiFi] No server URL saved, treating as a connection failure");
+    }
+
     // Credentials exist: try to connect, using a cached channel/BSSID hint to skip
     // the scan on the first attempt (with full-scan fallback inside connectToWiFi).
     int32_t hintChannel = 0;
     uint8_t hintBssid[6];
     bool hasHint = wifiManager.loadConnHint(hintChannel, hintBssid);
 
-    if (!wifiManager.connectToWiFi(ssid.c_str(), password.c_str(), 15000,
+    if (!hasServerURL ||
+        !wifiManager.connectToWiFi(ssid.c_str(), password.c_str(), 15000,
                                    hasHint ? hintChannel : 0,
                                    hasHint ? hintBssid : nullptr)) {
-        // connectToWiFi already exhausted its in-call retries. Credentials are present,
-        // so this is a transient/environmental failure (AP busy, weak signal, server
-        // down), not a misconfiguration — show the error screen and go back to a normal
-        // sleep. The next wake retries from scratch. We do NOT drop into SoftAP forever
-        // (which would need a manual reset to escape); to reconfigure WiFi, hold BOOT at
+        // Either there is no server URL, or connectToWiFi already exhausted its in-call
+        // retries — usually a transient/environmental failure (AP busy, weak signal).
+        // Both get the error screen and a normal fallback sleep; the next wake retries
+        // from scratch. We do NOT drop into SoftAP forever (which would need a manual
+        // reset to escape); to reconfigure WiFi or the server URL, hold BOOT at
         // power-on to enter setup mode.
         Serial.printf("[WiFi] Connection failed, showing error and sleeping %ds...\n",
                       FALLBACK_SLEEP_SECONDS);
@@ -302,27 +312,22 @@ void setup() {
 
     initEPaper();
 
-    String serverBaseURL;
-    bool hasServerURL = wifiManager.loadServerURL(serverBaseURL);
-
     int sleepSeconds = -1;
 
-    if (hasServerURL) {
-        char imageURL[512];
-        uint8_t macAddr[6];
-        WiFi.macAddress(macAddr);
-        int n = snprintf(imageURL, sizeof(imageURL),
-                 "%s/pf/%02x%02x%02x%02x%02x%02x/image/random.bin?rr=%s&wc=%s",
-                 serverBaseURL.c_str(),
-                 macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5],
-                 resetReasonName(esp_reset_reason()),
-                 wakeupCauseName(esp_sleep_get_wakeup_cause()));
-        if (n < 0 || n >= (int)sizeof(imageURL)) {
-            // A truncated URL would 404 forever with no hint in any log.
-            Serial.println("[http] Server URL too long, refusing to send a truncated request");
-        } else {
-            sleepSeconds = fetchImage(imageURL, epaper);
-        }
+    char imageURL[512];
+    uint8_t macAddr[6];
+    WiFi.macAddress(macAddr);
+    int n = snprintf(imageURL, sizeof(imageURL),
+             "%s/pf/%02x%02x%02x%02x%02x%02x/image/random.bin?rr=%s&wc=%s",
+             serverBaseURL.c_str(),
+             macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5],
+             resetReasonName(esp_reset_reason()),
+             wakeupCauseName(esp_sleep_get_wakeup_cause()));
+    if (n < 0 || n >= (int)sizeof(imageURL)) {
+        // A truncated URL would 404 forever with no hint in any log.
+        Serial.println("[http] Server URL too long, refusing to send a truncated request");
+    } else {
+        sleepSeconds = fetchImage(imageURL, epaper);
     }
 
     // All network work is done — the image bytes are already in the panel's RAM.
